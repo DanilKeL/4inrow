@@ -1,0 +1,63 @@
+{
+  "spacing": 1.09,
+  "seats": 25,
+  "topHeight": 0.162,
+  "seatFloor": 0.104,
+  "objects": [
+    {
+      "name": "01 - Single porcelain shell",
+      "vertices": 11812,
+      "faces": 10174,
+      "nonManifoldEdges": 0
+    },
+    {
+      "name": "02 - Graphite floating plinth",
+      "vertices": 408,
+      "faces": 342,
+      "nonManifoldEdges": 0
+    },
+    {
+      "name": "03 - Recessed champagne seam",
+      "vertices": 272,
+      "faces": 206,
+      "nonManifoldEdges": 0
+    },
+    {
+      "name": "04 - Champagne seat rims",
+      "vertices": 12800,
+      "faces": 12800,
+      "nonManifoldEdges": 0
+    },
+    {
+      "name": "05 - Cobalt orientation inlay",
+      "vertices": 136,
+      "faces": 70,
+      "nonManifoldEdges": 0
+    },
+    {
+      "name": "06 - Non-slip foot",
+      "vertices": 204,
+      "faces": 138,
+      "nonManifoldEdges": 0
+    },
+    {
+      "name": "06 - Non-slip foot.001",
+      "vertices": 204,
+      "faces": 138,
+      "nonManifoldEdges": 0
+    },
+    {
+      "name": "06 - Non-slip foot.002",
+      "vertices": 204,
+      "faces": 138,
+      "nonManifoldEdges": 0
+    },
+    {
+      "name": "06 - Non-slip foot.003",
+      "vertices": 204,
+      "faces": 138,
+      "nonManifoldEdges": 0
+    }
+  ],
+  "glbBytes": 1047928
+}

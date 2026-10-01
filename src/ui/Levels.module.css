@@ -1,0 +1,127 @@
+.levels {
+  display: grid;
+  gap: 14px;
+}
+.intro {
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.5;
+  margin: 0;
+}
+.chapter {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+}
+.chapter > span {
+  font-size: 11px;
+  color: var(--muted);
+  white-space: nowrap;
+}
+.grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+}
+.grid button {
+  display: grid;
+  text-align: left;
+  gap: 10px;
+  padding: 14px;
+  min-width: 0;
+  border: 1px solid #dcded6;
+  border-radius: 12px;
+  background: #f4f5ef;
+  color: var(--text);
+}
+.grid button:hover {
+  border-color: var(--accent);
+  background: #eef1fc;
+}
+.grid button.completed {
+  border-color: #b8c7ed;
+  background: #edf1fb;
+}
+.number {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 25px;
+  font-weight: 650;
+  font-variant-numeric: tabular-nums;
+}
+.number svg {
+  color: var(--accent);
+}
+.grid small {
+  font-size: 11px;
+  color: var(--muted);
+}
+.pages {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 20px;
+  font-size: 12px;
+}
+.pages button {
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 36px;
+  border: 1px solid #dcded6;
+  border-radius: 8px;
+  background: transparent;
+}
+.pages button:disabled {
+  opacity: 0.3;
+}
+.note {
+  text-align: center;
+  color: var(--muted);
+  font-size: 11px;
+}
+@media (max-width: 650px) {
+  .levels {
+    gap: 10px;
+  }
+  .grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 6px;
+  }
+  .grid button {
+    padding: 8px 12px;
+    gap: 3px;
+  }
+  .number {
+    font-size: 21px;
+  }
+  .intro {
+    font-size: 12px;
+  }
+}
+@media (orientation: landscape) and (max-height: 500px) {
+  .levels {
+    gap: 6px;
+  }
+  .grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 6px;
+  }
+  .grid button {
+    padding: 6px 10px;
+    gap: 2px;
+  }
+  .number {
+    font-size: 19px;
+  }
+  .intro,
+  .note {
+    display: none;
+  }
+  .pages button {
+    height: 30px;
+  }
+}

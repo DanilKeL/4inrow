@@ -1,0 +1,253 @@
+.backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 16;
+  display: grid;
+  place-items: center;
+  padding: max(18px, env(safe-area-inset-top)) 18px max(18px, env(safe-area-inset-bottom));
+  background: rgb(31 35 32 / 58%);
+  backdrop-filter: blur(12px) saturate(0.8);
+}
+.panel {
+  position: relative;
+  width: min(440px, 100%);
+  max-height: 100%;
+  overflow: auto;
+  padding: 32px;
+  color: #252824;
+  text-align: center;
+  background: #fafaf7;
+  border: 1px solid #d9ddd4;
+  border-radius: 18px;
+  outline: none;
+}
+.panel::before {
+  content: '';
+  position: absolute;
+  inset: 0 0 auto;
+  height: 4px;
+  background: #2955e7;
+}
+.lost::before {
+  background: #9e4c43;
+}
+.draw::before {
+  background: #737b71;
+}
+.eyebrow {
+  color: #777e74;
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+}
+.resultMark {
+  width: 58px;
+  height: 58px;
+  display: grid;
+  place-items: center;
+  margin: 18px auto 12px;
+  color: #fff;
+  background: #2955e7;
+  border-radius: 50%;
+}
+.lost .resultMark {
+  background: #474d48;
+}
+.draw .resultMark {
+  background: #6d756b;
+}
+.panel h2 {
+  font-size: 32px;
+  line-height: 1.1;
+  letter-spacing: -1px;
+}
+.resultText {
+  margin-top: 7px;
+  color: #61685f;
+  font-size: 13px;
+}
+.endReason {
+  margin-top: 7px;
+  color: #878e84;
+  font-size: 11px;
+}
+.ratingCard {
+  display: grid;
+  justify-items: center;
+  margin: 24px 0 20px;
+  padding: 18px;
+  background: #f0f1ec;
+  border: 1px solid #e0e3db;
+  border-radius: 12px;
+}
+.ratingCard > span {
+  color: #777e74;
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+.ratingCard > strong {
+  margin: 4px 0;
+  font-size: 40px;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -1.5px;
+}
+.positive {
+  color: #236d43;
+}
+.negative {
+  color: #a0443b;
+}
+.ratingCard > div {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  color: #838a80;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+.ratingCard i {
+  color: #a6aca2;
+  font-style: normal;
+}
+.ratingCard b {
+  color: #252824;
+  font-size: 15px;
+}
+.actions {
+  display: grid;
+  gap: 8px;
+}
+.actions button {
+  min-height: 46px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 9px;
+  padding: 11px 16px;
+  border-radius: 9px;
+  font-size: 12px;
+  font-weight: 750;
+}
+.rematch {
+  color: #fff;
+  background: #2955e7;
+  border: 1px solid #2955e7;
+}
+.rematch:disabled {
+  opacity: 1;
+  color: #5e655c;
+  background: #e4e6df;
+  border-color: #d8dbd2;
+}
+.actions small {
+  margin: -2px 0 5px;
+  color: #8a9087;
+  font-size: 9px;
+}
+.secondary {
+  color: #343a34;
+  background: #f5f6f1;
+  border: 1px solid #d9ddd3;
+}
+.menu {
+  min-height: 38px !important;
+  color: #717870;
+  background: transparent;
+  border: 0;
+}
+.particles {
+  position: absolute;
+  left: 50%;
+  top: 84px;
+  pointer-events: none;
+}
+.particles span {
+  --angle: calc(var(--particle-index) * 30deg);
+  position: absolute;
+  width: 5px;
+  height: 5px;
+  background: #2955e7;
+  border-radius: 50%;
+  animation: particle 900ms cubic-bezier(0.2, 0.75, 0.3, 1) both;
+  animation-delay: calc(var(--particle-index) * 22ms);
+}
+.particles span:nth-child(3n) {
+  background: #d2a843;
+}
+.particles span:nth-child(2n) {
+  width: 4px;
+  height: 8px;
+  border-radius: 2px;
+}
+@keyframes particle {
+  from {
+    opacity: 1;
+    transform: rotate(var(--angle)) translateY(0) rotate(calc(var(--angle) * -1));
+  }
+  to {
+    opacity: 0;
+    transform: rotate(var(--angle)) translateY(-82px) rotate(calc(var(--angle) * -1 + 150deg));
+  }
+}
+@media (max-width: 520px) {
+  .backdrop {
+    padding-inline: 12px;
+  }
+  .panel {
+    padding: 25px 18px 18px;
+    border-radius: 15px;
+  }
+  .resultMark {
+    width: 50px;
+    height: 50px;
+    margin-top: 13px;
+  }
+  .panel h2 {
+    font-size: 28px;
+  }
+  .ratingCard {
+    margin: 18px 0 15px;
+    padding: 13px;
+  }
+  .ratingCard > strong {
+    font-size: 34px;
+  }
+  .actions button {
+    min-height: 43px;
+  }
+}
+@media (max-height: 620px) {
+  .panel {
+    padding-block: 20px 14px;
+  }
+  .resultMark {
+    width: 44px;
+    height: 44px;
+    margin: 9px auto 7px;
+  }
+  .panel h2 {
+    font-size: 25px;
+  }
+  .ratingCard {
+    margin: 12px 0 10px;
+    padding: 10px;
+  }
+  .ratingCard > strong {
+    font-size: 31px;
+  }
+  .actions {
+    gap: 5px;
+  }
+  .actions button {
+    min-height: 38px;
+    padding-block: 8px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .particles {
+    display: none;
+  }
+}

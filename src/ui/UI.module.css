@@ -1,0 +1,2395 @@
+.app {
+  max-width: 1680px;
+  margin: 0 auto;
+  padding: var(--safe-area-inset-top, env(safe-area-inset-top, 0px)) 64px
+    var(--safe-area-inset-bottom, env(safe-area-inset-bottom, 0px));
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+}
+.header {
+  height: 104px;
+  display: flex;
+  align-items: center;
+  border-bottom: 1px solid var(--line);
+  gap: 40px;
+  flex-shrink: 0;
+}
+.brand {
+  font-size: 33px;
+  font-weight: 800;
+  letter-spacing: -2px;
+  background: none;
+  border: 0;
+  padding: 0;
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+.brand sup {
+  color: var(--accent);
+  font-size: 16px;
+  align-self: flex-start;
+  line-height: 28px;
+  letter-spacing: 0;
+}
+.headerActions {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.accountButton {
+  border: 0;
+  background: transparent;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 190px;
+  padding: 9px;
+  border-radius: 8px;
+  font-size: 11px;
+  font-weight: 700;
+}
+.accountButton span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.accountButton:hover {
+  background: #e8e9e2;
+}
+.helpButton {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px;
+  border: 0;
+  background: none;
+  font-size: 12px;
+  font-weight: 600;
+}
+.iconButton {
+  border: 0;
+  background: transparent;
+  display: grid;
+  place-items: center;
+  min-width: 44px;
+  height: 44px;
+  border-radius: 50%;
+}
+.iconButton:hover,
+.helpButton:hover {
+  background: #e8e9e2;
+}
+.divider {
+  height: 20px;
+  width: 1px;
+  background: var(--line);
+  margin: 0 10px;
+}
+.main {
+  display: grid;
+  grid-template-columns: 40% 60%;
+  min-height: 620px;
+  flex: 1;
+  align-items: stretch;
+}
+.hero {
+  padding: 77px 0 55px;
+  z-index: 1;
+}
+.hero h1 {
+  font-size: clamp(38px, 3.65vw, 60px);
+  font-weight: 650;
+  line-height: 1.12;
+  letter-spacing: -2.5px;
+}
+.hero h1 em {
+  font-style: normal;
+  color: var(--accent);
+}
+.primary {
+  border: 1px solid var(--accent);
+  background: var(--accent);
+  color: #fff;
+  min-height: 52px;
+  padding: 14px 21px;
+  font-weight: 650;
+  font-size: 13px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  border-radius: 8px;
+  width: 100%;
+}
+.primary:hover {
+  background: #1945d5;
+  box-shadow: 0 5px 15px #2955e724;
+}
+.playButton {
+  width: 245px;
+  justify-content: space-between;
+  font-size: 15px;
+  min-height: 58px;
+  margin-top: 31px;
+  box-shadow: 0 6px 15px #2955e721;
+}
+.quickModes {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+  margin-top: 16px;
+}
+.quickModes button {
+  display: flex;
+  gap: 7px;
+  align-items: center;
+  background: none;
+  border: 0;
+  padding: 8px 0;
+  font-size: 11px;
+  font-weight: 600;
+  color: #60665d;
+}
+.quickModes button:hover {
+  color: var(--accent);
+}
+.quickModes > span {
+  width: 1px;
+  height: 12px;
+  background: #d2d5cc;
+}
+.boardArea {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.boardTop {
+  height: 82px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 12px 0 30px;
+  z-index: 2;
+}
+.dimension {
+  border: 1px solid #d6d9ce;
+  color: #777d6e;
+  padding: 7px 10px;
+  border-radius: 4px;
+  font-size: 10px;
+  letter-spacing: 1px;
+}
+.canvasWrap {
+  position: relative;
+  flex: 1;
+  min-height: 450px;
+  margin: -20px -35px 0 -25px;
+}
+.canvasWrap,
+.canvasWrap * {
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+}
+.canvasWrap > div {
+  position: absolute;
+  inset: 0;
+  height: 100%;
+  min-height: 0;
+}
+.boardBottom {
+  min-height: 64px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 15px;
+  padding: 0 6px 0 30px;
+  z-index: 3;
+}
+.boardTools {
+  display: flex;
+  gap: 3px;
+  align-items: center;
+}
+.toolButton {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-width: 44px;
+  min-height: 44px;
+  padding: 8px 10px;
+  border: 1px solid transparent;
+  background: transparent;
+  border-radius: 7px;
+  font-size: 10px;
+  color: #68705f;
+}
+.toolButton:hover {
+  background: #e5e8dd;
+}
+.toolActive {
+  background: #e2e8fb !important;
+  color: var(--accent);
+  border-color: #ced8f9;
+}
+.loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  color: var(--muted);
+  font-size: 12px;
+  height: 100%;
+}
+.loadingRing {
+  width: 30px;
+  height: 30px;
+  border: 2px solid #d8ddce;
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+.backdrop {
+  position: fixed;
+  inset: 0;
+  background: #323a334d;
+  backdrop-filter: blur(9px);
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+}
+.dialog {
+  width: 480px;
+  max-width: 100%;
+  max-height: calc(100dvh - 48px);
+  overflow: auto;
+  background: #fafbf7;
+  border: 1px solid #ffffff80;
+  box-shadow: 0 30px 100px #16231126;
+  padding: 30px;
+  border-radius: 18px;
+}
+.wide {
+  width: 800px;
+}
+.dialogHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+  margin: -5px -9px 10px 0;
+}
+.dialogHeader h2 {
+  font-size: 23px;
+  letter-spacing: -0.8px;
+  font-weight: 650;
+}
+.muted {
+  font-size: 12px;
+  line-height: 1.9;
+  color: #7a8073;
+}
+.modeChoices {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  margin: 26px 0;
+}
+.threeModes {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+.threeModes > button {
+  padding-left: 8px;
+  padding-right: 8px;
+}
+.onlineSetup {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.onlineSetup > label {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  font-size: 12px;
+}
+.onlineSetup input {
+  width: 100%;
+  padding: 13px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: white;
+  font-size: 23px;
+  letter-spacing: 7px;
+  text-transform: uppercase;
+}
+.onlineError {
+  font-size: 12px;
+  color: #a23c32;
+  line-height: 1.7;
+}
+.quickMatch {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+  text-align: center;
+  padding: 12px 0 2px;
+}
+.quickMatch > svg {
+  color: var(--accent);
+}
+.quickMatch strong {
+  font-size: 17px;
+}
+.quickMatch .primary,
+.quickMatch .secondary {
+  width: 100%;
+  justify-content: center;
+}
+.onlineBanner {
+  margin: 18px 10px 0 20px;
+  border: 1px solid #cbd6f5;
+  background: #f6f8ff;
+  border-radius: 12px;
+  padding: 9px 15px;
+  z-index: 4;
+  flex-shrink: 0;
+}
+.lobbyHeading {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.lobbyHeading > span {
+  font-size: 9px;
+  letter-spacing: 1px;
+  color: #6c7695;
+}
+.lobbyHeading > strong {
+  font-size: 22px;
+  letter-spacing: 4px;
+  color: var(--accent);
+  user-select: all;
+}
+.lobbyHeading > button:last-child {
+  margin-left: auto;
+}
+.onlineBanner p,
+.onlineBanner small {
+  font-size: 11px;
+  line-height: 1.6;
+  color: #67738e;
+}
+.onlineBanner p[role='alert'] {
+  color: #a23c32;
+}
+.modeChoices > button {
+  border: 1px solid #dce0d4;
+  background: #f4f5ef;
+  border-radius: 10px;
+  padding: 20px 13px;
+  display: flex;
+  align-items: center;
+  flex-direction: column;
+  gap: 8px;
+  min-height: 126px;
+}
+.modeChoices strong {
+  font-size: 14px;
+  font-weight: 650;
+}
+.modeChoices small {
+  font-size: 10px;
+  color: var(--muted);
+}
+.selected {
+  background: #e8edfe !important;
+  border-color: #9fb2f4 !important;
+  color: var(--accent) !important;
+}
+.nameFields {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 23px;
+}
+.nameFields p {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-size: 12px;
+  color: #757c6c;
+}
+.nameFields strong {
+  color: var(--text);
+}
+.accountPanel {
+  display: grid;
+  gap: 14px;
+}
+.accountPanel form {
+  display: grid;
+  gap: 12px;
+}
+.accountPanel label {
+  display: grid;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 650;
+}
+.accountPanel input {
+  width: 100%;
+  border: 1px solid #dce0d4;
+  background: white;
+  border-radius: 7px;
+  padding: 12px;
+  font-size: 16px;
+}
+.inputHint {
+  color: #7b8275;
+  font-size: 10px;
+  font-weight: 500;
+  line-height: 1.4;
+}
+.accountNotice {
+  margin: 0;
+  border: 1px solid #c8ddc3;
+  background: #f1f8ef;
+  color: #315c2c;
+  border-radius: 7px;
+  padding: 10px 12px;
+  font-size: 12px;
+  line-height: 1.45;
+}
+.textButton {
+  border: 0;
+  background: transparent;
+  color: var(--accent);
+  padding: 4px;
+  text-decoration: underline;
+}
+.accountTabs {
+  display: flex;
+  gap: 8px;
+}
+.accountTabs button {
+  flex: 1;
+  border: 1px solid #dce0d4;
+  background: white;
+  border-radius: 7px;
+  padding: 10px;
+}
+.accountTabs button.selected {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+.nameFields label {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  flex: 1;
+  min-width: 0;
+  font-size: 10px;
+  font-weight: 600;
+  color: #757c6c;
+}
+.nameFields input {
+  border: 1px solid #dce0d4;
+  background: white;
+  padding: 12px;
+  border-radius: 7px;
+  font-size: 12px;
+  color: var(--text);
+  width: 100%;
+}
+.difficulty {
+  border: 0;
+  padding: 0;
+  display: flex;
+  gap: 7px;
+  margin: 0 0 24px;
+}
+.difficulty legend {
+  font-size: 11px;
+  padding: 0;
+  margin-bottom: 10px;
+  color: #757c6c;
+}
+.difficulty button {
+  flex: 1;
+  padding: 12px 5px;
+  background: transparent;
+  border: 1px solid #dce0d4;
+  border-radius: 6px;
+  font-size: 12px;
+}
+.settingsList {
+  margin-top: 15px;
+}
+.setting {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+  padding: 18px 0;
+  border-bottom: 1px solid var(--line);
+}
+.setting:last-child {
+  border: 0;
+}
+.setting > svg {
+  color: #6d765f;
+}
+.setting > span {
+  flex: 1;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.setting strong {
+  font-size: 12px;
+  font-weight: 650;
+  display: block;
+}
+.setting small {
+  display: block;
+  font-size: 10px;
+  color: #8b9183;
+  margin-top: 4px;
+}
+.setting input[type='checkbox'] {
+  appearance: none;
+  width: 40px;
+  height: 24px;
+  border-radius: 20px;
+  background: #d9ddcf;
+  position: relative;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: background 0.2s;
+}
+.setting input[type='checkbox']:before {
+  content: '';
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  background: #fff;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  box-shadow: 0 1px 3px #0002;
+  transition: transform 0.2s;
+}
+.setting input[type='checkbox']:checked {
+  background: var(--accent);
+}
+.setting input[type='checkbox']:checked:before {
+  transform: translateX(16px);
+}
+.secondary {
+  min-height: 48px;
+  padding: 12px 16px;
+  border: 1px solid #dce0d4;
+  background: #f5f6ef;
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  width: 100%;
+  margin-top: 10px;
+}
+.secondary:hover {
+  background: #ebeee2;
+}
+.textButton {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  background: none;
+  border: 0;
+  min-height: 44px;
+  font-size: 11px;
+  color: #737d66;
+  margin-top: 7px;
+}
+.textButton:hover {
+  color: var(--accent);
+}
+.dialogActions {
+  margin-top: 25px;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+.playMain {
+  grid-template-columns: 280px 1fr;
+  gap: 35px;
+  min-height: 650px;
+}
+.gamePanel {
+  padding: 55px 0 30px;
+}
+.panelEyebrow {
+  font-size: 9px;
+  color: #8c947e;
+  letter-spacing: 1.8px;
+  margin-bottom: 22px;
+  font-weight: 700;
+}
+.gamePanel h2 {
+  font-size: 33px;
+  line-height: 1.22;
+  letter-spacing: -1.4px;
+  font-weight: 600;
+  margin-bottom: 14px;
+  overflow-wrap: anywhere;
+}
+.gamePanel > .muted {
+  max-width: 250px;
+}
+.players {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 32px;
+}
+.player {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 13px 12px;
+  border: 1px solid #e1e4d9;
+  background: #eeefe8;
+  border-radius: 10px;
+  min-height: 72px;
+}
+.activePlayer {
+  border-color: #c4d1fd;
+  background: #f8f9fd;
+  box-shadow: 0 0 0 3px #2955e707;
+}
+.token {
+  width: 34px;
+  height: 34px;
+  background: #30373b;
+  border: 3px solid #475054;
+  box-shadow: 0 3px 3px #0002;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 9px;
+  color: #aeb5b3;
+  flex-shrink: 0;
+}
+.ivory {
+  background: #efe9da;
+  border-color: #fffcf5;
+  color: #9a9384;
+  font-size: 18px;
+}
+.player > span:nth-child(2) {
+  flex: 1;
+  min-width: 0;
+}
+.player strong {
+  display: block;
+  font-size: 12px;
+  font-weight: 650;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.player small {
+  font-size: 9px;
+  color: #8b9381;
+  display: block;
+  margin-top: 4px;
+}
+.activeDot {
+  height: 6px;
+  width: 6px;
+  border-radius: 50%;
+  background: var(--accent);
+  margin: 0 4px;
+}
+.stats {
+  display: flex;
+  gap: 40px;
+  border-bottom: 1px solid var(--line);
+  padding: 25px 0 23px;
+  margin-bottom: 22px;
+}
+.stats small {
+  display: block;
+  font-size: 8px;
+  color: #929a85;
+  letter-spacing: 1px;
+  margin-bottom: 5px;
+}
+.stats strong {
+  font-size: 21px;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+}
+.stats strong > span {
+  font-size: 11px;
+  color: #8c957e;
+}
+.turnPill {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 12px;
+  background: #fafbf6;
+  box-shadow: 0 3px 12px #323e2810;
+  border: 1px solid #e6e9de;
+  padding: 12px 17px;
+  border-radius: 30px;
+  font-weight: 600;
+}
+.turnLabel {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.turnTimer {
+  display: inline-flex;
+  align-items: baseline;
+  justify-content: flex-end;
+  gap: 3px;
+  min-width: 49px;
+  margin-left: 2px;
+  padding-left: 12px;
+  border-left: 1px solid #dfe3d7;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+.turnTimer strong {
+  min-width: 20px;
+  text-align: right;
+  font-size: 13px;
+  font-weight: 700;
+}
+.turnTimer small {
+  color: #858d7b;
+  font-size: 9px;
+  font-weight: 600;
+  text-transform: uppercase;
+}
+.turnToken {
+  width: 13px;
+  height: 13px;
+  border-radius: 50%;
+  background: #30383a;
+  border: 2px solid #5e6868;
+}
+.lightTurn {
+  background: #f3ecdd;
+  border-color: #c8bea8;
+}
+.playMain .boardTop {
+  padding-left: 20px;
+}
+.playMain .canvasWrap {
+  margin-left: -30px;
+  min-height: 440px;
+}
+.playMain .boardBottom {
+  padding-left: 20px;
+}
+.viewControl {
+  position: relative;
+}
+.viewPopover {
+  position: absolute;
+  bottom: 54px;
+  right: 0;
+  padding: 20px;
+  background: #fcfdf9;
+  box-shadow: 0 8px 45px #273c2522;
+  border: 1px solid #e2e7d8;
+  border-radius: 12px;
+  width: 260px;
+}
+.viewPopover > strong {
+  font-size: 11px;
+  display: block;
+  margin-bottom: 10px;
+}
+.viewHeading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin: -10px -10px 8px 0;
+  font-size: 11px;
+}
+.dialog:focus {
+  outline: none;
+}
+.volumeSlider {
+  display: block;
+  width: 100%;
+  height: 30px;
+  margin: 8px 0 0;
+  accent-color: var(--accent);
+  cursor: pointer;
+  touch-action: pan-y;
+}
+.setting output {
+  float: right;
+  color: var(--accent);
+  font-variant-numeric: tabular-nums;
+}
+.cameraChoices,
+.layerChoices {
+  display: flex;
+  gap: 5px;
+  margin-bottom: 18px;
+}
+.cameraChoices button,
+.layerChoices button {
+  min-height: 44px;
+  flex: 1;
+  border: 1px solid #dfe4d5;
+  border-radius: 5px;
+  background: none;
+  font-size: 10px;
+  padding: 8px 5px;
+}
+.viewPopover > small {
+  font-size: 9px;
+  color: #959d89;
+  line-height: 1.7;
+}
+.trophy {
+  color: var(--accent);
+  margin-bottom: 13px;
+}
+.replayControls {
+  display: flex;
+  gap: 5px;
+}
+.replayControls button {
+  flex: 1;
+  background: #f9faf6;
+  border: 1px solid #dce3d1;
+  display: grid;
+  place-items: center;
+  height: 44px;
+  border-radius: 6px;
+}
+.replayLabel {
+  font-size: 11px;
+  text-align: center;
+  color: #7b886d;
+  margin: 12px;
+}
+.feedback {
+  font-size: 11px;
+  color: #b75c3b;
+  text-align: center;
+  position: absolute;
+  bottom: 75px;
+  left: 0;
+  right: 0;
+  pointer-events: none;
+}
+.mobilePlayers {
+  display: none;
+}
+@media (min-width: 1500px) {
+  .main {
+    min-height: 710px;
+  }
+  .hero {
+    padding-top: 100px;
+  }
+  .canvasWrap {
+    min-height: 510px;
+  }
+}
+@media (max-width: 1200px) {
+  .app {
+    padding-inline: 36px;
+  }
+  .header {
+    gap: 25px;
+    height: 88px;
+  }
+  .hero h1 {
+    font-size: 42px;
+  }
+  .main {
+    min-height: 580px;
+    grid-template-columns: 41% 59%;
+  }
+  .hero {
+    padding-top: 60px;
+  }
+  .canvasWrap {
+    min-height: 400px;
+    margin-right: -20px;
+  }
+  .boardTop {
+    padding-left: 15px;
+  }
+  .boardBottom {
+    padding-left: 5px;
+  }
+  .playMain {
+    grid-template-columns: 245px 1fr;
+    gap: 15px;
+    min-height: 600px;
+  }
+  .gamePanel h2 {
+    font-size: 29px;
+  }
+  .playMain .boardBottom {
+    padding-left: 0;
+  }
+  .toolButton {
+    padding: 8px;
+  }
+  .playMain .canvasWrap {
+    margin-left: -20px;
+  }
+}
+@media (max-width: 900px) {
+  .app {
+    padding-inline: 25px;
+  }
+  .header {
+    height: 80px;
+  }
+  .hero h1 {
+    font-size: 35px;
+    letter-spacing: -1.8px;
+  }
+  .hero {
+    padding-top: 55px;
+  }
+  .primary.playButton {
+    width: 210px;
+  }
+  .canvasWrap {
+    margin-left: -20px;
+    margin-right: -15px;
+  }
+  .boardTop {
+    padding-left: 5px;
+  }
+  .dimension {
+    font-size: 8px;
+  }
+  .boardBottom {
+    flex-wrap: wrap;
+    gap: 0;
+    justify-content: center;
+  }
+  .playMain {
+    grid-template-columns: 210px 1fr;
+  }
+  .playMain .canvasWrap {
+    min-height: 420px;
+  }
+  .gamePanel h2 {
+    font-size: 25px;
+  }
+  .gamePanel .muted {
+    font-size: 10px;
+  }
+  .player {
+    gap: 8px;
+    padding: 10px 8px;
+  }
+  .player strong {
+    font-size: 11px;
+  }
+  .player small {
+    font-size: 8px;
+  }
+  .stats {
+    gap: 25px;
+  }
+  .playMain .boardTop {
+    padding-left: 0;
+  }
+  .turnPill {
+    font-size: 10px;
+    padding: 11px;
+  }
+  .toolButton span {
+    font-size: 9px;
+  }
+}
+@media (max-height: 550px) and (min-width: 651px) {
+  .header {
+    height: 62px;
+  }
+  .playMain {
+    min-height: 400px;
+  }
+  .gamePanel {
+    padding-top: 25px;
+  }
+  .gamePanel h2 {
+    font-size: 22px;
+  }
+  .gamePanel .muted {
+    display: none;
+  }
+  .players {
+    margin-top: 18px;
+  }
+  .stats {
+    padding: 15px 0;
+  }
+  .playMain .canvasWrap {
+    min-height: 280px;
+  }
+  .boardTop {
+    height: 52px;
+  }
+  .playMain .boardBottom {
+    min-height: 50px;
+  }
+}
+/* Phone layouts share a bounded viewport; the board gets the remaining space.
+   Dialogs retain overflow as an accessibility fallback for zoom/keyboards. */
+@media (max-width: 650px), (max-width: 1000px) and (max-height: 550px) and (pointer: coarse) {
+  .app {
+    height: 100dvh;
+    min-height: 0;
+    padding: var(--safe-area-inset-top, env(safe-area-inset-top, 0px))
+      max(12px, var(--safe-area-inset-right, env(safe-area-inset-right, 0px)))
+      var(--safe-area-inset-bottom, env(safe-area-inset-bottom, 0px))
+      max(12px, var(--safe-area-inset-left, env(safe-area-inset-left, 0px)));
+  }
+  .header {
+    height: 52px;
+    gap: 8px;
+  }
+  .brand {
+    font-size: 27px;
+  }
+  .brand sup {
+    font-size: 12px;
+    line-height: 23px;
+  }
+  .headerActions {
+    gap: 0;
+  }
+  .accountButton {
+    max-width: 44px;
+    width: 44px;
+    height: 44px;
+    justify-content: center;
+    flex-shrink: 0;
+  }
+  .accountButton span {
+    display: none;
+  }
+  .helpButton span {
+    display: none;
+  }
+  .divider {
+    margin: 0 2px;
+  }
+  .helpButton {
+    padding: 10px;
+  }
+  .iconButton {
+    min-width: 40px;
+    width: 40px;
+    height: 44px;
+    flex-shrink: 0;
+  }
+  .main,
+  .playMain {
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    min-width: 0;
+    gap: 0;
+  }
+  .hero {
+    padding: clamp(8px, 2dvh, 18px) 0 0;
+    flex-shrink: 0;
+  }
+  .hero h1 {
+    font-size: clamp(27px, 4.4dvh, 38px);
+    line-height: 1.08;
+    letter-spacing: -1.3px;
+  }
+  .hero h1 > br:first-child {
+    display: none;
+  }
+  .playButton.primary {
+    margin-top: 12px;
+    min-height: 44px;
+    padding: 10px 15px;
+    width: 100%;
+    font-size: 14px;
+  }
+  .quickModes {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 4px;
+    margin-top: 4px;
+  }
+  .quickModes > span {
+    display: none;
+  }
+  .quickModes button {
+    justify-content: center;
+    gap: 5px;
+    min-width: 0;
+    min-height: 34px;
+    font-size: 11px;
+    padding: 4px 0;
+    white-space: nowrap;
+  }
+  .boardArea,
+  .playMain .boardArea {
+    min-height: 0;
+    flex: 1 1 0;
+  }
+  .boardTop,
+  .playMain .boardTop {
+    height: 48px;
+    flex-shrink: 0;
+    padding: 0;
+  }
+  .menuMain .boardTop {
+    height: 30px;
+  }
+  .dimension {
+    font-size: 9px;
+    padding: 4px 7px;
+  }
+  .canvasWrap,
+  .playMain .canvasWrap {
+    flex: 1 1 0;
+    min-height: 0;
+    height: auto;
+    margin: 0;
+  }
+  .turnPill {
+    min-width: 0;
+    max-width: calc(100% - 44px);
+    font-size: 11px;
+    padding: 9px 11px;
+    white-space: normal;
+    overflow-wrap: anywhere;
+    line-height: 1.3;
+  }
+  .turnTimer {
+    min-width: 43px;
+    padding-left: 8px;
+  }
+  .turnTimer strong {
+    font-size: 11px;
+  }
+  .turnToken {
+    flex-shrink: 0;
+  }
+  .boardBottom,
+  .playMain .boardBottom {
+    min-height: 44px;
+    flex-shrink: 0;
+    padding: 0;
+    gap: 0;
+    flex-direction: column;
+  }
+  .menuMain .boardBottom {
+    flex-direction: row;
+  }
+  .menuMain .boardTools {
+    width: 100%;
+    justify-content: center;
+  }
+  .boardTools,
+  .playMain .boardTools {
+    width: 100%;
+    justify-content: space-between;
+    gap: 0;
+  }
+  .toolButton,
+  .playMain .toolButton {
+    min-height: 44px;
+    padding: 8px;
+    gap: 5px;
+    font-size: 11px;
+  }
+  .playMain .toolButton span {
+    font-size: 11px;
+  }
+  .mobilePlayers {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    padding: 5px 0;
+    min-height: 30px;
+    flex-shrink: 0;
+    border-bottom: 1px solid var(--line);
+    font-size: 10px;
+  }
+  .mobilePlayers > span {
+    flex: 1;
+    min-width: 0;
+    max-width: 38%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .mobilePlayers > span:last-child {
+    text-align: right;
+  }
+  .mobilePlayers > strong {
+    flex-shrink: 0;
+    font-size: 10px;
+    font-weight: 500;
+  }
+  .onlineBanner {
+    margin: 5px 0 0;
+    padding: 2px 8px 5px;
+  }
+  .lobbyHeading {
+    gap: 5px;
+  }
+  .lobbyHeading > svg {
+    flex-shrink: 0;
+  }
+  .lobbyHeading > span {
+    font-size: 8px;
+  }
+  .lobbyHeading > strong {
+    font-size: 20px;
+    letter-spacing: 2px;
+    white-space: nowrap;
+  }
+  .onlineBanner p,
+  .onlineBanner small {
+    overflow-wrap: anywhere;
+    font-size: 10px;
+    line-height: 1.3;
+  }
+  .viewPopover {
+    position: fixed;
+    bottom: calc(48px + var(--safe-area-inset-bottom, env(safe-area-inset-bottom, 0px)));
+    right: max(12px, env(safe-area-inset-right, 0px));
+    width: min(290px, calc(100vw - 24px));
+    padding: 12px;
+    z-index: 10;
+  }
+  .viewPopover .cameraChoices,
+  .viewPopover .layerChoices {
+    margin-bottom: 8px;
+  }
+  .viewPopover button {
+    min-height: 40px;
+  }
+  .feedback {
+    bottom: 80px;
+    left: 0;
+    right: 0;
+    max-width: 100%;
+    padding: 8px;
+    overflow-wrap: anywhere;
+  }
+  .playMain .gamePanel {
+    display: none;
+  }
+  .playMain:has(.trophy) .gamePanel,
+  .playMain:has(.replayControls) .gamePanel {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    gap: 4px 8px;
+    order: 2;
+    flex-shrink: 0;
+    padding: 6px 0;
+    border-top: 1px solid var(--line);
+  }
+  .playMain:has(.trophy) .boardArea,
+  .playMain:has(.replayControls) .boardArea {
+    flex: 1 1 0;
+    min-height: 0;
+    height: auto;
+  }
+  .playMain .gamePanel .panelEyebrow,
+  .playMain .gamePanel .players,
+  .playMain .gamePanel .stats,
+  .playMain .gamePanel .muted,
+  .playMain .gamePanel .trophy {
+    display: none;
+  }
+  .playMain:has(.trophy) .gamePanel h2,
+  .playMain:has(.replayControls) .gamePanel h2 {
+    grid-column: 1 / -1;
+    font-size: 17px;
+    line-height: 1.25;
+    overflow-wrap: anywhere;
+    letter-spacing: -0.4px;
+  }
+  .playMain:has(.replayControls) .gamePanel h2 {
+    display: none;
+  }
+  .gamePanel .primary,
+  .gamePanel .secondary,
+  .gamePanel .textButton {
+    margin: 0;
+    min-height: 44px;
+    padding: 6px;
+    font-size: 11px;
+    min-width: 0;
+  }
+  .gamePanel .textButton {
+    grid-column: 1 / -1;
+  }
+  .gamePanel .replayControls {
+    grid-column: 1 / -1;
+    margin: 0;
+  }
+  .gamePanel .replayControls button {
+    min-height: 40px;
+  }
+  .gamePanel .replayLabel {
+    align-self: center;
+    margin: 0;
+    font-size: 11px;
+  }
+  .backdrop {
+    padding: max(8px, env(safe-area-inset-top, 0px)) 10px max(8px, env(safe-area-inset-bottom, 0px));
+  }
+  .dialog {
+    padding: 14px;
+    max-height: calc(
+      100dvh - 16px - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px)
+    );
+  }
+  .dialogHeader {
+    margin: 0 0 6px;
+  }
+  .dialogHeader h2 {
+    font-size: 21px;
+    min-width: 0;
+    overflow-wrap: anywhere;
+  }
+  .dialog .muted {
+    font-size: 11px;
+    line-height: 1.5;
+  }
+  .modeChoices {
+    margin: 12px 0;
+    gap: 6px;
+  }
+  .modeChoices > button {
+    min-height: 74px;
+    padding: 8px 4px;
+    gap: 4px;
+    min-width: 0;
+  }
+  .modeChoices strong {
+    font-size: 11px;
+    line-height: 1.3;
+  }
+  .modeChoices small {
+    font-size: 9px;
+    line-height: 1.3;
+  }
+  .modeChoices svg {
+    width: 20px;
+    height: 20px;
+  }
+  .nameFields {
+    gap: 8px;
+    margin-bottom: 12px;
+  }
+  .nameFields label,
+  .onlineSetup > label {
+    gap: 5px;
+    font-size: 11px;
+  }
+  .nameFields input,
+  .onlineSetup input {
+    padding: 8px;
+    min-height: 42px;
+    font-size: 16px;
+  }
+  .onlineSetup input {
+    letter-spacing: 4px;
+  }
+  .onlineSetup {
+    gap: 6px;
+  }
+  .onlineSetup .secondary {
+    margin-top: 0;
+  }
+  .dialog .primary,
+  .dialog .secondary {
+    min-height: 44px;
+    padding: 10px;
+    font-size: 12px;
+  }
+  .difficulty {
+    margin-bottom: 12px;
+  }
+  .difficulty legend {
+    margin-bottom: 6px;
+  }
+  .difficulty button {
+    min-height: 42px;
+    padding: 8px 4px;
+  }
+  .settingsList {
+    margin-top: 6px;
+  }
+  .setting {
+    padding: 10px 0;
+    gap: 8px;
+    min-height: 54px;
+  }
+  .setting > svg {
+    flex-shrink: 0;
+  }
+  .setting strong {
+    font-size: 12px;
+  }
+  .setting small {
+    font-size: 10px;
+    line-height: 1.4;
+  }
+  .dialogActions {
+    margin-top: 12px;
+  }
+}
+
+@media (max-width: 1000px) and (max-height: 550px) and (orientation: landscape) and (pointer: coarse) {
+  .header {
+    height: 44px;
+  }
+  .menuMain {
+    display: grid;
+    grid-template-columns: 42% minmax(0, 1fr);
+    gap: 14px;
+  }
+  .hero {
+    align-self: center;
+    padding: 0;
+  }
+  .hero h1 {
+    font-size: 28px;
+  }
+  .boardTop,
+  .playMain .boardTop {
+    height: 44px;
+  }
+  .playMain .boardArea {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 200px;
+    grid-template-rows: auto minmax(0, 1fr) auto 44px;
+    column-gap: 10px;
+  }
+  .playMain .canvasWrap {
+    grid-column: 1;
+    grid-row: 1 / -1;
+  }
+  .playMain .onlineBanner {
+    grid-column: 2;
+    grid-row: 1;
+  }
+  .playMain .lobbyHeading {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 40px 40px;
+  }
+  .playMain .lobbyHeading > svg,
+  .playMain .lobbyHeading > span {
+    display: none;
+  }
+  .playMain .lobbyHeading > strong {
+    font-size: 18px;
+    letter-spacing: 1px;
+  }
+  .playMain .boardTop {
+    grid-column: 2;
+    grid-row: 2;
+    align-self: start;
+    height: auto;
+    min-height: 44px;
+  }
+  .playMain .mobilePlayers {
+    grid-column: 2;
+    grid-row: 3;
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    border: 0;
+  }
+  .playMain .mobilePlayers > span {
+    max-width: 100%;
+  }
+  .playMain .mobilePlayers > strong {
+    grid-row: 2;
+    grid-column: 1 / -1;
+    text-align: center;
+  }
+  .playMain .boardBottom {
+    grid-column: 2;
+    grid-row: 4;
+  }
+  .playMain .toolButton span {
+    display: none;
+  }
+  .playMain:has(.trophy),
+  .playMain:has(.replayControls) {
+    display: grid;
+    grid-template-columns: 210px minmax(0, 1fr);
+    gap: 12px;
+  }
+  .playMain:has(.trophy) .gamePanel,
+  .playMain:has(.replayControls) .gamePanel {
+    order: 0;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    border: 0;
+    min-height: 0;
+  }
+  .playMain:has(.trophy) .boardArea,
+  .playMain:has(.replayControls) .boardArea {
+    display: flex;
+  }
+  .playMain:has(.trophy) .mobilePlayers,
+  .playMain:has(.replayControls) .mobilePlayers {
+    padding-right: 0;
+    height: 25px;
+  }
+  .playMain:has(.trophy) .boardBottom,
+  .playMain:has(.replayControls) .boardBottom {
+    position: static;
+    width: 100%;
+  }
+  .dialog {
+    width: 760px;
+  }
+  .dialog:has(.modeChoices) {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    column-gap: 18px;
+  }
+  .dialog:has(.modeChoices) .dialogHeader,
+  .dialog:has(.modeChoices) > .muted {
+    grid-column: 1 / -1;
+  }
+  .dialog .modeChoices {
+    grid-column: 1;
+    grid-row: 3;
+    margin: 8px 0;
+  }
+  .dialog .nameFields {
+    grid-column: 1;
+    grid-row: 4 / 6;
+    margin: 0;
+  }
+  .dialog .difficulty {
+    grid-column: 2;
+    grid-row: 3;
+    margin: 8px 0;
+  }
+  .dialog:has(.modeChoices) > .primary {
+    grid-column: 2;
+    grid-row: 4;
+    align-self: end;
+  }
+  .dialog .onlineSetup {
+    grid-column: 2;
+    grid-row: 3 / 6;
+    gap: 5px;
+    margin-top: 8px;
+  }
+  .onlineSetup > .muted {
+    display: none;
+  }
+  .settingsList {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    column-gap: 20px;
+  }
+}
+
+/* Application layout. The board consumes remaining space, never sets page height. */
+.app {
+  height: 100dvh;
+  min-height: 0;
+  max-width: 1760px;
+  padding-inline: clamp(16px, 3vw, 48px);
+}
+.header {
+  height: 68px;
+  gap: 20px;
+}
+.brand {
+  font-size: 28px;
+}
+.brand sup {
+  font-size: 14px;
+  line-height: 23px;
+}
+.main,
+.playMain {
+  display: grid;
+  grid-template-columns: 288px minmax(0, 1fr);
+  flex: 1 1 0;
+  min-height: 0;
+  min-width: 0;
+  gap: clamp(20px, 3vw, 48px);
+  padding-block: 24px;
+}
+.hero {
+  align-self: center;
+  padding: 0;
+  min-width: 0;
+}
+.hero h1 {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 29px;
+  line-height: 1.2;
+  letter-spacing: -1px;
+  margin-bottom: 28px;
+  font-weight: 650;
+}
+.hero h1 > span {
+  font-size: 11px;
+  letter-spacing: 0;
+  color: #626d85;
+  background: #e6e9f0;
+  padding: 5px 7px;
+  border-radius: 5px;
+}
+.hero .primary.playButton {
+  width: 100%;
+  min-height: 52px;
+  margin: 0;
+  padding: 14px;
+  font-size: 13px;
+  box-shadow: none;
+  justify-content: flex-start;
+}
+.playButton > svg:last-child {
+  margin-left: auto;
+}
+.quickModes {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 8px;
+  margin-top: 10px;
+}
+.quickModes button {
+  display: flex;
+  justify-content: flex-start;
+  width: 100%;
+  min-height: 52px;
+  padding: 12px 14px;
+  gap: 12px;
+  font-size: 13px;
+  color: #353b40;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+}
+.quickModes button:hover {
+  background: #eaece8;
+  border-color: #bec4be;
+}
+.quickModes button > svg:last-child {
+  margin-left: auto;
+  color: #919893;
+}
+.historyLink {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  min-height: 48px;
+  margin-top: 20px;
+  padding: 12px 0;
+  border: 0;
+  border-top: 1px solid var(--line);
+  background: transparent;
+  color: #636a65;
+  font-size: 12px;
+}
+.historyLink:hover {
+  color: var(--accent);
+}
+.boardArea {
+  min-height: 0;
+  min-width: 0;
+  height: 100%;
+  border: 1px solid #dfe1d9;
+  border-radius: 16px;
+  background: #eeeee8;
+}
+.boardTop,
+.playMain .boardTop {
+  height: 54px;
+  min-height: 0;
+  flex-shrink: 0;
+  padding: 0 16px;
+}
+.menuMain .boardTop {
+  height: 40px;
+  justify-content: flex-end;
+}
+.dimension {
+  border: 0;
+  font-size: 10px;
+  color: #7b8077;
+}
+.canvasWrap,
+.playMain .canvasWrap {
+  flex: 1 1 0;
+  min-height: 0;
+  height: auto;
+  margin: 0;
+}
+.boardBottom,
+.playMain .boardBottom {
+  flex-shrink: 0;
+  min-height: 52px;
+  padding: 4px 12px;
+  display: flex;
+  flex-direction: row;
+  justify-content: flex-end;
+  flex-wrap: nowrap;
+}
+.boardTools {
+  justify-content: flex-end;
+}
+.onlineBanner {
+  margin: 12px 12px 0;
+  border-radius: 9px;
+}
+.gamePanel {
+  min-height: 0;
+  padding: 22px 0 0;
+}
+.panelEyebrow {
+  margin-bottom: 12px;
+  font-size: 10px;
+  letter-spacing: 1px;
+}
+.gamePanel h2 {
+  font-size: 24px;
+  letter-spacing: -0.7px;
+  line-height: 1.25;
+  margin-bottom: 12px;
+}
+.players {
+  margin-top: 22px;
+}
+.player {
+  min-height: 64px;
+  background: #eeefe9;
+}
+.player.activePlayer {
+  background: #e9edf9;
+  border-color: #c1cfee;
+}
+.stats {
+  padding: 18px 0;
+  margin-bottom: 18px;
+}
+.trophy {
+  width: 22px;
+  height: 22px;
+  margin-bottom: 8px;
+}
+.dialogHeader h2 {
+  font-weight: 650;
+  letter-spacing: -0.5px;
+}
+.primary,
+.secondary {
+  box-shadow: none;
+}
+
+@media (min-width: 651px) and (max-height: 700px) {
+  .header {
+    height: 56px;
+  }
+  .main,
+  .playMain {
+    padding-block: 12px;
+    grid-template-columns: 250px minmax(0, 1fr);
+    gap: 20px;
+  }
+  .hero h1 {
+    font-size: 25px;
+    margin-bottom: 18px;
+  }
+  .gamePanel {
+    padding-top: 8px;
+  }
+  .gamePanel h2 {
+    font-size: 20px;
+  }
+  .players {
+    margin-top: 12px;
+    gap: 6px;
+  }
+  .player {
+    min-height: 54px;
+    padding: 8px;
+  }
+  .stats {
+    margin-bottom: 12px;
+    padding: 12px 0;
+  }
+  .gamePanel .primary,
+  .gamePanel .secondary {
+    min-height: 44px;
+    padding: 8px;
+  }
+  .playMain:has(.trophy) .gamePanel .players,
+  .playMain:has(.replayControls) .gamePanel .players {
+    display: none;
+  }
+  .panelEyebrow {
+    margin-bottom: 8px;
+  }
+  .boardTop,
+  .playMain .boardTop {
+    height: 44px;
+  }
+  .boardBottom,
+  .playMain .boardBottom {
+    min-height: 44px;
+  }
+}
+@media (max-width: 650px) {
+  .app {
+    padding-inline: max(12px, env(safe-area-inset-left, 0px));
+  }
+  .header {
+    height: 52px;
+    gap: 8px;
+  }
+  .main,
+  .playMain {
+    display: flex;
+    min-height: 0;
+    gap: 0;
+    padding-block: 8px;
+  }
+  .menuMain {
+    display: grid;
+    grid-template-rows: minmax(0, 1fr) auto;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 16px;
+  }
+  .menuMain .boardArea {
+    order: 0;
+  }
+  .hero {
+    order: 1;
+    width: 100%;
+  }
+  .hero h1 {
+    font-size: 22px;
+    margin-bottom: 12px;
+    gap: 9px;
+  }
+  .hero h1 > span {
+    font-size: 10px;
+    padding: 3px 5px;
+  }
+  .hero .primary.playButton {
+    min-height: 46px;
+    padding: 10px 14px;
+  }
+  .quickModes {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 6px;
+    margin-top: 6px;
+  }
+  .quickModes button {
+    min-height: 44px;
+    padding: 8px 3px;
+    font-size: 11px;
+    gap: 5px;
+    justify-content: center;
+  }
+  .quickModes button > svg {
+    width: 15px;
+    height: 15px;
+  }
+  .quickModes button > svg:last-child {
+    display: none;
+  }
+  .historyLink {
+    margin-top: 6px;
+    min-height: 40px;
+    padding: 8px 0;
+    font-size: 11px;
+    justify-content: center;
+    border: 0;
+  }
+  .boardArea {
+    border-radius: 12px;
+  }
+  .menuMain .boardTop {
+    height: 24px;
+    padding: 0 8px;
+  }
+  .menuMain .boardBottom {
+    min-height: 34px;
+    padding: 0 8px;
+  }
+  .menuMain .boardTools {
+    justify-content: flex-end;
+  }
+  .menuMain .toolButton {
+    min-height: 34px;
+    font-size: 10px;
+    padding: 4px;
+  }
+  .playMain .boardArea {
+    height: auto;
+  }
+  .playMain .boardTop {
+    padding: 0 8px;
+    height: 46px;
+  }
+  .playMain .boardBottom {
+    padding: 0 4px;
+    min-height: 44px;
+  }
+  .playMain .boardTools {
+    width: 100%;
+    justify-content: space-between;
+  }
+  .mobilePlayers {
+    padding-inline: 8px;
+  }
+  .onlineBanner {
+    margin: 6px 6px 0;
+  }
+  .playMain:has(.trophy) .gamePanel,
+  .playMain:has(.replayControls) .gamePanel {
+    padding: 6px 0 0;
+  }
+  .playMain:has(.trophy) .gamePanel h2 {
+    font-size: 15px;
+    margin: 0;
+  }
+  .gamePanel .textButton {
+    min-height: 36px;
+  }
+}
+@media (min-width: 651px) and (max-width: 1000px) and (max-height: 550px) and (pointer: coarse) {
+  .app {
+    padding-inline: max(12px, env(safe-area-inset-left, 0px));
+  }
+  .header {
+    height: 44px;
+  }
+  .menuMain {
+    grid-template-columns: 230px minmax(0, 1fr);
+    gap: 14px;
+    padding-block: 8px;
+  }
+  .hero {
+    padding: 0;
+  }
+  .hero h1 {
+    font-size: 22px;
+    margin-bottom: 12px;
+  }
+  .hero .primary.playButton {
+    min-height: 44px;
+    padding: 8px;
+  }
+  .quickModes {
+    grid-template-columns: 1fr;
+    gap: 4px;
+    margin-top: 4px;
+  }
+  .quickModes button {
+    min-height: 36px;
+    padding: 6px 10px;
+    font-size: 11px;
+  }
+  .historyLink {
+    margin-top: 6px;
+    min-height: 34px;
+    padding: 6px;
+  }
+  .playMain {
+    display: flex;
+    padding-block: 6px;
+    gap: 0;
+  }
+  .playMain .boardArea {
+    padding: 6px;
+  }
+  .playMain .boardTop {
+    height: auto;
+    padding: 0;
+  }
+  .playMain .boardBottom {
+    padding: 0;
+  }
+  .playMain .onlineBanner {
+    margin: 0;
+  }
+  .playMain .gamePanel {
+    padding: 0;
+  }
+  .playMain:has(.trophy),
+  .playMain:has(.replayControls) {
+    display: grid;
+    grid-template-columns: 190px minmax(0, 1fr);
+    gap: 12px;
+  }
+}
+.onlinePause {
+  text-align: center;
+  padding: 12px 0;
+}
+.pauseCountdown {
+  display: block;
+  font-size: 56px;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -2px;
+}
+.dialog:has([data-guide]) {
+  display: flex;
+  flex-direction: column;
+  width: 960px;
+  height: min(720px, calc(100dvh - 48px));
+  padding: 24px;
+  overflow: hidden;
+}
+.dialog:has([data-guide]) .dialogHeader {
+  flex-shrink: 0;
+  margin: 0 0 14px;
+}
+@media (max-width: 650px), (max-height: 700px) {
+  .dialog:has([data-guide]) {
+    height: calc(100dvh - 24px);
+    max-height: calc(100dvh - 24px);
+    padding: 14px;
+  }
+  .dialog:has([data-guide]) .dialogHeader {
+    margin-bottom: 10px;
+  }
+}
+
+/* Four solo/online choices share two rows without extending the mobile page. */
+.quickModes {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+@media (orientation: landscape) and (max-height: 500px) {
+  .quickModes button > svg:last-child {
+    display: none;
+  }
+}
+@media (max-width: 650px) and (orientation: landscape) and (max-height: 500px) {
+  .header {
+    height: 44px;
+  }
+  .menuMain {
+    grid-template-columns: minmax(180px, 0.9fr) minmax(0, 1fr);
+    grid-template-rows: minmax(0, 1fr);
+    gap: 12px;
+    padding-block: 6px;
+  }
+  .menuMain .hero {
+    order: 0;
+    padding: 0;
+  }
+  .menuMain .boardArea {
+    order: 1;
+    height: 100%;
+    min-height: 0;
+  }
+  .hero h1 {
+    font-size: 20px;
+    margin-bottom: 6px;
+  }
+  .hero .primary.playButton {
+    min-height: 36px;
+    padding: 7px;
+    font-size: 12px;
+  }
+  .quickModes {
+    gap: 4px;
+    margin-top: 4px;
+  }
+  .quickModes button {
+    min-height: 34px;
+    padding: 6px 3px;
+  }
+  .historyLink {
+    min-height: 30px;
+    padding: 4px;
+    margin-top: 4px;
+  }
+}
+
+/* Main menu: a quiet control card beside a full studio scene. */
+.menuMain {
+  grid-template-columns: minmax(320px, 360px) minmax(0, 1fr);
+  gap: 18px;
+  padding-block: 18px 24px;
+}
+.menuMain .hero {
+  container-type: inline-size;
+  align-self: stretch;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-start;
+  padding: clamp(58px, 8vh, 84px) clamp(24px, 2.5vw, 34px) 34px;
+  border: 1px solid #e4e6df;
+  border-radius: 20px;
+  background: #fafbf8;
+  box-shadow: 0 18px 50px #2830260a;
+}
+.menuMain .hero h1 {
+  display: block;
+  white-space: nowrap;
+  margin: 0 0 12px;
+  font-size: clamp(18px, 12cqw, 42px);
+  font-weight: 720;
+  letter-spacing: -1.8px;
+}
+.heroSubtitle {
+  margin: 0 0 27px;
+  color: #777d74;
+  font-size: 14px;
+  line-height: 1.55;
+}
+.menuMain .hero .primary.playButton {
+  min-height: 58px;
+  padding-inline: 19px;
+  border-radius: 11px;
+  font-size: 15px;
+  box-shadow: 0 10px 24px #2955e729;
+}
+.menuMain .quickModes {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  margin-top: 13px;
+}
+.menuMain .quickModes button {
+  gap: 7px;
+  min-height: 65px;
+  padding: 13px 12px;
+  border-color: #e1e4dc;
+  border-radius: 11px;
+  background: #fff;
+  box-shadow: 0 7px 20px #2f382b0a;
+  font-size: 12px;
+  font-weight: 680;
+}
+.menuMain .quickModes button > svg:first-child {
+  color: var(--accent);
+}
+.menuMain .quickModes button > span {
+  white-space: nowrap;
+}
+@container (max-width: 330px) {
+  .menuMain .quickModes button > svg:last-child {
+    display: none;
+  }
+}
+.menuMain .quickModes button:hover {
+  border-color: #ccd4e7;
+  background: #f5f7fd;
+  transform: translateY(-1px);
+}
+.menuMain .boardArea {
+  position: relative;
+  overflow: hidden;
+  border: 1px solid #e1e2dd;
+  border-radius: 20px;
+  background: #ebeae7;
+  box-shadow: 0 18px 55px #2830260d;
+}
+.menuMain .boardTop {
+  position: absolute;
+  top: 17px;
+  right: 17px;
+  z-index: 4;
+  width: auto;
+  height: auto;
+  padding: 0;
+}
+.menuMain .dimension {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 9px 12px;
+  border: 1px solid #ffffff8c;
+  border-radius: 9px;
+  background: #ffffffc9;
+  box-shadow: 0 8px 24px #28302612;
+  backdrop-filter: blur(9px);
+  color: #626960;
+  font-size: 11px;
+  font-weight: 700;
+}
+.menuMain .canvasWrap {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+.menuMain .boardBottom {
+  display: none;
+}
+
+@media (max-width: 650px) {
+  .menuMain {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: minmax(0, 1fr) auto;
+    gap: 10px;
+    padding-block: 8px 10px;
+  }
+  .menuMain .hero {
+    order: 1;
+    padding: 13px;
+    border-radius: 14px;
+  }
+  .menuMain .hero h1 {
+    margin-bottom: 8px;
+    font-size: 21px;
+    letter-spacing: -0.8px;
+  }
+  .heroSubtitle {
+    display: none;
+  }
+  .menuMain .hero .primary.playButton {
+    min-height: 45px;
+    padding: 9px 13px;
+    border-radius: 9px;
+    font-size: 12px;
+  }
+  .menuMain .quickModes {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 6px;
+    margin-top: 6px;
+  }
+  .menuMain .quickModes button {
+    min-height: 42px;
+    padding: 7px 9px;
+    border-radius: 8px;
+    font-size: 10px;
+  }
+  .menuMain .boardArea {
+    order: 0;
+    border-radius: 14px;
+  }
+  .menuMain .boardTop {
+    top: 8px;
+    right: 8px;
+  }
+  .menuMain .dimension {
+    padding: 6px 8px;
+    font-size: 9px;
+  }
+}
+
+@media (orientation: landscape) and (max-height: 500px) {
+  .menuMain {
+    grid-template-columns: minmax(210px, 0.82fr) minmax(0, 1.5fr);
+    grid-template-rows: minmax(0, 1fr);
+    gap: 10px;
+    padding-block: 7px;
+  }
+  .menuMain .hero {
+    order: 0;
+    padding: 12px;
+    border-radius: 13px;
+  }
+  .menuMain .boardArea {
+    order: 1;
+    min-height: 0;
+    border-radius: 13px;
+  }
+  .menuMain .hero h1 {
+    margin-bottom: 7px;
+    font-size: 20px;
+  }
+  .menuMain .hero .primary.playButton {
+    min-height: 39px;
+    padding: 7px 10px;
+  }
+  .menuMain .quickModes {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 5px;
+    margin-top: 5px;
+  }
+  .menuMain .quickModes button {
+    min-height: 37px;
+    padding: 6px;
+  }
+}
+
+.playMain .gamePanel .levelResult {
+  display: block;
+  grid-column: 1 / -1;
+  margin: 0 0 8px;
+  font-size: 12px;
+  line-height: 1.4;
+}
+.leaderboardButton {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  min-height: 40px;
+  margin-top: 16px;
+  padding: 9px 4px;
+  border: 0;
+  background: transparent;
+  color: #697163;
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+.leaderboardButton:hover {
+  color: var(--accent);
+}
+.leaderboardButton > svg:last-child {
+  margin-left: auto;
+}
+@media (max-width: 650px), (orientation: landscape) and (max-height: 500px) {
+  .leaderboardButton {
+    min-height: 30px;
+    margin-top: 5px;
+    padding: 3px 4px;
+    font-size: 10px;
+  }
+}

@@ -1,0 +1,40 @@
+{
+  "name": "Atelier",
+  "source": "assets/atelier/four-atelier.blend",
+  "objects": [
+    {
+      "name": "Atelier | baked architectural lighting",
+      "vertices": 11160,
+      "triangles": 20632
+    },
+    {
+      "name": "Dais | bronze hairline",
+      "vertices": 640,
+      "triangles": 960
+    },
+    {
+      "name": "ReflectiveSurface",
+      "vertices": 320,
+      "triangles": 320
+    },
+    {
+      "name": "Sculpture | endless bronze ribbon",
+      "vertices": 1920,
+      "triangles": 3840
+    },
+    {
+      "name": "Vessel | fluted smoked glass",
+      "vertices": 1152,
+      "triangles": 2048
+    },
+    {
+      "name": "Vessel | water",
+      "vertices": 384,
+      "triangles": 576
+    }
+  ],
+  "files": {
+    "atelier-light.hdr": 712831,
+    "atelier.glb": 1296704
+  }
+}

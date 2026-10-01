@@ -1,0 +1,8 @@
+FOUR³ source and current web release
+
+Open https://116.206.95.180/ to play.
+For development: install Node.js 24 LTS, run npm ci, then npm run dev.
+For production: run npm run build, then npm start behind an HTTPS reverse proxy.
+The live account database is /srv/four-game-data/accounts.json and is not included with the source.
+Account statistics and match history use /srv/four-game-data/statistics.sqlite, also excluded from source archives.
+Stop four-game before backing up the entire data directory, then restart it.
