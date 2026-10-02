@@ -7,6 +7,8 @@ import 'package:four3/src/feature/account/widget/account_root_scope.dart';
 import 'package:four3/src/feature/game/bloc/game_bloc.dart';
 import 'package:four3/src/feature/game/model/game_models.dart';
 import 'package:four3/src/feature/game/widget/game_root_scope.dart';
+import 'package:four3/src/feature/matchmaking/bloc/matchmaking_bloc.dart';
+import 'package:four3/src/feature/matchmaking/widget/matchmaking_root_scope.dart';
 import 'package:four3/src/feature/matchmaking/widget/online_setup_view.dart';
 import 'package:four3/src/feature/settings/bloc/settings_bloc.dart';
 import 'package:four3/src/feature/settings/widget/settings_root_scope.dart';
@@ -120,7 +122,7 @@ class _GameSetupViewState extends State<GameSetupView> {
         ],
         if (_mode == GameMode.online) ...[
           const SizedBox(height: 14),
-          const OnlineSetupView(),
+          OnlineSetupView(onQuickStart: () => _openQuick(context, player)),
         ],
         if (_mode != GameMode.online) ...[
           const SizedBox(height: 18),
@@ -170,6 +172,20 @@ class _GameSetupViewState extends State<GameSetupView> {
             game.add(const GameEvent$Resume());
           },
         ),
+      );
+    });
+  }
+
+  void _openQuick(BuildContext context, String player) {
+    final BuildContext appContext = Navigator.of(context).context;
+    MatchmakingRootScope.of(context).add(MatchmakingEvent$Find(player));
+    Navigator.pop(context);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!appContext.mounted) return;
+      showAppDialog<void>(
+        context: appContext,
+        title: 'Рейтинговая игра',
+        child: const OnlineSetupView(quickOnly: true),
       );
     });
   }

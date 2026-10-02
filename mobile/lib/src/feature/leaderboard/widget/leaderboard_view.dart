@@ -25,6 +25,7 @@ class _LeaderboardViewState extends State<LeaderboardView> {
     final LeaderboardBloc bloc = LeaderboardRootScope.of(context);
     final String? username = AccountRootScope.of(context).profile?.username;
     return Column(
+      mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         Row(
@@ -37,29 +38,49 @@ class _LeaderboardViewState extends State<LeaderboardView> {
                 style: TextStyle(color: AppColors.muted, fontSize: 12),
               ),
             ),
-            IconButton.outlined(
-              tooltip: 'Обновить рейтинг',
-              onPressed: () => bloc.add(const LeaderboardEvent$Load()),
-              icon: const Icon(LucideIcons.refreshCw, size: 16),
+            SizedBox(
+              width: 36,
+              height: 36,
+              child: IconButton.outlined(
+                padding: EdgeInsets.zero,
+                tooltip: 'Обновить рейтинг',
+                onPressed: () => bloc.add(const LeaderboardEvent$Load()),
+                style: IconButton.styleFrom(
+                  side: const BorderSide(color: Color(0xFFDFE3DA)),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                ),
+                icon: const Icon(LucideIcons.refreshCw, size: 16),
+              ),
             ),
           ],
         ),
-        const SizedBox(height: 8),
-        Expanded(
-          child: BlocBuilder<LeaderboardBloc, LeaderboardState>(
-            bloc: bloc,
-            builder: (context, state) => switch (state) {
-              LeaderboardState$Ready(:final players) =>
-                players.isEmpty
-                    ? const _StateText('В рейтинге пока нет игроков.')
-                    : _LeaderboardTable(players: players, username: username),
-              LeaderboardState$Failure() => _StateText(
-                'Не удалось загрузить рейтинг.',
-                action: () => bloc.add(const LeaderboardEvent$Load()),
-              ),
-              _ => const _StateText('Загрузка рейтинга…'),
-            },
-          ),
+        const SizedBox(height: 10),
+        BlocBuilder<LeaderboardBloc, LeaderboardState>(
+          bloc: bloc,
+          builder: (context, state) => switch (state) {
+            LeaderboardState$Ready(:final players) =>
+              players.isEmpty
+                  ? const _StateText('В рейтинге пока нет игроков.')
+                  : SizedBox(
+                      height:
+                          ((MediaQuery.sizeOf(context).width <= 650
+                                      ? 36.0
+                                      : 42.0) *
+                                  (players.length + 1))
+                              .clamp(84.0, 500.0),
+                      child: _LeaderboardTable(
+                        players: players,
+                        username: username,
+                      ),
+                    ),
+            LeaderboardState$Failure() => _StateText(
+              'Не удалось загрузить рейтинг.',
+              action: () => bloc.add(const LeaderboardEvent$Load()),
+            ),
+            _ => const _StateText('Загрузка рейтинга…'),
+          },
         ),
       ],
     );
@@ -87,6 +108,7 @@ class _LeaderboardTable extends StatelessWidget {
             itemBuilder: (context, index) => _TableRow(
               player: players[index],
               self: players[index].username == username,
+              last: index == players.length - 1,
             ),
           ),
         ),
@@ -96,94 +118,115 @@ class _LeaderboardTable extends StatelessWidget {
 }
 
 class _TableRow extends StatelessWidget {
-  const new({this.player, this.header = false, this.self = false});
+  const new({
+    this.player,
+    this.header = false,
+    this.self = false,
+    this.last = false,
+  });
   final LeaderboardPlayer? player;
   final bool header;
   final bool self;
+  final bool last;
 
   @override
-  Widget build(BuildContext context) => Container(
-    height: header ? 38 : 44,
-    padding: const EdgeInsets.symmetric(horizontal: 7),
-    decoration: BoxDecoration(
-      color: header
-          ? const Color(0xFFEEF0EA)
-          : self
-          ? const Color(0xFFEAF0FF)
-          : null,
-      border: const Border(bottom: BorderSide(color: Color(0xFFE8EBE3))),
-    ),
-    child: Row(
-      children: [
-        SizedBox(
-          width: 43,
-          child: header
-              ? const Text('Место', textAlign: TextAlign.center)
-              : Center(
-                  child: Container(
-                    width: 28,
-                    height: 28,
-                    alignment: Alignment.center,
-                    decoration: player!.rank <= 3
-                        ? BoxDecoration(
-                            color: const Color(0xFFEFE5CC),
-                            borderRadius: BorderRadius.circular(9),
-                          )
-                        : null,
-                    child: Text('${player!.rank}'),
-                  ),
-                ),
+  Widget build(BuildContext context) {
+    final bool compact = MediaQuery.sizeOf(context).width <= 650;
+    return Container(
+      height: compact ? 36 : 42,
+      padding: EdgeInsets.symmetric(horizontal: compact ? 7 : 14),
+      decoration: BoxDecoration(
+        color: header
+            ? const Color(0xFFEEF0EA)
+            : self
+            ? const Color(0xFFEAF0FF)
+            : null,
+        border: last
+            ? null
+            : const Border(bottom: BorderSide(color: Color(0xFFE8EBE3))),
+      ),
+      child: DefaultTextStyle(
+        style: TextStyle(
+          color: AppColors.ink,
+          fontFamily: 'Manrope',
+          fontSize: header ? (compact ? 10 : 11) : (compact ? 11 : 13),
         ),
-        Expanded(
-          flex: 4,
-          child: Row(
-            children: [
-              Flexible(
-                child: Text(
-                  header ? 'Игрок' : player!.username,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    fontWeight: header ? FontWeight.w600 : FontWeight.w700,
+        child: Row(
+          children: [
+            SizedBox(
+              width: compact ? 43 : 65,
+              child: header
+                  ? const Text('Место', textAlign: TextAlign.center)
+                  : Center(
+                      child: Container(
+                        width: 28,
+                        height: 28,
+                        alignment: Alignment.center,
+                        decoration: player!.rank <= 3
+                            ? BoxDecoration(
+                                color: const Color(0xFFEFE5CC),
+                                borderRadius: BorderRadius.circular(9),
+                              )
+                            : null,
+                        child: Text('${player!.rank}'),
+                      ),
+                    ),
+            ),
+            Expanded(
+              flex: 4,
+              child: Row(
+                children: [
+                  Flexible(
+                    child: Text(
+                      header ? 'Игрок' : player!.username,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontWeight: header ? FontWeight.w600 : FontWeight.w700,
+                      ),
+                    ),
                   ),
+                  if (self) ...[
+                    const SizedBox(width: 5),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 5,
+                        vertical: 2,
+                      ),
+                      decoration: BoxDecoration(
+                        color: AppColors.accent,
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                      child: const Text(
+                        'Вы',
+                        style: TextStyle(color: Colors.white, fontSize: 8),
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+            Expanded(
+              flex: 2,
+              child: Text(
+                header ? 'Elo' : '${player!.elo}',
+                textAlign: TextAlign.right,
+                style: TextStyle(
+                  fontWeight: header ? FontWeight.w600 : FontWeight.w800,
                 ),
               ),
-              if (self) ...[
-                const SizedBox(width: 5),
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 5,
-                    vertical: 2,
-                  ),
-                  color: AppColors.accent,
-                  child: const Text(
-                    'Вы',
-                    style: TextStyle(color: Colors.white, fontSize: 8),
-                  ),
-                ),
-              ],
-            ],
-          ),
-        ),
-        Expanded(
-          flex: 2,
-          child: Text(
-            header ? 'Elo' : '${player!.elo}',
-            textAlign: TextAlign.right,
-            style: TextStyle(
-              fontWeight: header ? FontWeight.w600 : FontWeight.w800,
             ),
-          ),
+            Expanded(
+              flex: 2,
+              child: Text(
+                header ? 'Игры' : '${player!.games}',
+                textAlign: TextAlign.right,
+              ),
+            ),
+          ],
         ),
-        Expanded(
-          flex: 2,
-          child: Text(
-            header ? 'Игры' : '${player!.games}',
-            textAlign: TextAlign.right,
-          ),
-        ),
-      ],
-    ),
-  );
+      ),
+    );
+  }
 }
 
 class _StateText extends StatelessWidget {
@@ -196,7 +239,14 @@ class _StateText extends StatelessWidget {
     child: Column(
       mainAxisSize: MainAxisSize.min,
       children: [
-        Text(text, style: const TextStyle(color: AppColors.muted)),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 32),
+          child: Text(
+            text,
+            textAlign: TextAlign.center,
+            style: const TextStyle(color: AppColors.muted, fontSize: 13),
+          ),
+        ),
         if (action != null) ...[
           const SizedBox(height: 10),
           OutlinedButton(

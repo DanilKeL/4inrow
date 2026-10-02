@@ -64,140 +64,165 @@ class _LevelsViewState extends State<LevelsView> {
       final bool landscape =
           MediaQuery.orientationOf(context) == Orientation.landscape;
       final bool short = MediaQuery.sizeOf(context).height <= 500;
-      return Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          if (!(landscape && short)) ...[
-            const Text(
-              'Победи из готовой позиции за меньшее число ходов.',
-              style: TextStyle(color: AppColors.muted, fontSize: 12),
-            ),
-            const SizedBox(height: 10),
-          ],
-          Row(
-            children: [
-              Expanded(
-                child: Text(
-                  shown.first.chapter,
-                  style: const TextStyle(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w700,
+      return SizedBox(
+        height: landscape && short ? 230 : 395,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            if (!(landscape && short)) ...[
+              const Text(
+                'Победи из готовой позиции за меньшее число ходов.',
+                style: TextStyle(color: AppColors.muted, fontSize: 12),
+              ),
+              const SizedBox(height: 10),
+            ],
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    shown.first.chapter,
+                    style: const TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w700,
+                    ),
                   ),
                 ),
-              ),
-              Text(
-                '${best.length} / ${levels.length} пройдено',
-                style: const TextStyle(color: AppColors.muted, fontSize: 11),
-              ),
-            ],
-          ),
-          const SizedBox(height: 8),
-          Expanded(
-            child: GridView.builder(
-              physics: const NeverScrollableScrollPhysics(),
-              gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                crossAxisCount: landscape ? 4 : 2,
-                childAspectRatio: landscape ? 1.65 : 2.05,
-                crossAxisSpacing: 6,
-                mainAxisSpacing: 6,
-              ),
-              itemCount: shown.length,
-              itemBuilder: (context, index) {
-                final GameLevel level = shown[index];
-                final int? record = best[level.id];
-                return InkWell(
-                  borderRadius: BorderRadius.circular(12),
-                  onTap: () {
-                    GameRootScope.of(context)
-                        .add(GameEvent$StartLevel(level.id));
-                    Navigator.pop(context);
-                  },
-                  child: Ink(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 12,
-                      vertical: 8,
-                    ),
-                    decoration: BoxDecoration(
-                      color: record == null
-                          ? const Color(0xFFF4F5EF)
-                          : const Color(0xFFEDF1FB),
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(
+                Text(
+                  '${best.length} / ${levels.length} пройдено',
+                  style: const TextStyle(color: AppColors.muted, fontSize: 11),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            Expanded(
+              child: GridView.builder(
+                physics: const NeverScrollableScrollPhysics(),
+                gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                  crossAxisCount: landscape ? 4 : 2,
+                  childAspectRatio: landscape ? 2.6 : 2.65,
+                  crossAxisSpacing: 6,
+                  mainAxisSpacing: 6,
+                ),
+                itemCount: shown.length,
+                itemBuilder: (context, index) {
+                  final GameLevel level = shown[index];
+                  final int? record = best[level.id];
+                  return InkWell(
+                    borderRadius: BorderRadius.circular(12),
+                    onTap: () {
+                      GameRootScope.of(context)
+                          .add(GameEvent$StartLevel(level.id));
+                      Navigator.pop(context);
+                    },
+                    child: Ink(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 7,
+                      ),
+                      decoration: BoxDecoration(
                         color: record == null
-                            ? const Color(0xFFDCDED6)
-                            : const Color(0xFFB8C7ED),
+                            ? const Color(0xFFF4F5EF)
+                            : const Color(0xFFEDF1FB),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(
+                          color: record == null
+                              ? const Color(0xFFDCDED6)
+                              : const Color(0xFFB8C7ED),
+                        ),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Row(
+                            children: [
+                              Text(
+                                level.id.toString().padLeft(2, '0'),
+                                style: const TextStyle(
+                                  fontSize: 21,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                              const Spacer(),
+                              if (record != null)
+                                const Icon(
+                                  LucideIcons.check,
+                                  size: 15,
+                                  color: AppColors.accent,
+                                ),
+                            ],
+                          ),
+                          Text(
+                            record == null
+                                ? 'Рекорд: —'
+                                : 'Рекорд: ${_moves(record)}',
+                            style: const TextStyle(
+                              color: AppColors.muted,
+                              fontSize: 11,
+                            ),
+                          ),
+                        ],
                       ),
                     ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Row(
-                          children: [
-                            Text(
-                              level.id.toString().padLeft(2, '0'),
-                              style: const TextStyle(
-                                fontSize: 21,
-                                fontWeight: FontWeight.w700,
-                              ),
-                            ),
-                            const Spacer(),
-                            if (record != null)
-                              const Icon(
-                                LucideIcons.check,
-                                size: 15,
-                                color: AppColors.accent,
-                              ),
-                          ],
-                        ),
-                        Text(
-                          record == null
-                              ? 'Рекорд: —'
-                              : 'Рекорд: ${_moves(record)}',
-                          style: const TextStyle(
-                            color: AppColors.muted,
-                            fontSize: 10,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                );
-              },
+                  );
+                },
+              ),
             ),
-          ),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              IconButton(
-                onPressed: _page == 0 ? null : () => setState(() => _page--),
-                icon: const Icon(LucideIcons.chevronLeft),
-              ),
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 12),
-                child: Text('${_page + 1} / ${(levels.length / 8).ceil()}'),
-              ),
-              IconButton(
-                onPressed: (_page + 1) * 8 >= levels.length
-                    ? null
-                    : () => setState(() => _page++),
-                icon: const Icon(LucideIcons.chevronRight),
-              ),
-            ],
-          ),
-          if (!(landscape && short))
-            Text(
-              AccountRootScope.of(context).profile?.username == null
-                  ? 'Войдите в аккаунт, чтобы сохранять прогресс на сервере.'
-                  : syncError.isNotEmpty
-                  ? syncError
-                  : 'Прогресс сохранён в аккаунте.',
-              textAlign: TextAlign.center,
-              style: const TextStyle(color: AppColors.muted, fontSize: 10),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                _PageButton(
+                  onPressed: _page == 0 ? null : () => setState(() => _page--),
+                  icon: const Icon(LucideIcons.chevronLeft),
+                ),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 20),
+                  child: Text('${_page + 1} / ${(levels.length / 8).ceil()}'),
+                ),
+                _PageButton(
+                  onPressed: (_page + 1) * 8 >= levels.length
+                      ? null
+                      : () => setState(() => _page++),
+                  icon: const Icon(LucideIcons.chevronRight),
+                ),
+              ],
             ),
-        ],
+            if (!(landscape && short))
+              Text(
+                AccountRootScope.of(context).profile?.username == null
+                    ? 'Войдите в аккаунт, чтобы сохранять прогресс на сервере.'
+                    : syncError.isNotEmpty
+                    ? syncError
+                    : 'Прогресс сохранён в аккаунте.',
+                textAlign: TextAlign.center,
+                style: const TextStyle(color: AppColors.muted, fontSize: 11),
+              ),
+          ],
+        ),
       );
     },
+  );
+}
+
+class _PageButton extends StatelessWidget {
+  const new({required this.onPressed, required this.icon});
+  final VoidCallback? onPressed;
+  final Widget icon;
+
+  @override
+  Widget build(BuildContext context) => SizedBox(
+    width: 40,
+    height: 36,
+    child: OutlinedButton(
+      onPressed: onPressed,
+      style: OutlinedButton.styleFrom(
+        minimumSize: const Size(40, 36),
+        padding: EdgeInsets.zero,
+        side: const BorderSide(color: Color(0xFFDCDED6)),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+      ),
+      child: icon,
+    ),
   );
 }
 

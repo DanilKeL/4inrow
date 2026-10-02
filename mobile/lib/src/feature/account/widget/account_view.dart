@@ -28,15 +28,46 @@ class _AccountViewState extends State<AccountView> {
   final _currentPassword = TextEditingController();
   final _newPassword = TextEditingController();
   final _newPasswordRepeat = TextEditingController();
+  final _guestScrollController = ScrollController();
   _AccountMode _mode = _AccountMode.register;
   bool _security = false;
   String _localError = '';
 
   @override
+  void initState() {
+    super.initState();
+    _username.addListener(_refreshIdentityActions);
+    _email.addListener(_refreshIdentityActions);
+  }
+
+  void _refreshIdentityActions() {
+    if (mounted) setState(() {});
+  }
+
+  @override
   Widget build(BuildContext context) {
     final AccountBloc bloc = AccountRootScope.of(context);
-    return BlocBuilder<AccountBloc, AccountState>(
+    return BlocConsumer<AccountBloc, AccountState>(
       bloc: bloc,
+      listenWhen: (previous, current) =>
+          current is AccountState$Ready && current.registrationCompleted,
+      listener: (context, state) {
+        _password.clear();
+        FocusManager.instance.primaryFocus?.unfocus();
+        setState(() {
+          _mode = _AccountMode.login;
+          _localError = '';
+        });
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (_guestScrollController.hasClients) {
+            _guestScrollController.animateTo(
+              0,
+              duration: const Duration(milliseconds: 180),
+              curve: Curves.easeOut,
+            );
+          }
+        });
+      },
       builder: (context, state) {
         final AccountProfile? profile = bloc.profile;
         final bool loading = state is AccountState$Loading;
@@ -62,6 +93,7 @@ class _AccountViewState extends State<AccountView> {
     String failure,
     String notice,
   ) => SingleChildScrollView(
+    controller: _guestScrollController,
     child: Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -101,13 +133,8 @@ class _AccountViewState extends State<AccountView> {
           _Field(label: 'Пароль', controller: _password, obscureText: true),
         ] else ...[
           const Text(
-            'Восстановление пароля',
-            style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800),
-          ),
-          const SizedBox(height: 5),
-          const Text(
             'Пришлём ссылку для создания нового пароля.',
-            style: TextStyle(color: AppColors.muted, fontSize: 11),
+            style: TextStyle(color: AppColors.muted, fontSize: 11, height: 1.5),
           ),
           const SizedBox(height: 16),
           _Field(
@@ -123,7 +150,9 @@ class _AccountViewState extends State<AccountView> {
           onPressed: loading ? null : () => _submitGuest(bloc),
           child: Text(
             loading
-                ? 'Подождите…'
+                ? _mode == _AccountMode.forgot
+                      ? 'Отправляем…'
+                      : 'Подождите…'
                 : switch (_mode) {
                     _AccountMode.register => 'Зарегистрироваться',
                     _AccountMode.login => 'Войти',
@@ -137,16 +166,19 @@ class _AccountViewState extends State<AccountView> {
             onPressed: () => setState(() => _mode = _AccountMode.forgot),
             child: const Text('Забыли пароль?'),
           ),
-          TextButton(
-            onPressed: loading
-                ? null
-                : () => bloc.add(
-                    AccountEvent$ResendVerification(
-                      _email.text.trim().isEmpty ? _username.text : _email.text,
+          if (_email.text.trim().isNotEmpty || _username.text.trim().isNotEmpty)
+            TextButton(
+              onPressed: loading
+                  ? null
+                  : () => bloc.add(
+                      AccountEvent$ResendVerification(
+                        _email.text.trim().isEmpty
+                            ? _username.text
+                            : _email.text,
+                      ),
                     ),
-                  ),
-            child: const Text('Отправить подтверждение повторно'),
-          ),
+              child: const Text('Отправить подтверждение ещё раз'),
+            ),
         ] else if (_mode == _AccountMode.forgot)
           OutlinedButton(
             onPressed: () => setState(() => _mode = _AccountMode.login),
@@ -176,50 +208,107 @@ class _AccountViewState extends State<AccountView> {
         const SizedBox(height: 12),
         if (notice.isNotEmpty) _Notice(notice),
         if (!_security) ...[
-          _SignedProfile(profile: profile),
-          const SizedBox(height: 12),
-          const _AccountOverviewCards(),
-          const SizedBox(height: 12),
-          _ActionTile(
-            icon: LucideIcons.history,
-            title: 'История и статистика',
-            subtitle: 'Рейтинг, результаты и сохранённые партии',
-            onTap: widget.onHistory,
-          ),
-          const SizedBox(height: 12),
-          OutlinedButton.icon(
-            onPressed: loading
-                ? null
-                : () => bloc.add(const AccountEvent$Logout()),
-            icon: const Icon(LucideIcons.logOut),
-            label: const Text('Выйти из аккаунта'),
+          if (MediaQuery.sizeOf(context).height > 650) ...[
+            _SignedProfile(profile: profile),
+            const SizedBox(height: 9),
+          ],
+          _AccountOverviewCards(onHistory: widget.onHistory),
+          const SizedBox(height: 6),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              if (widget.onHistory != null)
+                TextButton.icon(
+                  onPressed: widget.onHistory,
+                  icon: const Icon(LucideIcons.history, size: 16),
+                  label: const Text('История'),
+                ),
+              TextButton.icon(
+                onPressed: loading
+                    ? null
+                    : () => bloc.add(const AccountEvent$Logout()),
+                icon: const Icon(LucideIcons.logOut, size: 16),
+                label: const Text('Выйти'),
+              ),
+            ],
           ),
         ] else ...[
-          const _SecurityIntro(),
-          const SizedBox(height: 12),
-          _Field(
-            label: 'Текущий пароль',
-            controller: _currentPassword,
-            obscureText: true,
-          ),
-          const SizedBox(height: 10),
-          _Field(
-            label: 'Новый пароль',
-            controller: _newPassword,
-            obscureText: true,
-          ),
-          const SizedBox(height: 10),
-          _Field(
-            label: 'Повторите новый пароль',
-            controller: _newPasswordRepeat,
-            obscureText: true,
-          ),
-          if (failure.isNotEmpty) _Error(failure),
-          const SizedBox(height: 16),
-          FilledButton.icon(
-            onPressed: loading ? null : () => _changePassword(bloc),
-            icon: const Icon(LucideIcons.keyRound),
-            label: Text(loading ? 'Сохраняем…' : 'Изменить пароль'),
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              border: Border.all(color: const Color(0xFFDDE1D8)),
+              borderRadius: BorderRadius.circular(14),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                const Row(
+                  children: [
+                    Icon(
+                      LucideIcons.lockKeyhole,
+                      size: 20,
+                      color: AppColors.accent,
+                    ),
+                    SizedBox(width: 11),
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'СМЕНА ПАРОЛЯ',
+                          style: TextStyle(
+                            color: AppColors.muted,
+                            fontSize: 8,
+                            fontWeight: FontWeight.w800,
+                            letterSpacing: 1.2,
+                          ),
+                        ),
+                        Text(
+                          'Обновите данные входа',
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 17),
+                _Field(
+                  label: 'Текущий пароль',
+                  controller: _currentPassword,
+                  obscureText: true,
+                ),
+                const SizedBox(height: 11),
+                _Field(
+                  label: 'Новый пароль',
+                  controller: _newPassword,
+                  obscureText: true,
+                  maxLength: 128,
+                ),
+                const SizedBox(height: 5),
+                const Text(
+                  'От 8 до 128 символов',
+                  style: TextStyle(color: AppColors.muted, fontSize: 8),
+                ),
+                const SizedBox(height: 11),
+                _Field(
+                  label: 'Повторите новый пароль',
+                  controller: _newPasswordRepeat,
+                  obscureText: true,
+                  maxLength: 128,
+                ),
+                if (failure.isNotEmpty) _Error(failure),
+                if (notice.isNotEmpty) _Notice(notice),
+                const SizedBox(height: 11),
+                FilledButton.icon(
+                  onPressed: loading ? null : () => _changePassword(bloc),
+                  icon: const Icon(LucideIcons.keyRound, size: 17),
+                  label: Text(loading ? 'Сохраняем…' : 'Изменить пароль'),
+                ),
+              ],
+            ),
           ),
         ],
       ],
@@ -236,13 +325,8 @@ class _AccountViewState extends State<AccountView> {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         const Text(
-          'Новый пароль',
-          style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800),
-        ),
-        const SizedBox(height: 5),
-        const Text(
           'Задайте новый пароль для аккаунта.',
-          style: TextStyle(color: AppColors.muted, fontSize: 11),
+          style: TextStyle(color: AppColors.muted, fontSize: 11, height: 1.5),
         ),
         const SizedBox(height: 16),
         _Field(label: 'Новый пароль', controller: _password, obscureText: true),
@@ -301,11 +385,13 @@ class _AccountViewState extends State<AccountView> {
 
   void _changePassword(AccountBloc bloc) {
     if (_newPassword.text.length < 8 ||
+        _newPassword.text.length > 128 ||
         _newPassword.text != _newPasswordRepeat.text ||
         _newPassword.text == _currentPassword.text) {
       setState(
-        () => _localError = _newPassword.text.length < 8
-            ? 'Новый пароль должен содержать от 8 символов.'
+        () => _localError =
+            _newPassword.text.length < 8 || _newPassword.text.length > 128
+            ? 'Новый пароль должен содержать от 8 до 128 символов.'
             : _newPassword.text != _newPasswordRepeat.text
             ? 'Новые пароли не совпадают.'
             : 'Новый пароль должен отличаться от текущего.',
@@ -330,6 +416,7 @@ class _AccountViewState extends State<AccountView> {
     ]) {
       controller.dispose();
     }
+    _guestScrollController.dispose();
     super.dispose();
   }
 }
@@ -340,16 +427,15 @@ class _ProfileIntro extends StatelessWidget {
   @override
   Widget build(BuildContext context) => DecoratedBox(
     decoration: BoxDecoration(
-      color: AppColors.surface,
-      border: Border.all(color: AppColors.border),
-      borderRadius: BorderRadius.circular(14),
+      color: const Color(0xFFF0F2EC),
+      borderRadius: BorderRadius.circular(10),
     ),
     child: Padding(
-      padding: const EdgeInsets.all(14),
+      padding: const EdgeInsets.all(12),
       child: Row(
         children: [
-          const Icon(LucideIcons.userRound, color: AppColors.accent),
-          const SizedBox(width: 12),
+          const Icon(LucideIcons.userRound, size: 20, color: Color(0xFF687064)),
+          const SizedBox(width: 11),
           Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -362,7 +448,14 @@ class _ProfileIntro extends StatelessWidget {
                   color: AppColors.muted,
                 ),
               ),
-              Text(name, style: const TextStyle(fontWeight: FontWeight.w800)),
+              Text(
+                name,
+                style: const TextStyle(
+                  color: Color(0xFF2F342D),
+                  fontSize: 12,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
             ],
           ),
         ],
@@ -376,13 +469,35 @@ class _AuthTabs extends StatelessWidget {
   final _AccountMode mode;
   final ValueChanged<_AccountMode> onChanged;
   @override
-  Widget build(BuildContext context) => AppSegmentedControl<_AccountMode>(
-    options: const [
-      AppSegment(value: _AccountMode.register, label: 'Регистрация'),
-      AppSegment(value: _AccountMode.login, label: 'Вход'),
+  Widget build(BuildContext context) => Row(
+    children: [
+      for (final (_AccountMode value, String label) in const [
+        (_AccountMode.register, 'Регистрация'),
+        (_AccountMode.login, 'Вход'),
+      ]) ...[
+        if (value != _AccountMode.register) const SizedBox(width: 8),
+        Expanded(
+          child: OutlinedButton(
+            onPressed: () => onChanged(value),
+            style: OutlinedButton.styleFrom(
+              minimumSize: const Size(0, 44),
+              padding: const EdgeInsets.all(10),
+              backgroundColor: Colors.white,
+              foregroundColor: value == mode ? AppColors.accent : AppColors.ink,
+              side: BorderSide(
+                color: value == mode
+                    ? AppColors.accent
+                    : const Color(0xFFDCE0D4),
+              ),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(7),
+              ),
+            ),
+            child: Text(label),
+          ),
+        ),
+      ],
     ],
-    selected: mode,
-    onChanged: onChanged,
   );
 }
 
@@ -410,93 +525,97 @@ class _SignedProfile extends StatelessWidget {
   const new({required this.profile});
   final AccountProfile profile;
   @override
-  Widget build(BuildContext context) => DecoratedBox(
-    decoration: BoxDecoration(
-      gradient: const LinearGradient(
-        colors: [Color(0xFFF2F4ED), Colors.white, Color(0xFFEEF2FF)],
+  Widget build(BuildContext context) {
+    final bool compact = MediaQuery.sizeOf(context).width <= 650;
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          colors: [Color(0xFFF2F4ED), Colors.white, Color(0xFFEEF2FF)],
+        ),
+        border: Border.all(color: AppColors.border),
+        borderRadius: BorderRadius.circular(14),
       ),
-      border: Border.all(color: AppColors.border),
-      borderRadius: BorderRadius.circular(14),
-    ),
-    child: Padding(
-      padding: const EdgeInsets.all(16),
-      child: Row(
-        children: [
-          Container(
-            width: 56,
-            height: 56,
-            alignment: Alignment.center,
-            decoration: BoxDecoration(
-              color: AppColors.ink,
-              borderRadius: BorderRadius.circular(16),
-            ),
-            child: Text(
-              profile.username!.characters.take(2).join().toUpperCase(),
-              style: const TextStyle(
-                color: Colors.white,
-                fontSize: 18,
-                fontWeight: FontWeight.w800,
+      child: Padding(
+        padding: EdgeInsets.all(compact ? 12 : 17),
+        child: Row(
+          children: [
+            Container(
+              width: compact ? 45 : 56,
+              height: compact ? 45 : 56,
+              alignment: Alignment.center,
+              decoration: BoxDecoration(
+                color: AppColors.ink,
+                borderRadius: BorderRadius.circular(compact ? 12 : 16),
+              ),
+              child: Text(
+                profile.username!.characters.take(2).join().toUpperCase(),
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: compact ? 15 : 18,
+                  fontWeight: FontWeight.w800,
+                ),
               ),
             ),
-          ),
-          const SizedBox(width: 14),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text(
-                  'ПРОФИЛЬ ИГРОКА',
-                  style: TextStyle(
-                    fontSize: 8,
-                    letterSpacing: 1.2,
-                    color: AppColors.muted,
-                    fontWeight: FontWeight.w800,
+            SizedBox(width: compact ? 10 : 15),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'ПРОФИЛЬ ИГРОКА',
+                    style: TextStyle(
+                      fontSize: 8,
+                      letterSpacing: 1.2,
+                      color: AppColors.muted,
+                      fontWeight: FontWeight.w800,
+                    ),
                   ),
-                ),
-                Text(
-                  profile.username!,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    fontSize: 21,
-                    fontWeight: FontWeight.w800,
+                  Text(
+                    profile.username!,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontSize: compact ? 18 : 22,
+                      fontWeight: FontWeight.w800,
+                    ),
                   ),
-                ),
-                Row(
-                  children: [
-                    const Icon(LucideIcons.mail, size: 13),
-                    const SizedBox(width: 5),
-                    Flexible(
-                      child: Text(
-                        profile.email ?? 'Локальный аккаунт',
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                          color: AppColors.muted,
-                          fontSize: 10,
+                  Row(
+                    children: [
+                      const Icon(LucideIcons.mail, size: 13),
+                      const SizedBox(width: 5),
+                      Flexible(
+                        child: Text(
+                          profile.email ?? 'Локальный аккаунт',
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            color: AppColors.muted,
+                            fontSize: 10,
+                          ),
                         ),
                       ),
-                    ),
-                    if (profile.emailVerified) ...[
-                      const SizedBox(width: 5),
-                      const Icon(
-                        LucideIcons.circleCheck,
-                        size: 13,
-                        color: Color(0xFF2F7F49),
-                      ),
+                      if (profile.emailVerified) ...[
+                        const SizedBox(width: 5),
+                        const Icon(
+                          LucideIcons.circleCheck,
+                          size: 13,
+                          color: Color(0xFF2F7F49),
+                        ),
+                      ],
                     ],
-                  ],
-                ),
-              ],
+                  ),
+                ],
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
-    ),
-  );
+    );
+  }
 }
 
 class _AccountOverviewCards extends StatelessWidget {
-  const new();
+  const new({required this.onHistory});
+  final VoidCallback? onHistory;
 
   @override
   Widget build(BuildContext context) {
@@ -511,7 +630,7 @@ class _AccountOverviewCards extends StatelessWidget {
       bloc: bloc,
       builder: (context, state) {
         if (state case MatchHistoryState$Ready(:final data)) {
-          return _OverviewData(data: data);
+          return _OverviewData(data: data, onHistory: onHistory);
         }
         if (state case MatchHistoryState$Failure(:final message)) {
           return Text(
@@ -531,8 +650,9 @@ class _AccountOverviewCards extends StatelessWidget {
 }
 
 class _OverviewData extends StatelessWidget {
-  const new({required this.data});
+  const new({required this.data, required this.onHistory});
   final MatchHistorySnapshot data;
+  final VoidCallback? onHistory;
 
   @override
   Widget build(BuildContext context) {
@@ -545,27 +665,34 @@ class _OverviewData extends StatelessWidget {
         ? 0
         : (data.statistics.wins * 100 / data.statistics.total).round();
     final bool short = MediaQuery.sizeOf(context).height <= 650;
-    return Column(
-      children: [
-        Row(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Expanded(
-              flex: 4,
-              child: Container(
-                padding: const EdgeInsets.all(13),
-                decoration: BoxDecoration(
-                  gradient: const LinearGradient(
-                    colors: [Color(0xFF244BD0), Color(0xFF456DF0)],
-                  ),
-                  borderRadius: BorderRadius.circular(14),
-                ),
+    final bool compact = MediaQuery.sizeOf(context).width <= 650;
+    final Widget ratingCard = Container(
+      padding: const EdgeInsets.symmetric(horizontal: 17, vertical: 15),
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          colors: [Color(0xFF244BD0), Color(0xFF315EEA), Color(0xFF456DF0)],
+        ),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: const Color(0xFF2853DF)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     const Text(
                       'РЕЙТИНГ',
-                      style: TextStyle(color: Color(0xFFDBE3FF), fontSize: 8),
+                      style: TextStyle(
+                        color: Color(0xFFDBE3FF),
+                        fontSize: 8,
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: 1.2,
+                      ),
                     ),
                     Text(
                       league.$1,
@@ -575,88 +702,198 @@ class _OverviewData extends StatelessWidget {
                         fontWeight: FontWeight.w700,
                       ),
                     ),
-                    const SizedBox(height: 6),
-                    Text(
-                      '${data.rating.points} ELO',
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 25,
-                        fontWeight: FontWeight.w800,
-                      ),
-                    ),
-                    const SizedBox(height: 6),
-                    LinearProgressIndicator(
-                      value: progress,
-                      color: Colors.white,
-                      backgroundColor: const Color(0x44FFFFFF),
-                    ),
-                    const SizedBox(height: 5),
-                    Text(
-                      '${(league.$3 - data.rating.points).clamp(0, 9999)} очков до «${league.$4}»',
-                      style: const TextStyle(
-                        color: Color(0xFFDBE3FF),
-                        fontSize: 7,
-                      ),
-                    ),
                   ],
                 ),
               ),
-            ),
-            const SizedBox(width: 8),
-            Expanded(
-              flex: 6,
-              child: Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
+              const Icon(
+                LucideIcons.trophy,
+                size: 23,
+                color: Color(0xFFDBE3FF),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              Text(
+                '${data.rating.points}',
+                style: TextStyle(
                   color: Colors.white,
-                  border: Border.all(color: AppColors.border),
-                  borderRadius: BorderRadius.circular(14),
+                  fontSize: compact ? 27 : 34,
+                  height: 1,
+                  fontWeight: FontWeight.w800,
+                  letterSpacing: -1.5,
                 ),
+              ),
+              const SizedBox(width: 6),
+              const Text(
+                'ELO',
+                style: TextStyle(
+                  color: Color(0xFFDBE3FF),
+                  fontSize: 9,
+                  fontWeight: FontWeight.w800,
+                  letterSpacing: 1,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 11),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(4),
+            child: LinearProgressIndicator(
+              minHeight: 4,
+              value: progress,
+              color: Colors.white,
+              backgroundColor: const Color(0x36FFFFFF),
+            ),
+          ),
+          const SizedBox(height: 7),
+          Text(
+            '${(league.$3 - data.rating.points).clamp(0, 9999)} очков до уровня «${league.$4}»',
+            style: const TextStyle(color: Color(0xFFDBE3FF), fontSize: 8),
+          ),
+        ],
+      ),
+    );
+    final Widget statisticsCard = Container(
+      padding: const EdgeInsets.symmetric(horizontal: 17, vertical: 15),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        border: Border.all(color: const Color(0xFFDDE1D8)),
+        borderRadius: BorderRadius.circular(14),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
+                    const Text(
+                      'КАРЬЕРА',
+                      style: TextStyle(
+                        color: AppColors.muted,
+                        fontSize: 8,
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: 1.2,
+                      ),
+                    ),
                     Text(
                       '${data.rating.games} рейтинговых партий',
                       style: const TextStyle(
-                        fontSize: 10,
+                        fontSize: 11,
                         fontWeight: FontWeight.w700,
                       ),
-                    ),
-                    const SizedBox(height: 8),
-                    Row(
-                      children: [
-                        _MiniStat('${data.statistics.total}', 'Партий'),
-                        _MiniStat('${data.statistics.wins}', 'Побед'),
-                        _MiniStat('$winRate%', 'Винрейт'),
-                        _MiniStat('${data.statistics.losses}', 'Поражений'),
-                      ],
                     ),
                   ],
                 ),
               ),
-            ),
-          ],
-        ),
+              const Icon(LucideIcons.target, size: 22, color: AppColors.accent),
+            ],
+          ),
+          SizedBox(height: compact ? 8 : 13),
+          Row(
+            children: [
+              _MiniStat('${data.statistics.total}', 'Партий'),
+              _MiniStat('${data.statistics.wins}', 'Побед'),
+              _MiniStat('$winRate%', 'Винрейт'),
+              _MiniStat('${data.statistics.losses}', 'Поражений'),
+            ],
+          ),
+        ],
+      ),
+    );
+    return Column(
+      children: [
+        if (compact) ...[
+          ratingCard,
+          const SizedBox(height: 9),
+          statisticsCard,
+        ] else
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Expanded(flex: 4, child: ratingCard),
+              const SizedBox(width: 12),
+              Expanded(flex: 6, child: statisticsCard),
+            ],
+          ),
         if (!short) ...[
-          const SizedBox(height: 8),
+          const SizedBox(height: 9),
           Container(
             width: double.infinity,
-            padding: const EdgeInsets.all(11),
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 11),
             decoration: BoxDecoration(
               color: Colors.white,
-              border: Border.all(color: AppColors.border),
+              border: Border.all(color: const Color(0xFFDDE1D8)),
               borderRadius: BorderRadius.circular(14),
             ),
-            child: data.matches.isEmpty
-                ? const Text(
-                    'Завершите первую партию — здесь появится ваша игровая форма.',
-                    textAlign: TextAlign.center,
-                    style: TextStyle(color: AppColors.muted, fontSize: 9),
+            child: Column(
+              children: [
+                Row(
+                  children: [
+                    const Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'ПОСЛЕДНИЕ ПАРТИИ',
+                            style: TextStyle(
+                              color: AppColors.muted,
+                              fontSize: 8,
+                              fontWeight: FontWeight.w800,
+                              letterSpacing: 1.2,
+                            ),
+                          ),
+                          Text(
+                            'Недавняя форма',
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    if (onHistory != null)
+                      TextButton.icon(
+                        onPressed: onHistory,
+                        iconAlignment: IconAlignment.end,
+                        icon: const Icon(LucideIcons.chevronRight, size: 15),
+                        label: const Text(
+                          'Вся история',
+                          style: TextStyle(fontSize: 10),
+                        ),
+                      ),
+                  ],
+                ),
+                const SizedBox(height: 9),
+                if (data.matches.isEmpty)
+                  const DecoratedBox(
+                    decoration: BoxDecoration(
+                      color: Color(0xFFF3F5F0),
+                      borderRadius: BorderRadius.all(Radius.circular(9)),
+                    ),
+                    child: Padding(
+                      padding: EdgeInsets.all(12),
+                      child: Text(
+                        'Завершите первую партию — здесь появится ваша игровая форма.',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(color: AppColors.muted, fontSize: 10),
+                      ),
+                    ),
                   )
-                : _RecentMatch(
+                else
+                  _RecentMatch(
                     match: data.matches.first,
                     username: data.username,
                   ),
+              ],
+            ),
           ),
         ],
       ],
@@ -671,15 +908,21 @@ class _MiniStat extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Expanded(
     child: Container(
-      margin: const EdgeInsets.symmetric(horizontal: 2),
-      padding: const EdgeInsets.symmetric(vertical: 6),
-      color: const Color(0xFFF2F4EE),
+      margin: const EdgeInsets.symmetric(horizontal: 3.5),
+      padding: const EdgeInsets.symmetric(vertical: 7, horizontal: 3),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF2F4EE),
+        borderRadius: BorderRadius.circular(9),
+      ),
       child: Column(
         children: [
-          Text(value, style: const TextStyle(fontWeight: FontWeight.w800)),
+          Text(
+            value,
+            style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w800),
+          ),
           Text(
             label,
-            style: const TextStyle(fontSize: 6, color: AppColors.muted),
+            style: const TextStyle(fontSize: 8, color: AppColors.muted),
           ),
         ],
       ),
@@ -696,50 +939,60 @@ class _RecentMatch extends StatelessWidget {
     final int seat = match.names.indexOf(username);
     final bool draw = match.game.winner == null;
     final bool won = !draw && match.game.winner!.index == seat;
-    return Row(
-      children: [
-        Container(
-          width: 27,
-          height: 27,
-          alignment: Alignment.center,
-          decoration: BoxDecoration(
-            color: draw
-                ? const Color(0xFFE8EBEE)
-                : won
-                ? const Color(0xFFE3F2E5)
-                : const Color(0xFFF7E7E4),
-            borderRadius: BorderRadius.circular(8),
-          ),
-          child: Text(
-            draw
-                ? 'Н'
-                : won
-                ? 'В'
-                : 'П',
-          ),
-        ),
-        const SizedBox(width: 8),
-        Expanded(
-          child: Text(
-            draw
-                ? 'Ничья'
-                : won
-                ? 'Победа'
-                : 'Поражение',
-            style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 10),
-          ),
-        ),
-        if (match.ratingChange != null)
-          Text(
-            '${match.ratingChange! >= 0 ? '+' : ''}${match.ratingChange} Elo',
-            style: TextStyle(
-              fontSize: 8,
-              color: match.ratingChange! >= 0
-                  ? AppColors.success
-                  : AppColors.danger,
+    return Container(
+      padding: const EdgeInsets.all(8),
+      decoration: BoxDecoration(
+        color: const Color(0xFFFAFBF8),
+        border: Border.all(color: const Color(0xFFE4E7DF)),
+        borderRadius: BorderRadius.circular(9),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 27,
+            height: 27,
+            alignment: Alignment.center,
+            decoration: BoxDecoration(
+              color: draw
+                  ? const Color(0xFFE8EBEE)
+                  : won
+                  ? const Color(0xFFE3F2E5)
+                  : const Color(0xFFF7E7E4),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Text(
+              draw
+                  ? 'Н'
+                  : won
+                  ? 'В'
+                  : 'П',
+              style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w700),
             ),
           ),
-      ],
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              draw
+                  ? 'Ничья'
+                  : won
+                  ? 'Победа'
+                  : 'Поражение',
+              style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 10),
+            ),
+          ),
+          if (match.ratingChange != null)
+            Text(
+              '${match.ratingChange! >= 0 ? '+' : ''}${match.ratingChange} Elo',
+              style: TextStyle(
+                fontSize: 8,
+                fontWeight: FontWeight.w800,
+                color: match.ratingChange! >= 0
+                    ? AppColors.success
+                    : AppColors.danger,
+              ),
+            ),
+        ],
+      ),
     );
   }
 }
@@ -752,65 +1005,6 @@ class _RecentMatch extends StatelessWidget {
   return ('Мастер', 1500, 1800, 'Высшая лига');
 }
 
-class _SecurityIntro extends StatelessWidget {
-  const new();
-  @override
-  Widget build(BuildContext context) => const _ActionTile(
-    icon: LucideIcons.shieldCheck,
-    title: 'Пароль и активные сеансы',
-    subtitle: 'После смены пароля остальные устройства выйдут из аккаунта. Текущий сеанс останется активным.',
-  );
-}
-
-class _ActionTile extends StatelessWidget {
-  const new({
-    required this.icon,
-    required this.title,
-    required this.subtitle,
-    this.onTap,
-  });
-  final IconData icon;
-  final String title;
-  final String subtitle;
-  final VoidCallback? onTap;
-  @override
-  Widget build(BuildContext context) => InkWell(
-    onTap: onTap,
-    borderRadius: BorderRadius.circular(14),
-    child: Ink(
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: AppColors.surface,
-        border: Border.all(color: AppColors.border),
-        borderRadius: BorderRadius.circular(14),
-      ),
-      child: Row(
-        children: [
-          Icon(icon, color: AppColors.accent),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  title,
-                  style: const TextStyle(fontWeight: FontWeight.w800),
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  subtitle,
-                  style: const TextStyle(fontSize: 10, color: AppColors.muted),
-                ),
-              ],
-            ),
-          ),
-          if (onTap != null) const Icon(LucideIcons.chevronRight, size: 17),
-        ],
-      ),
-    ),
-  );
-}
-
 class _Field extends StatelessWidget {
   const new({
     required this.label,
@@ -818,18 +1012,21 @@ class _Field extends StatelessWidget {
     this.obscureText = false,
     this.autocorrect = true,
     this.keyboardType,
+    this.maxLength,
   });
   final String label;
   final TextEditingController controller;
   final bool obscureText;
   final bool autocorrect;
   final TextInputType? keyboardType;
+  final int? maxLength;
   @override
   Widget build(BuildContext context) => AppTextField(
     controller: controller,
     obscureText: obscureText,
     autocorrect: autocorrect,
     keyboardType: keyboardType,
+    maxLength: maxLength,
     label: label,
   );
 }
@@ -838,9 +1035,22 @@ class _Notice extends StatelessWidget {
   const new(this.text);
   final String text;
   @override
-  Widget build(BuildContext context) => Padding(
-    padding: const EdgeInsets.only(top: 10),
-    child: Text(text, style: const TextStyle(color: Color(0xFF426B4A))),
+  Widget build(BuildContext context) => Container(
+    margin: const EdgeInsets.only(top: 10),
+    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+    decoration: BoxDecoration(
+      color: const Color(0xFFF1F8EF),
+      border: Border.all(color: const Color(0xFFC8DDC3)),
+      borderRadius: BorderRadius.circular(7),
+    ),
+    child: Text(
+      text,
+      style: const TextStyle(
+        color: Color(0xFF315C2C),
+        fontSize: 12,
+        height: 1.45,
+      ),
+    ),
   );
 }
 
@@ -852,7 +1062,11 @@ class _Error extends StatelessWidget {
     padding: const EdgeInsets.only(top: 10),
     child: Text(
       text,
-      style: TextStyle(color: Theme.of(context).colorScheme.error),
+      style: TextStyle(
+        color: Theme.of(context).colorScheme.error,
+        fontSize: 12,
+        height: 1.7,
+      ),
     ),
   );
 }

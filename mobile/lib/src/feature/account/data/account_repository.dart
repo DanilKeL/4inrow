@@ -1,8 +1,16 @@
 import 'dart:math';
 
+import 'package:four3/src/common/rest_client/rest_client.dart';
 import 'package:four3/src/feature/account/data/account_datasource.dart';
 import 'package:four3/src/feature/account/model/account_profile.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+
+final class AccountRegistrationResult {
+  const new({required this.verificationRequired, required this.notice});
+
+  final bool verificationRequired;
+  final String notice;
+}
 
 final class AccountRepository {
   new({required this._datasource, required this._preferences});
@@ -34,18 +42,37 @@ final class AccountRepository {
     return _profileFromJson(await _datasource.profile());
   }
 
-  Future<String> register(
+  Future<AccountRegistrationResult> register(
     String username,
     String email,
     String password,
   ) async {
-    final Map<String, dynamic> json = await _datasource.register(
-      username: username,
-      email: email,
-      password: password,
+    late final Map<String, dynamic> json;
+    try {
+      json = await _datasource.register(
+        username: username,
+        email: email,
+        password: password,
+      );
+    } on RestClientException catch (error) {
+      // The account already exists when delivery of the verification email
+      // fails. The web client treats that response as a completed registration
+      // and offers the resend action instead of leaving the user on the form.
+      if (error.data?['verificationRequired'] == true) {
+        return AccountRegistrationResult(
+          verificationRequired: true,
+          notice: error.message,
+        );
+      }
+      rethrow;
+    }
+    final bool verificationRequired = json['verificationRequired'] == true;
+    return AccountRegistrationResult(
+      verificationRequired: verificationRequired,
+      notice: verificationRequired
+          ? json['message']?.toString() ?? json['error']?.toString() ?? 'Аккаунт создан. Проверьте «Входящие» и папку «Спам», затем подтвердите email.'
+          : '',
     );
-    return json['message']?.toString() ??
-        'Аккаунт создан. Подтвердите email, затем выполните вход.';
   }
 
   Future<AccountProfile> verifyEmail(String token) async {

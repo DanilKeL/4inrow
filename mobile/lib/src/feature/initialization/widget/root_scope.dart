@@ -129,7 +129,7 @@ class _RootScopeState extends State<RootScope> {
       if (snapshot.hasError) {
         return MaterialApp(
           home: _LaunchScreen(
-            error: 'Не удалось запустить приложение: ${snapshot.error}',
+            error: 'Проверьте соединение и попробуйте ещё раз.',
             onRetry: () => setState(() => _future = RootDependencies.create()),
           ),
         );
@@ -176,42 +176,9 @@ class _LaunchScreen extends StatelessWidget {
                 letterSpacing: -2,
               ),
             ),
-            const SizedBox(height: 28),
-            SizedBox(
-              width: 160,
-              height: 150,
-              child: Stack(
-                alignment: Alignment.bottomCenter,
-                children: [
-                  Container(
-                    width: 130,
-                    height: 58,
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFE5E2DA),
-                      border: Border.all(color: const Color(0xFFD0CEC6)),
-                      borderRadius: BorderRadius.circular(65),
-                    ),
-                  ),
-                  for (final value in const <(double, Color)>[
-                    (42.0, Color(0xFF30353C)),
-                    (68.0, Color(0xFFF8F1E3)),
-                    (94.0, Color(0xFF416BED)),
-                  ])
-                    Positioned(
-                      bottom: value.$1,
-                      child: Container(
-                        width: 68,
-                        height: 35,
-                        decoration: BoxDecoration(
-                          color: value.$2,
-                          borderRadius: BorderRadius.circular(34),
-                        ),
-                      ),
-                    ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 16),
+            const SizedBox(height: 30),
+            const _LoadingSculpture(),
+            const SizedBox(height: 20),
             Text(
               error == null ? 'Загрузка игры' : 'Не удалось загрузить поле',
               style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w700),
@@ -229,13 +196,163 @@ class _LaunchScreen extends StatelessWidget {
             if (error == null)
               const SizedBox(
                 width: 128,
-                child: LinearProgressIndicator(minHeight: 2),
+                child: LinearProgressIndicator(
+                  minHeight: 2,
+                  color: Color(0xFF2955E7),
+                  backgroundColor: Color(0xFFDDDFD7),
+                ),
               )
             else
               FilledButton(
                 onPressed: onRetry,
                 child: const Text('Попробовать снова'),
               ),
+          ],
+        ),
+      ),
+    ),
+  );
+}
+
+class _LoadingSculpture extends StatefulWidget {
+  const new();
+
+  @override
+  State<_LoadingSculpture> createState() => _LoadingSculptureState();
+}
+
+class _LoadingSculptureState extends State<_LoadingSculpture>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _controller = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 2800),
+  )..repeat();
+
+  double _offset(double delay) {
+    if (MediaQuery.disableAnimationsOf(context)) return 0;
+    final double progress = (_controller.value - delay) % 1;
+    if (progress <= .25) return -14 * (progress / .25);
+    if (progress <= .45) return -14 * (1 - (progress - .25) / .2);
+    return 0;
+  }
+
+  @override
+  Widget build(BuildContext context) => SizedBox(
+    width: 160,
+    height: 170,
+    child: AnimatedBuilder(
+      animation: _controller,
+      builder: (context, _) => Stack(
+        alignment: Alignment.bottomCenter,
+        children: [
+          Positioned(
+            left: 15,
+            bottom: 12,
+            child: Stack(
+              children: [
+                Container(
+                  width: 130,
+                  height: 58,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF353A3D),
+                    borderRadius: BorderRadius.circular(65),
+                  ),
+                ),
+                Container(
+                  width: 130,
+                  height: 52,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFE5E2DA),
+                    border: Border.all(color: const Color(0xFFD0CEC6)),
+                    borderRadius: BorderRadius.circular(65),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          _LoadingCoin(
+            bottom: 42,
+            offset: _offset(0),
+            color: const Color(0xFF30353C),
+            edge: const Color(0xFF202429),
+            hole: const Color(0xFF9B9D9E),
+          ),
+          _LoadingCoin(
+            bottom: 68,
+            offset: _offset(.064),
+            color: const Color(0xFFF8F1E3),
+            edge: const Color(0xFFD9D0BF),
+            hole: const Color(0xFF9B9D9E),
+          ),
+          _LoadingCoin(
+            bottom: 94,
+            offset: _offset(.128),
+            color: const Color(0xFF416BED),
+            edge: const Color(0xFF2955CE),
+            hole: const Color(0xFFC7D2FA),
+          ),
+        ],
+      ),
+    ),
+  );
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+}
+
+class _LoadingCoin extends StatelessWidget {
+  const new({
+    required this.bottom,
+    required this.offset,
+    required this.color,
+    required this.edge,
+    required this.hole,
+  });
+
+  final double bottom;
+  final double offset;
+  final Color color;
+  final Color edge;
+  final Color hole;
+
+  @override
+  Widget build(BuildContext context) => Positioned(
+    bottom: bottom,
+    child: Transform.translate(
+      offset: Offset(0, offset),
+      child: SizedBox(
+        width: 68,
+        height: 35,
+        child: Stack(
+          children: [
+            Container(
+              decoration: BoxDecoration(
+                color: edge,
+                borderRadius: BorderRadius.circular(34),
+              ),
+            ),
+            Container(
+              height: 25,
+              decoration: BoxDecoration(
+                color: color,
+                borderRadius: BorderRadius.circular(34),
+              ),
+            ),
+            Positioned(
+              top: 8,
+              left: 30,
+              child: Container(
+                width: 7,
+                height: 4,
+                decoration: BoxDecoration(
+                  border: Border.all(color: hole),
+                  borderRadius: BorderRadius.circular(4),
+                ),
+              ),
+            ),
           ],
         ),
       ),

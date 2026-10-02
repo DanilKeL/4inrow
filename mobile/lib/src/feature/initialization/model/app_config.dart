@@ -4,7 +4,7 @@ final class AppConfig {
   factory fromEnvironment() {
     const api = String.fromEnvironment(
       'FOUR_API_BASE_URL',
-      defaultValue: 'http://localhost:3000',
+      defaultValue: 'https://4inrow.ru',
     );
     const configuredOnline = String.fromEnvironment('FOUR_ONLINE_URL');
     final Uri base = Uri.parse(api);

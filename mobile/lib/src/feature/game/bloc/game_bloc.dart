@@ -30,6 +30,8 @@ final class GameViewData extends Equatable {
     this.message = '',
     this.replayIndex = 0,
     this.levelId,
+    this.levelChapter,
+    this.levelPresetLength = 0,
     this.levelBestBefore,
     this.onlinePlayer,
     this.onlineConnection = OnlineConnectionStatus.idle,
@@ -50,7 +52,14 @@ final class GameViewData extends Equatable {
   final String message;
   final int replayIndex;
   final int? levelId;
+  final String? levelChapter;
+  final int levelPresetLength;
   final int? levelBestBefore;
+
+  int get levelMoves => snapshot.history
+      .skip(levelPresetLength)
+      .where((move) => move.player == Player.one)
+      .length;
   final Player? onlinePlayer;
   final OnlineConnectionStatus onlineConnection;
   final String? onlineCode;
@@ -82,6 +91,8 @@ final class GameViewData extends Equatable {
     String? message,
     int? replayIndex,
     Object? levelId = _unset,
+    Object? levelChapter = _unset,
+    int? levelPresetLength,
     Object? levelBestBefore = _unset,
     Object? onlinePlayer = _unset,
     OnlineConnectionStatus? onlineConnection,
@@ -101,6 +112,10 @@ final class GameViewData extends Equatable {
     message: message ?? this.message,
     replayIndex: replayIndex ?? this.replayIndex,
     levelId: identical(levelId, _unset) ? this.levelId : levelId as int?,
+    levelChapter: identical(levelChapter, _unset)
+        ? this.levelChapter
+        : levelChapter as String?,
+    levelPresetLength: levelPresetLength ?? this.levelPresetLength,
     levelBestBefore: identical(levelBestBefore, _unset)
         ? this.levelBestBefore
         : levelBestBefore as int?,
@@ -131,6 +146,8 @@ final class GameViewData extends Equatable {
     message,
     replayIndex,
     levelId,
+    levelChapter,
+    levelPresetLength,
     levelBestBefore,
     onlinePlayer,
     onlineConnection,
@@ -514,6 +531,8 @@ final class GameBloc extends Bloc<GameEvent, GameState> {
       xray: _settings().xrayDefault,
       cameraReset: (data?.cameraReset ?? 0) + 1,
       levelId: id,
+      levelChapter: level.chapter,
+      levelPresetLength: level.preset.length,
       levelBestBefore: best[id],
     );
     emit(GameState$Ready(value));
@@ -705,6 +724,8 @@ final class GameBloc extends Bloc<GameEvent, GameState> {
           phase: GamePhase.menu,
           mode: GameMode.local,
           levelId: null,
+          levelChapter: null,
+          levelPresetLength: 0,
           levelBestBefore: null,
           message: '',
         ),

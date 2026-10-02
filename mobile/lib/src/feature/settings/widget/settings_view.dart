@@ -47,9 +47,8 @@ class SettingsView extends StatelessWidget {
                 ),
                 Slider(
                   value: settings.volume,
-                  onChanged: settings.sound
-                      ? (value) => update(settings.copyWith(volume: value))
-                      : null,
+                  onChanged: (value) =>
+                      update(settings.copyWith(volume: value)),
                 ),
                 if (!settings.sound)
                   const Text(
@@ -70,7 +69,7 @@ class SettingsView extends StatelessWidget {
             icon: LucideIcons.mousePointer2,
             value: settings.hints,
             title: 'Предпросмотр хода',
-            subtitle: 'Показывать фишку перед ходом',
+            subtitle: 'Показывать фишку при наведении',
             onChanged: (value) => update(settings.copyWith(hints: value)),
           ),
           _SettingSwitch(
@@ -109,7 +108,10 @@ class _SettingRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Container(
-    padding: const EdgeInsets.symmetric(vertical: 12),
+    constraints: const BoxConstraints(minHeight: 54),
+    padding: EdgeInsets.symmetric(
+      vertical: MediaQuery.sizeOf(context).width <= 650 ? 10 : 18,
+    ),
     decoration: const BoxDecoration(
       border: Border(bottom: BorderSide(color: AppColors.border)),
     ),
@@ -120,7 +122,7 @@ class _SettingRow extends StatelessWidget {
           padding: const EdgeInsets.only(top: 2),
           child: Icon(icon, size: 20, color: const Color(0xFF6D765F)),
         ),
-        const SizedBox(width: 12),
+        SizedBox(width: MediaQuery.sizeOf(context).width <= 650 ? 8 : 15),
         Expanded(child: child),
       ],
     ),

@@ -43,7 +43,7 @@ Future<T?> showAppDialog<T>({
               margin: EdgeInsets.all(inset),
               padding: EdgeInsets.fromLTRB(
                 compact ? 14 : 30,
-                compact ? 10 : 24,
+                compact ? 14 : 24,
                 compact ? 14 : 30,
                 (compact ? 14 : 30) + MediaQuery.viewInsetsOf(context).bottom,
               ),
@@ -62,7 +62,7 @@ Future<T?> showAppDialog<T>({
               child: Material(
                 color: Colors.transparent,
                 child: Column(
-                  mainAxisSize: wide ? MainAxisSize.max : MainAxisSize.min,
+                  mainAxisSize: MainAxisSize.min,
                   children: [
                     Row(
                       children: [
@@ -85,7 +85,7 @@ Future<T?> showAppDialog<T>({
                     ),
                     const SizedBox(height: 6),
                     if (wide)
-                      Expanded(child: child)
+                      Flexible(child: child)
                     else
                       Flexible(child: SingleChildScrollView(child: child)),
                   ],

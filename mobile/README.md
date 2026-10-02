@@ -7,10 +7,13 @@ Native iOS/Android client. Flutter is pinned with FVM; web and backend remain in
 ```sh
 fvm install
 fvm flutter pub get
-fvm flutter run --dart-define=FOUR_API_BASE_URL=http://127.0.0.1:3000
+fvm flutter run
 ```
 
-For an Android emulator use `http://10.0.2.2:3000`. Override `FOUR_ONLINE_URL` only when the WebSocket endpoint is not derived from the API host.
+The app uses `https://4inrow.ru` by default. To run against a local backend,
+pass `--dart-define=FOUR_API_BASE_URL=http://127.0.0.1:3000`; for an Android
+emulator use `http://10.0.2.2:3000`. Override `FOUR_ONLINE_URL` only when the
+WebSocket endpoint is not derived from the API host.
 
 ## Verification
 

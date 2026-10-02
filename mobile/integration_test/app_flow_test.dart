@@ -60,6 +60,11 @@ void main() {
     await tester.tap(find.text('Начать игру'));
     await tester.pump(const Duration(seconds: 1));
 
+    if (find.text('Как играть').evaluate().isNotEmpty) {
+      await tester.tap(find.text('Начать'));
+      await tester.pump(const Duration(seconds: 1));
+    }
+
     expect(bloc.data?.phase, GamePhase.playing);
     await binding.takeScreenshot('local-game-empty');
 
@@ -86,8 +91,12 @@ void main() {
     await tester.tap(find.byTooltip('Пауза'));
     await tester.pump(const Duration(milliseconds: 300));
     expect(find.text('Время остановлено.'), findsOneWidget);
-    await tester.tap(find.text('В главное меню'));
+    await tester.tap(find.text('Главное меню'));
     await tester.pump(const Duration(milliseconds: 500));
+    if (find.text('Завершить текущую партию?').evaluate().isNotEmpty) {
+      await tester.tap(find.text('Выйти в меню'));
+      await tester.pump(const Duration(milliseconds: 500));
+    }
     expect(bloc.data?.phase, GamePhase.menu);
     expect(find.text('Четыре в ряд'), findsOneWidget);
 

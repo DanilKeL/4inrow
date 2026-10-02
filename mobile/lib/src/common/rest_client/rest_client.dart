@@ -4,10 +4,11 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:http/http.dart' as http;
 
 final class RestClientException implements Exception {
-  const new(this.message, {this.statusCode});
+  const new(this.message, {this.statusCode, this.data});
 
   final String message;
   final int? statusCode;
+  final Map<String, dynamic>? data;
 
   @override
   String toString() => message;
@@ -140,6 +141,7 @@ final class RestClient$Http implements RestClient {
       throw RestClientException(
         body['error']?.toString() ?? 'Ошибка сервера.',
         statusCode: response.statusCode,
+        data: body,
       );
     }
     return body;

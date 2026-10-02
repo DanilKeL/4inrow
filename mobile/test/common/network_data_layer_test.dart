@@ -55,6 +55,57 @@ void main() {
     expect(profile.createdAt, 42);
   });
 
+  test(
+    'account repository preserves registration feedback from web API',
+    () async {
+      SharedPreferences.setMockInitialValues(<String, Object>{});
+      final SharedPreferences preferences =
+          await SharedPreferences.getInstance();
+      final datasource = _FakeAccountDatasource()
+        ..registerResponse = <String, dynamic>{
+          'verificationRequired': true,
+          'message': 'Письмо с подтверждением отправлено. Проверьте «Входящие» и папку «Спам».',
+        };
+      final repository = AccountRepository(
+        datasource: datasource,
+        preferences: preferences,
+      );
+
+      final AccountRegistrationResult result = await repository.register(
+        'cube',
+        'cube@example.com',
+        'password-123',
+      );
+
+      expect(result.verificationRequired, isTrue);
+      expect(result.notice, contains('папку «Спам»'));
+    },
+  );
+
+  test('failed email delivery still completes registration like web', () async {
+    SharedPreferences.setMockInitialValues(<String, Object>{});
+    final SharedPreferences preferences = await SharedPreferences.getInstance();
+    final datasource = _FakeAccountDatasource()
+      ..registerError = const RestClientException(
+        'Аккаунт создан, но письмо не отправлено. Повторите отправку позже.',
+        statusCode: 503,
+        data: <String, dynamic>{'verificationRequired': true},
+      );
+    final repository = AccountRepository(
+      datasource: datasource,
+      preferences: preferences,
+    );
+
+    final AccountRegistrationResult result = await repository.register(
+      'cube',
+      'cube@example.com',
+      'password-123',
+    );
+
+    expect(result.verificationRequired, isTrue);
+    expect(result.notice, startsWith('Аккаунт создан'));
+  });
+
   test('leaderboard repository converts raw rows into models', () async {
     final datasource = LeaderboardDatasource$RestClient(
       restClient: _FakeRestClient(<String, Map<String, dynamic>>{
@@ -117,6 +168,8 @@ final class _FakeRestClient implements RestClient {
 
 final class _FakeAccountDatasource implements AccountDatasource {
   Map<String, dynamic> profileResponse = <String, dynamic>{};
+  Map<String, dynamic> registerResponse = <String, dynamic>{};
+  RestClientException? registerError;
 
   @override
   Future<Map<String, dynamic>> profile() async => profileResponse;
@@ -132,7 +185,10 @@ final class _FakeAccountDatasource implements AccountDatasource {
     required String username,
     required String email,
     required String password,
-  }) async => <String, dynamic>{};
+  }) async {
+    if (registerError case final error?) throw error;
+    return registerResponse;
+  }
 
   @override
   Future<Map<String, dynamic>> verifyEmail({required String token}) async =>

@@ -63,11 +63,32 @@ void main() {
       expect(ready.notice, 'verification sent');
     },
   );
+
+  test('marks email registration complete and keeps its notice', () async {
+    datasource.registrationResponse = {
+      'verificationRequired': true,
+      'message': 'Письмо с подтверждением отправлено. Проверьте «Входящие» и папку «Спам».',
+    };
+    bloc.add(const AccountEvent$Load());
+    await bloc.stream.firstWhere((state) => state is AccountState$Ready);
+
+    bloc.add(
+      const AccountEvent$Register('Alice', 'alice@example.com', 'password-123'),
+    );
+    final AccountState$Ready ready = (await bloc.stream.firstWhere(
+      (state) => state is AccountState$Ready && state.registrationCompleted,
+    )) as AccountState$Ready;
+
+    expect(ready.profile.username, isNull);
+    expect(ready.registrationCompleted, isTrue);
+    expect(ready.notice, contains('папку «Спам»'));
+  });
 }
 
 final class _AccountDatasource implements AccountDatasource {
   String? completedToken;
   bool signedIn = false;
+  Map<String, dynamic> registrationResponse = {'message': 'registered'};
 
   @override
   Future<Map<String, dynamic>> profile() async => signedIn
@@ -119,7 +140,7 @@ final class _AccountDatasource implements AccountDatasource {
     required String username,
     required String email,
     required String password,
-  }) async => {'message': 'registered'};
+  }) async => registrationResponse;
 
   @override
   Future<Map<String, dynamic>> verifyEmail({required String token}) async => {

@@ -120,7 +120,11 @@ final class MatchmakingState$Idle extends MatchmakingState {
 }
 
 final class MatchmakingState$Connecting extends MatchmakingState {
-  const new();
+  const new({this.reconnecting = false});
+  final bool reconnecting;
+
+  @override
+  List<Object> get props => [reconnecting];
 }
 
 final class MatchmakingState$Searching extends MatchmakingState {
@@ -332,7 +336,7 @@ final class MatchmakingBloc extends Bloc<MatchmakingEvent, MatchmakingState> {
             ),
           );
         } else if (_connection == OnlineConnectionStatus.reconnecting) {
-          emit(const MatchmakingState$Connecting());
+          emit(const MatchmakingState$Connecting(reconnecting: true));
         }
       case OnlineTransportEvent$Failure(:final message):
         emit(MatchmakingState$Failure(message));

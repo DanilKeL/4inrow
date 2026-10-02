@@ -1,11 +1,11 @@
 import 'dart:async';
 import 'dart:math' as math;
+import 'dart:ui';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:four3/src/common/theme/app_theme.dart';
-import 'package:four3/src/common/widget/app_controls.dart';
 import 'package:four3/src/common/widget/app_dialog.dart';
 import 'package:four3/src/feature/account/bloc/account_bloc.dart';
 import 'package:four3/src/feature/account/widget/account_root_scope.dart';
@@ -29,6 +29,17 @@ import 'package:four3/src/feature/settings/widget/settings_root_scope.dart';
 import 'package:four3/src/feature/settings/widget/settings_view.dart';
 import 'package:four3/src/feature/tutorial/widget/tutorial_view.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
+
+String _moveLabel(int count) {
+  final String ending = count % 100 >= 11 && count % 100 <= 14
+      ? 'ходов'
+      : count % 10 == 1
+      ? 'ход'
+      : count % 10 >= 2 && count % 10 <= 4
+      ? 'хода'
+      : 'ходов';
+  return '$count $ending';
+}
 
 class GameShell extends StatelessWidget {
   const new({super.key});
@@ -94,21 +105,18 @@ class _GameShellBody extends StatelessWidget {
                     Expanded(
                       child: LayoutBuilder(
                         builder: (context, constraints) {
-                          final Widget scene = _SceneCard(
-                            menu: isMenu,
-                            child: GameSceneView(
-                              data: shownData,
-                              settings: settings,
-                              demo: isMenu,
-                              onPlace: (x, y) {
-                                if (data.mode == GameMode.online) {
-                                  MatchmakingRootScope.of(context)
-                                      .add(MatchmakingEvent$Move(x, y));
-                                } else {
-                                  gameBloc.add(GameEvent$MakeMove(x, y));
-                                }
-                              },
-                            ),
+                          final Widget sceneView = GameSceneView(
+                            data: shownData,
+                            settings: settings,
+                            demo: isMenu,
+                            onPlace: (x, y) {
+                              if (data.mode == GameMode.online) {
+                                MatchmakingRootScope.of(context)
+                                    .add(MatchmakingEvent$Move(x, y));
+                              } else {
+                                gameBloc.add(GameEvent$MakeMove(x, y));
+                              }
+                            },
                           );
                           if (!isMenu) {
                             final bool shortLandscape =
@@ -117,21 +125,27 @@ class _GameShellBody extends StatelessWidget {
                             final bool result =
                                 data.snapshot.status != GameStatus.playing ||
                                 data.phase == GamePhase.replay;
-                            final Widget board = Stack(
-                              fit: StackFit.expand,
-                              children: [
-                                scene,
-                                if (!shortLandscape)
-                                  _PlayingOverlay(data: data),
-                                if (shortLandscape && data.message.isNotEmpty)
-                                  _GameMessage(message: data.message),
-                                if (data.onlineSnapshot?.pause
-                                    case final pause?)
-                                  if (pause.requestId != null ||
-                                      pause.endsAt != null)
-                                    _OnlinePauseOverlay(data: data),
-                              ],
-                            );
+                            final Widget board = shortLandscape
+                                ? Stack(
+                                    fit: StackFit.expand,
+                                    children: [
+                                      _SceneCard(menu: false, child: sceneView),
+                                      if (data.message.isNotEmpty)
+                                        _GameMessage(message: data.message),
+                                    ],
+                                  )
+                                : _PortraitGameBoard(
+                                    data: data,
+                                    scene: sceneView,
+                                  );
+                            final Widget content = result && !shortLandscape
+                                ? Column(
+                                    children: [
+                                      Expanded(child: board),
+                                      _GamePanel(data: data),
+                                    ],
+                                  )
+                                : board;
                             return Padding(
                               padding: const EdgeInsets.fromLTRB(0, 8, 0, 10),
                               child: shortLandscape
@@ -156,9 +170,13 @@ class _GameShellBody extends StatelessWidget {
                                         ],
                                       ],
                                     )
-                                  : board,
+                                  : content,
                             );
                           }
+                          final Widget scene = _SceneCard(
+                            menu: true,
+                            child: sceneView,
+                          );
                           final bool landscape =
                               constraints.maxWidth > constraints.maxHeight;
                           final Widget menu = _MenuHero(
@@ -195,6 +213,12 @@ class _GameShellBody extends StatelessWidget {
                 ),
               ),
             ),
+            if (data.onlineSnapshot?.pause case final pause?)
+              if (pause.requestId != null || pause.endsAt != null)
+                _OnlinePauseOverlay(
+                  key: ValueKey('${pause.requestId}-${pause.endsAt}'),
+                  data: data,
+                ),
             if (data.onlineSnapshot case final snapshot?)
               if (snapshot.game.status != GameStatus.playing &&
                   snapshot.ranking?.rated == true &&
@@ -222,7 +246,7 @@ class _GameShellBody extends StatelessWidget {
     showAppDialog<void>(
       context: context,
       title: 'Рейтинговая игра',
-      child: const OnlineSetupView(),
+      child: const OnlineSetupView(quickOnly: true),
     );
   }
 }
@@ -354,9 +378,11 @@ class _Header extends StatelessWidget {
     if (openHistory && context.mounted) {
       await showAppDialog<void>(
         context: context,
-        title: 'История и статистика',
-        wide: true,
-        child: const MatchHistoryView(),
+        title: 'История партий',
+        child: SizedBox(
+          height: math.min(560, MediaQuery.sizeOf(context).height - 180),
+          child: const MatchHistoryView(),
+        ),
       );
     }
   }
@@ -577,20 +603,27 @@ class _MenuHero extends StatelessWidget {
         SizedBox(height: compact ? 4 : 5),
         SizedBox(
           height: compact ? 30 : 32,
-          child: TextButton.icon(
+          child: TextButton(
             onPressed: () => showAppDialog<void>(
               context: context,
               title: 'Рейтинг игроков',
               wide: true,
-              child: const SizedBox(height: 520, child: LeaderboardView()),
+              child: const LeaderboardView(),
             ),
             style: TextButton.styleFrom(
               padding: const EdgeInsets.symmetric(horizontal: 4),
               foregroundColor: const Color(0xFF697163),
               textStyle: const TextStyle(fontSize: 10),
             ),
-            icon: const Icon(LucideIcons.trophy, size: 16),
-            label: const Text('Рейтинг игроков'),
+            child: const Row(
+              children: [
+                Icon(LucideIcons.trophy, size: 16),
+                SizedBox(width: 9),
+                Text('Рейтинг игроков'),
+                Spacer(),
+                Icon(LucideIcons.arrowRight, size: 14),
+              ],
+            ),
           ),
         ),
       ],
@@ -729,9 +762,24 @@ class _TurnStatusState extends State<_TurnStatus> {
               margin: const EdgeInsets.symmetric(horizontal: 8),
               color: AppColors.border,
             ),
-            Text(
-              _remaining == null ? '— сек' : '${_remaining!} сек',
-              style: const TextStyle(fontSize: 9, fontWeight: FontWeight.w700),
+            Text.rich(
+              TextSpan(
+                text: _remaining == null ? '—' : '${_remaining!}',
+                style: const TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w700,
+                ),
+                children: const [
+                  TextSpan(
+                    text: ' сек',
+                    style: TextStyle(
+                      color: Color(0xFF858D7B),
+                      fontSize: 9,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
+              ),
             ),
           ],
         ],
@@ -779,6 +827,19 @@ class _OnlineBannerState extends State<_OnlineBanner> {
         : !opponent.connected
         ? 'Соперник отключился. Ждём возвращения…'
         : 'Вы играете ${index == 0 ? 'графитом · ●' : 'светлыми · ○'}';
+    final String rankedStatus = ranking?.rated == true
+        ? 'Рейтинг: ${ranking!.points[index] + (delta ?? 0)}'
+              '${delta != null
+                  ? ' (${delta >= 0 ? '+' : ''}$delta)'
+                  : snapshot.pause?.endsAt != null
+                  ? ' · Пауза'
+                  : ''}'
+              '${snapshot.endReason != null
+                  ? ' · ${snapshot.endReason}'
+                  : opponent?.connected == false
+                  ? ' · Ждём подключения'
+                  : ''}'
+        : (ranking?.reason ?? status);
     return Container(
       padding: EdgeInsets.all(widget.compact ? 7 : 10),
       decoration: BoxDecoration(
@@ -832,9 +893,7 @@ class _OnlineBannerState extends State<_OnlineBanner> {
             ],
           ),
           Text(
-            ranking?.rated == true
-                ? 'Рейтинг: ${(ranking!.points[index]) + (delta ?? 0)}${delta == null ? '' : ' (${delta >= 0 ? '+' : ''}$delta)'}'
-                : (ranking?.reason ?? status),
+            rankedStatus,
             style: const TextStyle(fontSize: 9, color: AppColors.muted),
           ),
           if (_copyStatus.isNotEmpty)
@@ -865,6 +924,64 @@ class _LandscapeGameRail extends StatelessWidget {
   );
 }
 
+class _PortraitGameBoard extends StatelessWidget {
+  const new({required this.data, required this.scene});
+
+  final GameViewData data;
+  final Widget scene;
+
+  @override
+  Widget build(BuildContext context) => ClipRRect(
+    borderRadius: BorderRadius.circular(12),
+    child: DecoratedBox(
+      decoration: BoxDecoration(
+        color: const Color(0xFFEEEEE8),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: const Color(0xFFDFE1D9)),
+      ),
+      child: Column(
+        children: [
+          if (data.mode == GameMode.online)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(12, 5, 12, 0),
+              child: _OnlineBanner(data: data),
+            ),
+          SizedBox(
+            height: 48,
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 7),
+              child: Row(
+                children: [
+                  Flexible(child: _TurnStatus(data: data)),
+                  const Spacer(),
+                  IconButton(
+                    tooltip: 'Пауза',
+                    onPressed: () => _showPauseDialog(context, data),
+                    icon: const Icon(LucideIcons.pause, size: 19),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          Expanded(
+            child: Stack(
+              fit: StackFit.expand,
+              children: [
+                scene,
+                if (data.message.isNotEmpty)
+                  _GameMessage(message: data.message, bottom: 8),
+              ],
+            ),
+          ),
+          _PlayerStrip(data: data),
+          const Divider(height: 1),
+          _ToolBar(data: data, labels: true),
+        ],
+      ),
+    ),
+  );
+}
+
 class _PlayerStrip extends StatelessWidget {
   const new({required this.data});
   final GameViewData data;
@@ -883,7 +1000,9 @@ class _PlayerStrip extends StatelessWidget {
           ),
         ),
         Text(
-          '${data.phase == GamePhase.replay ? data.replayIndex : data.snapshot.history.length} ходов',
+          data.mode == GameMode.level
+              ? _moveLabel(data.levelMoves)
+              : '${data.phase == GamePhase.replay ? data.replayIndex : data.snapshot.history.length} ходов',
           style: const TextStyle(fontSize: 9),
         ),
         Expanded(
@@ -901,8 +1020,9 @@ class _PlayerStrip extends StatelessWidget {
 }
 
 class _ToolBar extends StatelessWidget {
-  const new({required this.data});
+  const new({required this.data, this.labels = false});
   final GameViewData data;
+  final bool labels;
 
   @override
   Widget build(BuildContext context) {
@@ -912,7 +1032,7 @@ class _ToolBar extends StatelessWidget {
         if (data.mode != GameMode.level)
           _Tool(
             icon: LucideIcons.rotateCcw,
-            label: '',
+            label: labels ? 'Отменить' : '',
             enabled:
                 data.mode != GameMode.online &&
                 data.phase == GamePhase.playing &&
@@ -921,11 +1041,11 @@ class _ToolBar extends StatelessWidget {
           ),
         _Tool(
           icon: LucideIcons.eye,
-          label: '',
+          label: labels ? 'Рентген' : '',
           selected: data.xray,
           onTap: () => bloc.add(const GameEvent$ToggleXray()),
         ),
-        const _ViewTool(label: ''),
+        _ViewTool(label: labels ? 'Вид' : ''),
         _Tool(
           icon: LucideIcons.maximize,
           label: '',
@@ -937,14 +1057,15 @@ class _ToolBar extends StatelessWidget {
 }
 
 class _GameMessage extends StatelessWidget {
-  const new({required this.message});
+  const new({required this.message, this.bottom = 76});
   final String message;
+  final double bottom;
 
   @override
   Widget build(BuildContext context) => Positioned(
     left: 24,
     right: 24,
-    bottom: 76,
+    bottom: bottom,
     child: Material(
       color: const Color(0xEE9A3F35),
       borderRadius: BorderRadius.circular(12),
@@ -961,7 +1082,7 @@ class _GameMessage extends StatelessWidget {
 }
 
 class _OnlinePauseOverlay extends StatefulWidget {
-  const new({required this.data});
+  const new({required this.data, super.key});
   final GameViewData data;
 
   @override
@@ -970,6 +1091,7 @@ class _OnlinePauseOverlay extends StatefulWidget {
 
 class _OnlinePauseOverlayState extends State<_OnlinePauseOverlay> {
   Timer? _timer;
+  bool _dismissed = false;
 
   @override
   void initState() {
@@ -981,6 +1103,7 @@ class _OnlinePauseOverlayState extends State<_OnlinePauseOverlay> {
 
   @override
   Widget build(BuildContext context) {
+    if (_dismissed) return const SizedBox.shrink();
     final OnlineMatchSnapshot snapshot = widget.data.onlineSnapshot!;
     final OnlinePause pause = snapshot.pause!;
     final Player player = widget.data.onlinePlayer!;
@@ -995,80 +1118,131 @@ class _OnlinePauseOverlayState extends State<_OnlinePauseOverlay> {
     return Positioned.fill(
       child: ColoredBox(
         color: const Color(0x66323A33),
-        child: Center(
-          child: Container(
-            width: 360,
-            constraints: const BoxConstraints(maxWidth: 360),
-            margin: const EdgeInsets.all(16),
-            padding: const EdgeInsets.all(18),
-            decoration: BoxDecoration(
-              color: AppColors.surface,
-              borderRadius: BorderRadius.circular(18),
-            ),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Text(
-                  pause.endsAt == null ? 'Запрос паузы' : 'Пауза · 2 минуты',
-                  style: const TextStyle(
-                    fontSize: 20,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-                const SizedBox(height: 12),
-                if (pause.endsAt != null) ...[
-                  Text(
-                    '${remaining ~/ 60}:${(remaining % 60).toString().padLeft(2, '0')}',
-                    textAlign: TextAlign.center,
-                    style: const TextStyle(
-                      fontSize: 48,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                  const Text(
-                    'Оба готовы — продолжаем сразу. Иначе ждём окончания таймера.',
-                    textAlign: TextAlign.center,
-                    style: TextStyle(color: AppColors.muted, fontSize: 11),
-                  ),
-                  const SizedBox(height: 12),
-                  FilledButton(
-                    onPressed: ready || remaining == 0
-                        ? null
-                        : () => bloc.add(const MatchmakingEvent$Ready()),
-                    child: Text(ready ? 'Вы готовы' : 'Готов'),
-                  ),
-                ] else ...[
-                  Text(
-                    own
-                        ? 'Ждём согласия соперника.'
-                        : '${widget.data.names[pause.requestedBy?.index ?? 0]} предлагает паузу на 2 минуты.',
-                  ),
-                  Text(
-                    'На ответ: $remaining сек. До принятия партия продолжается.',
-                    style: const TextStyle(
-                      color: AppColors.muted,
-                      fontSize: 11,
-                    ),
+        child: BackdropFilter(
+          filter: ImageFilter.blur(sigmaX: 9, sigmaY: 9),
+          child: Center(
+            child: Container(
+              width: 360,
+              constraints: const BoxConstraints(maxWidth: 360),
+              margin: const EdgeInsets.all(16),
+              padding: const EdgeInsets.all(18),
+              decoration: BoxDecoration(
+                color: AppColors.surface,
+                borderRadius: BorderRadius.circular(18),
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          pause.endsAt == null
+                              ? 'Запрос паузы'
+                              : 'Пауза · 2 минуты',
+                          style: const TextStyle(
+                            fontSize: 21,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ),
+                      IconButton(
+                        tooltip: 'Закрыть',
+                        onPressed: () => setState(() => _dismissed = true),
+                        icon: const Icon(Icons.close_rounded, size: 20),
+                      ),
+                    ],
                   ),
                   const SizedBox(height: 12),
-                  if (!own)
+                  if (pause.endsAt != null) ...[
+                    Text(
+                      '${remaining ~/ 60}:${(remaining % 60).toString().padLeft(2, '0')}',
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(
+                        fontSize: 48,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    const Text(
+                      'Оба готовы — продолжаем сразу. Иначе ждём окончания таймера.',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(color: AppColors.muted, fontSize: 11),
+                    ),
+                    const SizedBox(height: 12),
                     FilledButton(
-                      onPressed: remaining == 0
+                      onPressed:
+                          ready ||
+                              remaining == 0 ||
+                              widget.data.onlineConnection !=
+                                  OnlineConnectionStatus.connected ||
+                              !snapshot.players.every(
+                                (player) => player?.connected ?? false,
+                              )
+                          ? null
+                          : () => bloc.add(const MatchmakingEvent$Ready()),
+                      child: Text(ready ? 'Вы готовы' : 'Готов'),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      ready
+                          ? 'Ждём готовности соперника.'
+                          : pause.ready.any((value) => value != player)
+                          ? 'Соперник готов.'
+                          : '',
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(
+                        color: AppColors.muted,
+                        fontSize: 11,
+                      ),
+                    ),
+                    if (widget.data.onlineConnection !=
+                        OnlineConnectionStatus.connected)
+                      const Text(
+                        'Восстанавливаем соединение…',
+                        textAlign: TextAlign.center,
+                      ),
+                  ] else ...[
+                    Text(
+                      own
+                          ? 'Ждём согласия соперника.'
+                          : '${widget.data.names[pause.requestedBy?.index ?? 0]} предлагает паузу на 2 минуты.',
+                    ),
+                    Text(
+                      'На ответ: $remaining сек. До принятия партия продолжается.',
+                      style: const TextStyle(
+                        color: AppColors.muted,
+                        fontSize: 11,
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    if (!own)
+                      FilledButton(
+                        onPressed:
+                            remaining == 0 ||
+                                widget.data.onlineConnection !=
+                                    OnlineConnectionStatus.connected
+                            ? null
+                            : () => bloc.add(
+                                const MatchmakingEvent$PauseAnswer(
+                                  accept: true,
+                                ),
+                              ),
+                        child: const Text('Принять паузу'),
+                      ),
+                    OutlinedButton(
+                      onPressed:
+                          widget.data.onlineConnection !=
+                              OnlineConnectionStatus.connected
                           ? null
                           : () => bloc.add(
-                              const MatchmakingEvent$PauseAnswer(accept: true),
+                              const MatchmakingEvent$PauseAnswer(accept: false),
                             ),
-                      child: const Text('Принять паузу'),
+                      child: Text(own ? 'Отменить запрос' : 'Отклонить'),
                     ),
-                  OutlinedButton(
-                    onPressed: () => bloc.add(
-                      const MatchmakingEvent$PauseAnswer(accept: false),
-                    ),
-                    child: Text(own ? 'Отменить запрос' : 'Отклонить'),
-                  ),
+                  ],
                 ],
-              ],
+              ),
             ),
           ),
         ),
@@ -1107,142 +1281,186 @@ class _RankedResultOverlayState extends State<_RankedResultOverlay> {
     final String opponent =
         snapshot.players[index == 0 ? 1 : 0]?.name ?? 'соперником';
     final bool waiting = snapshot.rematch.contains(data.onlinePlayer);
+    final bool connected =
+        data.onlineConnection == OnlineConnectionStatus.connected &&
+        snapshot.players.every((player) => player?.connected ?? false);
     return Positioned.fill(
       child: ColoredBox(
         color: const Color(0x94313732),
-        child: SafeArea(
-          child: Center(
-            child: SingleChildScrollView(
-              child: Container(
-                width: 440,
-                margin: const EdgeInsets.all(12),
-                padding: const EdgeInsets.fromLTRB(18, 22, 18, 18),
-                decoration: BoxDecoration(
-                  color: AppColors.surface,
-                  borderRadius: BorderRadius.circular(18),
-                  border: Border.all(color: AppColors.border),
-                ),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    const Text(
-                      'РЕЙТИНГОВАЯ ПАРТИЯ ЗАВЕРШЕНА',
-                      style: TextStyle(
-                        color: AppColors.muted,
-                        fontSize: 9,
-                        fontWeight: FontWeight.w800,
-                        letterSpacing: 1.2,
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    CircleAvatar(
-                      radius: 25,
-                      backgroundColor: won
-                          ? AppColors.accent
-                          : const Color(0xFF5F6761),
-                      foregroundColor: Colors.white,
-                      child: Icon(
-                        delta >= 0
-                            ? LucideIcons.trendingUp
-                            : LucideIcons.trendingDown,
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      won
-                          ? 'Победа'
-                          : lost
-                          ? 'Поражение'
-                          : 'Ничья',
-                      style: const TextStyle(
-                        fontSize: 28,
-                        fontWeight: FontWeight.w800,
-                      ),
-                    ),
-                    Text(
-                      won
-                          ? 'Вы обыграли $opponent'
-                          : lost
-                          ? '$opponent выиграл эту партию'
-                          : 'Равная партия с $opponent',
-                      style: const TextStyle(
-                        color: AppColors.muted,
-                        fontSize: 12,
-                      ),
-                    ),
-                    if (snapshot.endReason case final reason?)
-                      Text(
-                        reason,
-                        style: const TextStyle(
-                          color: AppColors.muted,
-                          fontSize: 10,
+        child: BackdropFilter(
+          filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
+          child: SafeArea(
+            child: Center(
+              child: SingleChildScrollView(
+                child: Container(
+                  width: 440,
+                  margin: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: AppColors.surface,
+                    borderRadius: BorderRadius.circular(15),
+                    border: Border.all(color: AppColors.border),
+                  ),
+                  clipBehavior: Clip.antiAlias,
+                  child: Stack(
+                    children: [
+                      Positioned(
+                        left: 0,
+                        top: 0,
+                        right: 0,
+                        height: 4,
+                        child: ColoredBox(
+                          color: won
+                              ? AppColors.accent
+                              : lost
+                              ? const Color(0xFF9E4C43)
+                              : const Color(0xFF737B71),
                         ),
                       ),
-                    Container(
-                      width: double.infinity,
-                      margin: const EdgeInsets.symmetric(vertical: 14),
-                      padding: const EdgeInsets.all(12),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFF0F1EC),
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: AppColors.border),
-                      ),
-                      child: Column(
-                        children: [
-                          const Text(
-                            'ИЗМЕНЕНИЕ ELO',
-                            style: TextStyle(fontSize: 9),
-                          ),
-                          Text(
-                            '${delta >= 0 ? '+' : ''}$delta',
-                            style: TextStyle(
-                              color: delta >= 0
-                                  ? AppColors.success
-                                  : AppColors.danger,
-                              fontSize: 34,
-                              fontWeight: FontWeight.w800,
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(18, 25, 18, 18),
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const Text(
+                              'РЕЙТИНГОВАЯ ПАРТИЯ ЗАВЕРШЕНА',
+                              style: TextStyle(
+                                color: AppColors.muted,
+                                fontSize: 9,
+                                fontWeight: FontWeight.w800,
+                                letterSpacing: 1.2,
+                              ),
                             ),
-                          ),
-                          Text(
-                            '${ranking.points[index]} → ${ranking.points[index] + delta}',
-                          ),
-                        ],
-                      ),
-                    ),
-                    FilledButton.icon(
-                      onPressed: waiting
-                          ? null
-                          : () =>
+                            const SizedBox(height: 12),
+                            CircleAvatar(
+                              radius: 25,
+                              backgroundColor: won
+                                  ? AppColors.accent
+                                  : const Color(0xFF5F6761),
+                              foregroundColor: Colors.white,
+                              child: Icon(
+                                delta >= 0
+                                    ? LucideIcons.trendingUp
+                                    : LucideIcons.trendingDown,
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+                            Text(
+                              won
+                                  ? 'Победа'
+                                  : lost
+                                  ? 'Поражение'
+                                  : 'Ничья',
+                              style: const TextStyle(
+                                fontSize: 28,
+                                fontWeight: FontWeight.w800,
+                              ),
+                            ),
+                            Text(
+                              won
+                                  ? 'Вы обыграли $opponent'
+                                  : lost
+                                  ? '$opponent выиграл эту партию'
+                                  : 'Равная партия с $opponent',
+                              style: const TextStyle(
+                                color: AppColors.muted,
+                                fontSize: 12,
+                              ),
+                            ),
+                            if (snapshot.endReason case final reason?)
+                              Text(
+                                reason,
+                                style: const TextStyle(
+                                  color: AppColors.muted,
+                                  fontSize: 10,
+                                ),
+                              ),
+                            Container(
+                              width: double.infinity,
+                              margin: const EdgeInsets.symmetric(vertical: 14),
+                              padding: const EdgeInsets.all(12),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFF0F1EC),
+                                borderRadius: BorderRadius.circular(12),
+                                border: Border.all(color: AppColors.border),
+                              ),
+                              child: Column(
+                                children: [
+                                  const Text(
+                                    'ИЗМЕНЕНИЕ ELO',
+                                    style: TextStyle(fontSize: 9),
+                                  ),
+                                  Text(
+                                    '${delta >= 0 ? '+' : ''}$delta',
+                                    style: TextStyle(
+                                      color: delta >= 0
+                                          ? AppColors.success
+                                          : AppColors.danger,
+                                      fontSize: 34,
+                                      fontWeight: FontWeight.w800,
+                                    ),
+                                  ),
+                                  Text(
+                                    '${ranking.points[index]} → ${ranking.points[index] + delta}',
+                                  ),
+                                ],
+                              ),
+                            ),
+                            SizedBox(
+                              width: double.infinity,
+                              child: FilledButton.icon(
+                                onPressed: waiting || !connected
+                                    ? null
+                                    : () => MatchmakingRootScope.of(
+                                        context,
+                                      ).add(const MatchmakingEvent$Rematch()),
+                                icon: Icon(
+                                  waiting
+                                      ? LucideIcons.clock3
+                                      : LucideIcons.rotateCcw,
+                                ),
+                                label: Text(
+                                  waiting
+                                      ? 'Ждём решения соперника'
+                                      : connected
+                                      ? 'Сыграть ещё с $opponent'
+                                      : 'Соперник не в сети',
+                                ),
+                              ),
+                            ),
+                            const SizedBox(height: 2),
+                            const Text(
+                              'Реванш не влияет на рейтинг',
+                              style: TextStyle(
+                                fontSize: 9,
+                                color: AppColors.muted,
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+                            SizedBox(
+                              width: double.infinity,
+                              child: OutlinedButton.icon(
+                                onPressed: () =>
+                                    setState(() => _dismissed = true),
+                                icon: const Icon(LucideIcons.eye),
+                                label: const Text('Посмотреть поле'),
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                            TextButton.icon(
+                              onPressed: () {
                                 MatchmakingRootScope.of(context)
-                                    .add(const MatchmakingEvent$Rematch()),
-                      icon: Icon(
-                        waiting ? LucideIcons.clock3 : LucideIcons.rotateCcw,
+                                    .add(const MatchmakingEvent$Leave());
+                                GameRootScope.of(context)
+                                    .add(const GameEvent$Menu());
+                              },
+                              icon: const Icon(LucideIcons.home),
+                              label: const Text('Главное меню'),
+                            ),
+                          ],
+                        ),
                       ),
-                      label: Text(
-                        waiting
-                            ? 'Ждём решения соперника'
-                            : 'Сыграть ещё с $opponent',
-                      ),
-                    ),
-                    const Text(
-                      'Реванш не влияет на рейтинг',
-                      style: TextStyle(fontSize: 9, color: AppColors.muted),
-                    ),
-                    OutlinedButton.icon(
-                      onPressed: () => setState(() => _dismissed = true),
-                      icon: const Icon(LucideIcons.eye),
-                      label: const Text('Посмотреть поле'),
-                    ),
-                    TextButton.icon(
-                      onPressed: () {
-                        MatchmakingRootScope.of(context)
-                            .add(const MatchmakingEvent$Leave());
-                        GameRootScope.of(context).add(const GameEvent$Menu());
-                      },
-                      icon: const Icon(LucideIcons.home),
-                      label: const Text('Главное меню'),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
               ),
             ),
@@ -1255,12 +1473,11 @@ class _RankedResultOverlayState extends State<_RankedResultOverlay> {
 
 void _showViewControls(BuildContext context) {
   final GameBloc bloc = GameRootScope.of(context);
-  final RenderBox? anchor = context.findRenderObject() as RenderBox?;
   final Size screen = MediaQuery.sizeOf(context);
-  final Offset offset = anchor?.localToGlobal(Offset.zero) ?? Offset.zero;
-  final double anchorWidth = anchor?.size.width ?? 44;
-  final double right = math.max(12, screen.width - offset.dx - anchorWidth);
-  final double bottom = math.max(12, screen.height - offset.dy + 8);
+  final EdgeInsets safeInsets = MediaQuery.viewPaddingOf(context);
+  final double right = math.max(12, safeInsets.right);
+  final double bottom = 48 + safeInsets.bottom;
+  final double availableHeight = math.max(0, screen.height - bottom - 12);
   showGeneralDialog<void>(
     context: context,
     barrierDismissible: true,
@@ -1283,7 +1500,7 @@ void _showViewControls(BuildContext context) {
           child: ConstrainedBox(
             constraints: BoxConstraints(
               maxWidth: math.min(290, screen.width - 24),
-              maxHeight: screen.height - 24,
+              maxHeight: availableHeight,
             ),
             child: Material(
               color: const Color(0xFFFCFDF9),
@@ -1326,22 +1543,26 @@ void _showViewControls(BuildContext context) {
                           ],
                         ),
                         const SizedBox(height: 4),
-                        AppSegmentedControl<CameraView>(
-                          options: const [
-                            AppSegment(
-                              value: CameraView.perspective,
-                              label: '3D',
-                            ),
-                            AppSegment(value: CameraView.top, label: 'Сверху'),
-                            AppSegment(
-                              value: CameraView.front,
-                              label: 'Спереди',
-                            ),
+                        Row(
+                          children: [
+                            for (final (view, label) in const [
+                              (CameraView.perspective, '3D'),
+                              (CameraView.top, 'Сверху'),
+                              (CameraView.front, 'Спереди'),
+                            ]) ...[
+                              if (view != CameraView.perspective)
+                                const SizedBox(width: 5),
+                              Expanded(
+                                child: _ViewChoice(
+                                  label: label,
+                                  selected: data.cameraView == view,
+                                  onTap: () => bloc.add(GameEvent$View(view)),
+                                ),
+                              ),
+                            ],
                           ],
-                          selected: data.cameraView,
-                          onChanged: (value) => bloc.add(GameEvent$View(value)),
                         ),
-                        const SizedBox(height: 16),
+                        const SizedBox(height: 8),
                         const Text(
                           'Показать слои',
                           style: TextStyle(
@@ -1349,7 +1570,7 @@ void _showViewControls(BuildContext context) {
                             fontWeight: FontWeight.w700,
                           ),
                         ),
-                        const SizedBox(height: 8),
+                        const SizedBox(height: 10),
                         Row(
                           children: [
                             Expanded(
@@ -1361,7 +1582,7 @@ void _showViewControls(BuildContext context) {
                               ),
                             ),
                             for (var layer = 0; layer < 5; layer++) ...[
-                              const SizedBox(width: 4),
+                              const SizedBox(width: 5),
                               Expanded(
                                 child: _LayerChoice(
                                   label: '${layer + 1}',
@@ -1373,7 +1594,7 @@ void _showViewControls(BuildContext context) {
                             ],
                           ],
                         ),
-                        const SizedBox(height: 10),
+                        const SizedBox(height: 8),
                         const Text(
                           'Включайте и скрывайте каждый слой отдельно.\nНовый ход вернёт все слои.',
                           style: TextStyle(
@@ -1413,13 +1634,26 @@ class _LayerChoice extends StatelessWidget {
         backgroundColor: selected ? const Color(0xFFE8EDFE) : Colors.white,
         foregroundColor: selected ? AppColors.accent : AppColors.ink,
         side: BorderSide(
-          color: selected ? const Color(0xFF9FB2F4) : AppColors.border,
+          color: selected ? const Color(0xFF9FB2F4) : const Color(0xFFDFE4D5),
         ),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(5)),
         textStyle: const TextStyle(fontSize: 10),
       ),
       child: Text(label),
     ),
   );
+}
+
+class _ViewChoice extends StatelessWidget {
+  const new({required this.label, required this.selected, required this.onTap});
+
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) =>
+      _LayerChoice(label: label, selected: selected, onTap: onTap);
 }
 
 Future<void> _requestGameMenu(
@@ -1450,9 +1684,9 @@ Future<void> _requestGameMenu(
       children: [
         Text(
           online && current.onlineSnapshot?.ranking?.rated == true
-              ? 'Выход засчитается как поражение и уменьшит рейтинг. При потере соединения у вас до 60 секунд на возврат.'
+              ? 'Выход засчитается как поражение и уменьшит рейтинг. При потере соединения у вас до 60 секунд на возврат; таймер хода продолжает идти.'
               : online
-              ? 'Лобби закроется для обоих игроков.'
+              ? 'Лобби закроется для обоих игроков. При обычном обновлении страницы вы сможете вернуться в игру.'
               : 'Текущие ходы будут потеряны.',
           style: const TextStyle(
             color: AppColors.muted,
@@ -1516,34 +1750,25 @@ class _ConfirmationActions extends StatelessWidget {
   final String confirmLabel;
 
   @override
-  Widget build(BuildContext context) => Row(
+  Widget build(BuildContext context) => Column(
+    crossAxisAlignment: CrossAxisAlignment.stretch,
     children: [
-      Expanded(
-        child: FilledButton(
-          onPressed: () => Navigator.pop(context, true),
-          style: FilledButton.styleFrom(
-            padding: const EdgeInsets.symmetric(horizontal: 6),
-            textStyle: const TextStyle(
-              fontSize: 11,
-              fontWeight: FontWeight.w700,
-            ),
-          ),
-          child: Text(confirmLabel, textAlign: TextAlign.center),
+      FilledButton(
+        onPressed: () => Navigator.pop(context, true),
+        style: FilledButton.styleFrom(
+          padding: const EdgeInsets.symmetric(horizontal: 6),
+          textStyle: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700),
         ),
+        child: Text(confirmLabel, textAlign: TextAlign.center),
       ),
-      const SizedBox(width: 8),
-      Expanded(
-        child: OutlinedButton(
-          onPressed: () => Navigator.pop(context, false),
-          style: OutlinedButton.styleFrom(
-            padding: const EdgeInsets.symmetric(horizontal: 6),
-            textStyle: const TextStyle(
-              fontSize: 11,
-              fontWeight: FontWeight.w700,
-            ),
-          ),
-          child: const Text('Остаться в игре', textAlign: TextAlign.center),
+      const SizedBox(height: 8),
+      OutlinedButton(
+        onPressed: () => Navigator.pop(context, false),
+        style: OutlinedButton.styleFrom(
+          padding: const EdgeInsets.symmetric(horizontal: 6),
+          textStyle: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700),
         ),
+        child: const Text('Остаться в игре', textAlign: TextAlign.center),
       ),
     ],
   );
@@ -1559,8 +1784,8 @@ void _confirmOnlineLeave(BuildContext context, GameViewData data) {
         Text(
           data.onlineSnapshot?.ranking?.rated == true &&
                   data.snapshot.status == GameStatus.playing
-              ? 'Выход засчитается как поражение и уменьшит рейтинг. При потере соединения у вас до 60 секунд на возврат.'
-              : 'Лобби закроется для обоих игроков.',
+              ? 'Выход засчитается как поражение и уменьшит рейтинг. При потере соединения у вас до 60 секунд на возврат; таймер хода продолжает идти.'
+              : 'Лобби закроется для обоих игроков. При обычном обновлении страницы вы сможете вернуться в игру.',
         ),
         const SizedBox(height: 14),
         const _ConfirmationActions(confirmLabel: 'Выйти из лобби'),
@@ -1573,188 +1798,153 @@ void _confirmOnlineLeave(BuildContext context, GameViewData data) {
   });
 }
 
-class _PlayingOverlay extends StatelessWidget {
-  const new({required this.data});
-  final GameViewData data;
+void _showPauseDialog(BuildContext context, GameViewData data) {
+  final GameBloc bloc = GameRootScope.of(context);
+  void afterClose(FutureOr<void> Function() action) {
+    Navigator.pop(context);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (context.mounted) unawaited(Future<void>.sync(action));
+    });
+  }
 
-  @override
-  Widget build(BuildContext context) => Stack(
-    children: [
-      Positioned(
-        top: 16,
-        left: 12,
-        right: 12,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            if (data.mode == GameMode.online) ...[
-              _OnlineBanner(data: data),
-              const SizedBox(height: 6),
-            ],
-            Row(
-              children: [
-                Flexible(child: _TurnStatus(data: data)),
-                const Spacer(),
-                IconButton(
-                  tooltip: 'Пауза',
-                  onPressed: () => _pauseDialog(context),
-                  icon: const Icon(LucideIcons.pause, size: 19),
-                ),
-              ],
-            ),
-          ],
-        ),
-      ),
-      Positioned(left: 0, right: 0, bottom: 0, child: _GamePanel(data: data)),
-      if (data.message.isNotEmpty) _GameMessage(message: data.message),
-    ],
-  );
-
-  void _pauseDialog(BuildContext context) {
-    final GameBloc bloc = GameRootScope.of(context);
-    void afterClose(FutureOr<void> Function() action) {
-      Navigator.pop(context);
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (context.mounted) unawaited(Future<void>.sync(action));
-      });
-    }
-
-    if (data.mode == GameMode.online) {
-      showAppDialog<void>(
-        context: context,
-        title: 'Пауза',
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            const Text('Онлайн-партия продолжается, пока открыто меню.'),
-            const SizedBox(height: 14),
-            FilledButton(
-              onPressed: data.onlineSnapshot?.pause?.used == true
-                  ? null
-                  : () {
-                      afterClose(
-                        () =>
-                            MatchmakingRootScope.of(context)
-                                .add(const MatchmakingEvent$Pause()),
-                      );
-                    },
-              child: Text(
-                data.onlineSnapshot?.pause?.used == true
-                    ? 'Пауза использована'
-                    : 'Предложить паузу · 2 мин',
-              ),
-            ),
-            const SizedBox(height: 6),
-            FilledButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('Продолжить'),
-            ),
-            const SizedBox(height: 8),
-            OutlinedButton.icon(
-              onPressed: () => afterClose(
-                () => showAppDialog<void>(
-                  context: context,
-                  title: 'Настройки',
-                  child: const SettingsView(),
-                ),
-              ),
-              icon: const Icon(LucideIcons.settings2),
-              label: const Text('Настройки'),
-            ),
-            TextButton.icon(
-              onPressed: () =>
-                  afterClose(() => _requestGameMenu(context, data)),
-              icon: const Icon(LucideIcons.home),
-              label: const Text('Главное меню'),
-            ),
-          ],
-        ),
-      );
-      return;
-    }
-    bloc.add(const GameEvent$Pause());
-    var resumeAfterDismiss = true;
+  if (data.mode == GameMode.online) {
     showAppDialog<void>(
       context: context,
       title: 'Пауза',
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          const Text('Время остановлено.'),
-          const SizedBox(height: 16),
+          const Text('Онлайн-партия продолжается, пока открыто меню.'),
+          const SizedBox(height: 14),
           FilledButton(
-            onPressed: () {
-              resumeAfterDismiss = false;
-              Navigator.pop(context);
-              bloc.add(const GameEvent$Resume());
-            },
-            child: const Text('Продолжить'),
+            onPressed: data.onlineSnapshot?.pause?.used == true
+                ? null
+                : () {
+                    afterClose(
+                      () =>
+                          MatchmakingRootScope.of(context)
+                              .add(const MatchmakingEvent$Pause()),
+                    );
+                  },
+            child: Text(
+              data.onlineSnapshot?.pause?.used == true
+                  ? 'Пауза использована'
+                  : 'Предложить паузу · 2 мин',
+            ),
           ),
           const SizedBox(height: 6),
-          OutlinedButton.icon(
-            onPressed: () {
-              resumeAfterDismiss = false;
-              afterClose(() => _requestRestart(context, data));
-            },
-            icon: const Icon(LucideIcons.rotateCcw),
-            label: const Text('Начать заново'),
+          FilledButton.icon(
+            onPressed: () => Navigator.pop(context),
+            iconAlignment: IconAlignment.end,
+            icon: const Icon(LucideIcons.arrowRight, size: 18),
+            label: const Text('Продолжить'),
           ),
           const SizedBox(height: 8),
           OutlinedButton.icon(
-            onPressed: () {
-              resumeAfterDismiss = false;
-              afterClose(() async {
-                await showAppDialog<void>(
-                  context: context,
-                  title: 'Настройки',
-                  child: const SettingsView(),
-                );
-                if (bloc.data?.phase == GamePhase.paused) {
-                  bloc.add(const GameEvent$Resume());
-                }
-              });
-            },
+            onPressed: () => afterClose(
+              () => showAppDialog<void>(
+                context: context,
+                title: 'Настройки',
+                child: const SettingsView(),
+              ),
+            ),
             icon: const Icon(LucideIcons.settings2),
             label: const Text('Настройки'),
           ),
-          if (data.mode == GameMode.level) ...[
-            const SizedBox(height: 8),
-            OutlinedButton.icon(
-              onPressed: () {
-                resumeAfterDismiss = false;
-                final int initialId = data.levelId ?? 1;
-                bloc.add(const GameEvent$Menu());
-                afterClose(
-                  () => showAppDialog<void>(
-                    context: context,
-                    title: 'Уровни',
-                    wide: true,
-                    child: LevelsView(initialId: initialId),
-                  ),
-                );
-              },
-              icon: const Icon(LucideIcons.puzzle),
-              label: const Text('К уровням'),
-            ),
-          ],
           TextButton.icon(
-            onPressed: () {
-              resumeAfterDismiss = false;
-              afterClose(() => _requestGameMenu(context, data));
-            },
+            onPressed: () => afterClose(() => _requestGameMenu(context, data)),
             icon: const Icon(LucideIcons.home),
             label: const Text('Главное меню'),
           ),
         ],
       ),
-    ).whenComplete(() {
-      // Pause and resume stay ordered in the bloc even if the dialog is
-      // dismissed before the pause event has been reduced.
-      if (resumeAfterDismiss) {
-        bloc.add(const GameEvent$Resume());
-      }
-    });
+    );
+    return;
   }
+  bloc.add(const GameEvent$Pause());
+  var resumeAfterDismiss = true;
+  showAppDialog<void>(
+    context: context,
+    title: 'Пауза',
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        const Text('Время остановлено.'),
+        const SizedBox(height: 16),
+        FilledButton.icon(
+          onPressed: () {
+            resumeAfterDismiss = false;
+            Navigator.pop(context);
+            bloc.add(const GameEvent$Resume());
+          },
+          iconAlignment: IconAlignment.end,
+          icon: const Icon(LucideIcons.arrowRight, size: 18),
+          label: const Text('Продолжить'),
+        ),
+        const SizedBox(height: 6),
+        OutlinedButton.icon(
+          onPressed: () {
+            resumeAfterDismiss = false;
+            afterClose(() => _requestRestart(context, data));
+          },
+          icon: const Icon(LucideIcons.rotateCcw),
+          label: const Text('Начать заново'),
+        ),
+        const SizedBox(height: 8),
+        OutlinedButton.icon(
+          onPressed: () {
+            resumeAfterDismiss = false;
+            afterClose(() async {
+              await showAppDialog<void>(
+                context: context,
+                title: 'Настройки',
+                child: const SettingsView(),
+              );
+              if (bloc.data?.phase == GamePhase.paused) {
+                bloc.add(const GameEvent$Resume());
+              }
+            });
+          },
+          icon: const Icon(LucideIcons.settings2),
+          label: const Text('Настройки'),
+        ),
+        if (data.mode == GameMode.level) ...[
+          const SizedBox(height: 8),
+          OutlinedButton.icon(
+            onPressed: () {
+              resumeAfterDismiss = false;
+              final int initialId = data.levelId ?? 1;
+              bloc.add(const GameEvent$Menu());
+              afterClose(
+                () => showAppDialog<void>(
+                  context: context,
+                  title: 'Уровни',
+                  wide: true,
+                  child: LevelsView(initialId: initialId),
+                ),
+              );
+            },
+            icon: const Icon(LucideIcons.puzzle),
+            label: const Text('К уровням'),
+          ),
+        ],
+        TextButton.icon(
+          onPressed: () {
+            resumeAfterDismiss = false;
+            afterClose(() => _requestGameMenu(context, data));
+          },
+          icon: const Icon(LucideIcons.home),
+          label: const Text('Главное меню'),
+        ),
+      ],
+    ),
+  ).whenComplete(() {
+    // Pause and resume stay ordered in the bloc even if the dialog is
+    // dismissed before the pause event has been reduced.
+    if (resumeAfterDismiss) {
+      bloc.add(const GameEvent$Resume());
+    }
+  });
 }
 
 class _GamePanel extends StatelessWidget {
@@ -1764,11 +1954,20 @@ class _GamePanel extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final GameBloc bloc = GameRootScope.of(context);
-    final finished = data.snapshot.status != GameStatus.playing;
     final Player? winner = data.snapshot.winner;
     final bool completedLevel =
         data.mode == GameMode.level && winner == Player.one;
     final bool hasNextLevel = completedLevel && (data.levelId ?? 40) < 40;
+    final bool waitingForRematch =
+        data.mode == GameMode.online &&
+        data.onlinePlayer != null &&
+        (data.onlineSnapshot?.rematch.contains(data.onlinePlayer) ?? false);
+    final bool onlineConnected =
+        data.onlineConnection == OnlineConnectionStatus.connected &&
+        (data.onlineSnapshot?.players.every(
+              (player) => player?.connected ?? false,
+            ) ??
+            false);
     void openLevels() {
       final int initialId = data.levelId ?? 1;
       bloc.add(const GameEvent$Menu());
@@ -1780,183 +1979,198 @@ class _GamePanel extends StatelessWidget {
       );
     }
 
+    final String title = data.mode == GameMode.level
+        ? completedLevel
+              ? 'Уровень пройден'
+              : winner == null
+              ? 'Ничья'
+              : 'Поражение'
+        : winner == null
+        ? 'Ничья'
+        : 'Победа: ${data.names[winner.index]}';
     return Container(
-      padding: const EdgeInsets.fromLTRB(8, 0, 8, 4),
+      padding: const EdgeInsets.fromLTRB(0, 6, 0, 0),
       decoration: const BoxDecoration(
-        color: Color(0xF7EEEEE8),
         border: Border(top: BorderSide(color: AppColors.border)),
       ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          SizedBox(
-            height: 30,
-            child: Row(
+      child: data.phase == GamePhase.replay
+          ? Column(
+              mainAxisSize: MainAxisSize.min,
               children: [
-                Expanded(
-                  child: Text(
-                    finished
-                        ? data.mode == GameMode.level
-                              ? completedLevel
-                                    ? 'Уровень пройден'
-                                    : winner == null
-                                    ? 'Ничья'
-                                    : 'Поражение'
-                              : (winner == null
-                                    ? 'Ничья'
-                                    : 'Победа: ${data.names[winner.index]}')
-                        : '● ${data.names[0]}',
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(fontSize: 10),
-                  ),
-                ),
-                Text(
-                  '${data.phase == GamePhase.replay ? data.replayIndex : data.snapshot.history.length} ходов',
-                  style: const TextStyle(
-                    fontSize: 10,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-                Expanded(
-                  child: Text(
-                    '○ ${data.names[1]}',
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    textAlign: TextAlign.right,
-                    style: const TextStyle(fontSize: 10),
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const Divider(height: 1),
-          Row(
-            children: [
-              if (data.phase == GamePhase.replay) ...[
-                IconButton(
-                  tooltip: 'В начало повтора',
-                  onPressed: data.replayIndex > 0
-                      ? () => bloc.add(const GameEvent$SeekReplay(0))
-                      : null,
-                  icon: const Icon(LucideIcons.chevronsLeft),
-                ),
-                IconButton(
-                  onPressed: data.replayIndex > 0
-                      ? () =>
-                            bloc.add(GameEvent$SeekReplay(data.replayIndex - 1))
-                      : null,
-                  icon: const Icon(LucideIcons.chevronLeft),
-                ),
-                IconButton(
-                  onPressed: data.replayIndex < data.snapshot.history.length
-                      ? () =>
-                            bloc.add(GameEvent$SeekReplay(data.replayIndex + 1))
-                      : null,
-                  icon: const Icon(LucideIcons.chevronRight),
-                ),
-                IconButton(
-                  tooltip: 'В конец повтора',
-                  onPressed: data.replayIndex < data.snapshot.history.length
-                      ? () => bloc.add(
-                          GameEvent$SeekReplay(data.snapshot.history.length),
-                        )
-                      : null,
-                  icon: const Icon(LucideIcons.chevronsRight),
-                ),
-                Expanded(
-                  child: FilledButton(
-                    onPressed: () => bloc.add(const GameEvent$CloseReplay()),
-                    child: const Text('Закрыть повтор'),
-                  ),
-                ),
-              ] else ...[
-                _Tool(
-                  icon: LucideIcons.rotateCcw,
-                  label: 'Отменить',
-                  enabled:
-                      data.mode != GameMode.level &&
-                      data.mode != GameMode.online &&
-                      data.phase == GamePhase.playing &&
-                      data.snapshot.history.isNotEmpty,
-                  onTap: () => bloc.add(const GameEvent$Undo()),
-                ),
-                _Tool(
-                  icon: LucideIcons.eye,
-                  label: 'Рентген',
-                  selected: data.xray,
-                  onTap: () => bloc.add(const GameEvent$ToggleXray()),
-                ),
-                const _ViewTool(label: 'Вид'),
-                _Tool(
-                  icon: LucideIcons.maximize,
-                  label: '',
-                  onTap: () =>
-                      bloc.add(const GameEvent$View(CameraView.perspective)),
-                ),
-                if (finished)
-                  _Tool(
-                    icon: LucideIcons.play,
-                    label: 'Повтор',
-                    onTap: () => bloc.add(const GameEvent$OpenReplay()),
-                  ),
-              ],
-            ],
-          ),
-          if (finished && data.mode == GameMode.level) ...[
-            const SizedBox(height: 8),
-            Row(
-              children: [
-                if (hasNextLevel) ...[
-                  Expanded(
-                    child: FilledButton.icon(
-                      onPressed: () =>
-                          bloc.add(GameEvent$StartLevel(data.levelId! + 1)),
-                      iconAlignment: IconAlignment.end,
-                      icon: const Icon(LucideIcons.chevronRight, size: 17),
-                      label: const Text('Следующий уровень'),
+                Row(
+                  children: [
+                    _ReplayButton(
+                      icon: LucideIcons.chevronsLeft,
+                      tooltip: 'В начало повтора',
+                      onPressed: data.replayIndex > 0
+                          ? () => bloc.add(const GameEvent$SeekReplay(0))
+                          : null,
                     ),
-                  ),
-                  const SizedBox(width: 8),
-                ],
-                Expanded(
-                  child: hasNextLevel
-                      ? OutlinedButton.icon(
-                          onPressed: () => bloc.add(const GameEvent$Restart()),
-                          icon: const Icon(LucideIcons.rotateCcw, size: 16),
-                          label: const Text('Повторить уровень'),
-                        )
-                      : FilledButton.icon(
-                          onPressed: () => bloc.add(const GameEvent$Restart()),
-                          icon: const Icon(LucideIcons.rotateCcw, size: 16),
-                          label: const Text('Повторить уровень'),
+                    _ReplayButton(
+                      icon: LucideIcons.chevronLeft,
+                      tooltip: 'Предыдущий ход',
+                      onPressed: data.replayIndex > 0
+                          ? () => bloc.add(
+                              GameEvent$SeekReplay(data.replayIndex - 1),
+                            )
+                          : null,
+                    ),
+                    _ReplayButton(
+                      icon: LucideIcons.chevronRight,
+                      tooltip: 'Следующий ход',
+                      onPressed: data.replayIndex < data.snapshot.history.length
+                          ? () => bloc.add(
+                              GameEvent$SeekReplay(data.replayIndex + 1),
+                            )
+                          : null,
+                    ),
+                    _ReplayButton(
+                      icon: LucideIcons.chevronsRight,
+                      tooltip: 'В конец повтора',
+                      onPressed: data.replayIndex < data.snapshot.history.length
+                          ? () => bloc.add(
+                              GameEvent$SeekReplay(
+                                data.snapshot.history.length,
+                              ),
+                            )
+                          : null,
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 4),
+                Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        'Ход ${data.replayIndex} из ${data.snapshot.history.length}',
+                        textAlign: TextAlign.center,
+                        style: const TextStyle(
+                          color: AppColors.muted,
+                          fontSize: 11,
                         ),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: OutlinedButton(
+                        onPressed: () =>
+                            bloc.add(const GameEvent$CloseReplay()),
+                        child: const Text('Завершить просмотр'),
+                      ),
+                    ),
+                  ],
                 ),
               ],
-            ),
-            TextButton(onPressed: openLevels, child: const Text('К уровням')),
-          ] else if (finished) ...[
-            const SizedBox(height: 8),
-            Row(
+            )
+          : Column(
+              mainAxisSize: MainAxisSize.min,
               children: [
-                Expanded(
-                  child: FilledButton(
-                    onPressed: () {
-                      if (data.mode == GameMode.online) {
-                        MatchmakingRootScope.of(context)
-                            .add(const MatchmakingEvent$Rematch());
-                      } else {
-                        bloc.add(const GameEvent$Restart());
-                      }
-                    },
-                    child: Text(
-                      data.mode == GameMode.online ? 'Реванш' : 'Сыграть ещё',
-                    ),
+                Text(
+                  title,
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(
+                    fontSize: 17,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: -.4,
                   ),
                 ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: OutlinedButton(
+                if (completedLevel && MediaQuery.sizeOf(context).width > 650)
+                  Text(
+                    '${data.levelBestBefore == null || data.levelMoves < data.levelBestBefore! ? 'Новый рекорд' : 'Победа'} · ${_moveLabel(data.levelMoves)}',
+                    style: const TextStyle(
+                      color: AppColors.muted,
+                      fontSize: 11,
+                    ),
+                  ),
+                const SizedBox(height: 4),
+                if (data.mode == GameMode.level) ...[
+                  Row(
+                    children: [
+                      if (hasNextLevel) ...[
+                        Expanded(
+                          child: FilledButton.icon(
+                            onPressed: () => bloc.add(
+                              GameEvent$StartLevel(data.levelId! + 1),
+                            ),
+                            iconAlignment: IconAlignment.end,
+                            icon: const Icon(
+                              LucideIcons.chevronRight,
+                              size: 17,
+                            ),
+                            label: const Text('Следующий уровень'),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                      ],
+                      Expanded(
+                        child: hasNextLevel
+                            ? OutlinedButton.icon(
+                                onPressed: () =>
+                                    bloc.add(const GameEvent$Restart()),
+                                icon: const Icon(
+                                  LucideIcons.rotateCcw,
+                                  size: 16,
+                                ),
+                                label: const Text('Повторить уровень'),
+                              )
+                            : FilledButton.icon(
+                                onPressed: () =>
+                                    bloc.add(const GameEvent$Restart()),
+                                icon: const Icon(
+                                  LucideIcons.rotateCcw,
+                                  size: 16,
+                                ),
+                                label: const Text('Повторить уровень'),
+                              ),
+                      ),
+                    ],
+                  ),
+                  TextButton(
+                    onPressed: openLevels,
+                    child: const Text('К уровням'),
+                  ),
+                ] else ...[
+                  Row(
+                    children: [
+                      Expanded(
+                        child: FilledButton.icon(
+                          onPressed:
+                              data.mode == GameMode.online &&
+                                  (waitingForRematch || !onlineConnected)
+                              ? null
+                              : () {
+                                  if (data.mode == GameMode.online) {
+                                    MatchmakingRootScope.of(context)
+                                        .add(const MatchmakingEvent$Rematch());
+                                  } else {
+                                    bloc.add(const GameEvent$Restart());
+                                  }
+                                },
+                          icon: Icon(
+                            waitingForRematch
+                                ? LucideIcons.clock3
+                                : LucideIcons.rotateCcw,
+                            size: 17,
+                          ),
+                          label: Text(
+                            waitingForRematch
+                                ? 'Ждём согласия соперника'
+                                : 'Ещё партия',
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: OutlinedButton.icon(
+                          onPressed: () =>
+                              bloc.add(const GameEvent$OpenReplay()),
+                          icon: const Icon(LucideIcons.play, size: 17),
+                          label: const Text('Повтор партии'),
+                        ),
+                      ),
+                    ],
+                  ),
+                  TextButton(
                     onPressed: () {
                       if (data.mode == GameMode.online) {
                         MatchmakingRootScope.of(context)
@@ -1964,16 +2178,33 @@ class _GamePanel extends StatelessWidget {
                       }
                       bloc.add(const GameEvent$Menu());
                     },
-                    child: const Text('В меню'),
+                    child: const Text('Главное меню'),
                   ),
-                ),
+                ],
               ],
             ),
-          ],
-        ],
-      ),
     );
   }
+}
+
+class _ReplayButton extends StatelessWidget {
+  const new({required this.icon, required this.tooltip, this.onPressed});
+
+  final IconData icon;
+  final String tooltip;
+  final VoidCallback? onPressed;
+
+  @override
+  Widget build(BuildContext context) => Expanded(
+    child: Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 2.5),
+      child: IconButton.outlined(
+        tooltip: tooltip,
+        onPressed: onPressed,
+        icon: Icon(icon, size: 20),
+      ),
+    ),
+  );
 }
 
 class _ViewTool extends StatelessWidget {
@@ -1982,11 +2213,27 @@ class _ViewTool extends StatelessWidget {
   final String label;
 
   @override
-  Widget build(BuildContext context) => Builder(
-    builder: (anchorContext) => _Tool(
-      icon: LucideIcons.layers3,
-      label: label,
-      onTap: () => _showViewControls(anchorContext),
+  Widget build(BuildContext context) => Expanded(
+    child: Builder(
+      builder: (anchorContext) => InkWell(
+        onTap: () => _showViewControls(anchorContext),
+        borderRadius: BorderRadius.circular(12),
+        child: SizedBox(
+          height: 44,
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const Icon(LucideIcons.layers3, size: 19),
+              if (label.isNotEmpty) ...[
+                const SizedBox(width: 6),
+                Text(label, style: const TextStyle(fontSize: 10)),
+                const SizedBox(width: 3),
+                const Icon(LucideIcons.chevronDown, size: 13),
+              ],
+            ],
+          ),
+        ),
+      ),
     ),
   );
 }

@@ -34,8 +34,13 @@ class _MatchHistoryViewState extends State<MatchHistoryView> {
     return BlocBuilder<MatchHistoryBloc, MatchHistoryState>(
       bloc: bloc,
       builder: (context, state) => switch (state) {
-        MatchHistoryState$Loading() || MatchHistoryState$Initial() =>
-          const Center(child: CircularProgressIndicator()),
+        MatchHistoryState$Loading() ||
+        MatchHistoryState$Initial() => const Center(
+          child: Text(
+            'Загружаем статистику…',
+            style: TextStyle(color: AppColors.muted, fontSize: 11),
+          ),
+        ),
         MatchHistoryState$Guest() => _Guest(onSignIn: widget.onSignIn),
         MatchHistoryState$Failure(:final message) => _Failure(
           message: message,
@@ -91,7 +96,7 @@ class _MatchHistoryViewState extends State<MatchHistoryView> {
                   child: Text(
                     'Сыграйте партию до конца — она появится здесь автоматически.',
                     textAlign: TextAlign.center,
-                    style: TextStyle(color: AppColors.muted),
+                    style: TextStyle(color: AppColors.muted, fontSize: 11),
                   ),
                 )
               : ListView.separated(
@@ -132,22 +137,24 @@ class _MatchHistoryViewState extends State<MatchHistoryView> {
         ),
         if (data.matches.isNotEmpty)
           Row(
-            mainAxisAlignment: MainAxisAlignment.center,
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              TextButton(
+              OutlinedButton(
                 onPressed: page == 0
                     ? null
                     : () => setState(() => _page = page - 1),
+                style: _smallButtonStyle,
                 child: const Text('Назад'),
               ),
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 12),
                 child: Text('${page + 1} / $pages'),
               ),
-              TextButton(
+              OutlinedButton(
                 onPressed: page + 1 == pages
                     ? null
                     : () => setState(() => _page = page + 1),
+                style: _smallButtonStyle,
                 child: const Text('Дальше'),
               ),
             ],
@@ -172,20 +179,20 @@ class _Stat extends StatelessWidget {
   Widget build(BuildContext context) => Expanded(
     child: Container(
       margin: const EdgeInsets.symmetric(horizontal: 2),
-      padding: const EdgeInsets.symmetric(vertical: 8),
+      padding: const EdgeInsets.symmetric(vertical: 6),
       decoration: BoxDecoration(
-        color: const Color(0xFFF2F4EE),
-        borderRadius: BorderRadius.circular(9),
+        color: const Color(0xFFEDF0E7),
+        borderRadius: BorderRadius.circular(8),
       ),
       child: Column(
         children: [
           Text(
             '$value',
-            style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w800),
+            style: const TextStyle(fontSize: 19, fontWeight: FontWeight.w800),
           ),
           Text(
             label,
-            style: const TextStyle(color: AppColors.muted, fontSize: 8),
+            style: const TextStyle(color: Color(0xFF60675E), fontSize: 10),
           ),
         ],
       ),
@@ -220,11 +227,10 @@ class ExpandedMatchCard extends StatelessWidget {
     };
     final DateTime date = DateTime.fromMillisecondsSinceEpoch(match.date);
     return Container(
-      padding: const EdgeInsets.all(11),
+      padding: const EdgeInsets.all(8),
       decoration: BoxDecoration(
-        color: const Color(0xFFFAFBF8),
         border: Border.all(color: AppColors.border),
-        borderRadius: BorderRadius.circular(10),
+        borderRadius: BorderRadius.circular(12),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -236,31 +242,60 @@ class ExpandedMatchCard extends StatelessWidget {
               maxLength: 80,
               semanticLabel: 'Название партии',
               fontSize: 14,
+              onSubmitted: (_) => onEdit(),
             )
           else
             Text(
               match.title,
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
-              style: const TextStyle(fontWeight: FontWeight.w800),
+              style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w800),
             ),
           Text(
             '${date.day.toString().padLeft(2, '0')}.${date.month.toString().padLeft(2, '0')}.${date.year} · $mode · ${match.game.history.length} ходов',
-            style: const TextStyle(color: AppColors.muted, fontSize: 9),
+            style: const TextStyle(
+              color: AppColors.muted,
+              fontSize: 10,
+              height: 1.6,
+            ),
           ),
           Text(
             '${winner == null ? 'Ничья' : 'Победа: ${match.names[winner.index]}'}${match.ratingChange == null ? '' : ' · ${match.ratingChange! >= 0 ? '+' : ''}${match.ratingChange} Elo'}${match.endReason == null ? '' : ' · досрочно'}',
-            style: const TextStyle(color: AppColors.muted, fontSize: 9),
+            style: const TextStyle(
+              color: AppColors.muted,
+              fontSize: 10,
+              height: 1.6,
+            ),
           ),
           const SizedBox(height: 6),
           Row(
             children: [
-              TextButton(onPressed: onWatch, child: const Text('Смотреть')),
-              TextButton(
+              OutlinedButton(
+                onPressed: onWatch,
+                style: _smallButtonStyle.copyWith(
+                  foregroundColor: const WidgetStatePropertyAll(
+                    AppColors.accent,
+                  ),
+                ),
+                child: const Text('Смотреть'),
+              ),
+              const SizedBox(width: 6),
+              OutlinedButton(
                 onPressed: onEdit,
+                style: _smallButtonStyle,
                 child: Text(editing ? 'Сохранить' : 'Название'),
               ),
-              TextButton(onPressed: onRemove, child: const Text('Удалить')),
+              const SizedBox(width: 6),
+              Expanded(
+                child: Tooltip(
+                  message: 'Убрать из истории; статистика сохранится',
+                  child: OutlinedButton(
+                    onPressed: onRemove,
+                    style: _smallButtonStyle,
+                    child: const Text('Удалить'),
+                  ),
+                ),
+              ),
             ],
           ),
         ],
@@ -279,7 +314,7 @@ class _Guest extends StatelessWidget {
     children: [
       const Text(
         'Войдите в аккаунт, чтобы сохранять статистику и историю партий на сервере. Гостевые партии не учитываются.',
-        style: TextStyle(color: AppColors.muted),
+        style: TextStyle(color: AppColors.muted, fontSize: 11, height: 1.5),
       ),
       const SizedBox(height: 12),
       FilledButton(
@@ -289,6 +324,14 @@ class _Guest extends StatelessWidget {
     ],
   );
 }
+
+final ButtonStyle _smallButtonStyle = OutlinedButton.styleFrom(
+  minimumSize: const Size(0, 36),
+  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+  side: const BorderSide(color: Color(0xFFD9DFD0)),
+  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+  textStyle: const TextStyle(fontSize: 11),
+);
 
 class _Failure extends StatelessWidget {
   const new({required this.message, required this.retry});

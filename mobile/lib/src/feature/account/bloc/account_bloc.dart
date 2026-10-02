@@ -106,11 +106,16 @@ final class AccountState$Loading extends AccountState {
 }
 
 final class AccountState$Ready extends AccountState {
-  const new(this.profile, {this.notice = ''});
+  const new(
+    this.profile, {
+    this.notice = '',
+    this.registrationCompleted = false,
+  });
   final AccountProfile profile;
   final String notice;
+  final bool registrationCompleted;
   @override
-  List<Object> get props => [profile, notice];
+  List<Object> get props => [profile, notice, registrationCompleted];
 }
 
 final class AccountState$Failure extends AccountState {
@@ -159,15 +164,18 @@ final class AccountBloc extends Bloc<AccountEvent, AccountState> {
       ):
         emit(AccountState$Loading(profile));
         try {
-          final String notice = await _repository.register(
+          final AccountRegistrationResult result = await _repository.register(
             username.trim(),
             email.trim(),
             password,
           );
           emit(
             AccountState$Ready(
-              profile ?? await _repository.load(),
-              notice: notice,
+              result.verificationRequired
+                  ? profile ?? await _repository.load()
+                  : await _repository.load(),
+              notice: result.notice,
+              registrationCompleted: true,
             ),
           );
         } on RestClientException catch (error) {
