@@ -57,6 +57,6 @@ void _writeWav(File file, List<double> frequencies, {bool triangle = false}) {
   bytes.setUint16(34, 16, Endian.little);
   text(36, 'data');
   bytes.setUint32(40, dataBytes, Endian.little);
-  bytes.buffer.asInt16List(22, pcm.length).setAll(0, pcm);
+  bytes.buffer.asInt16List(44, pcm.length).setAll(0, pcm);
   file.writeAsBytesSync(bytes.buffer.asUint8List(), flush: true);
 }

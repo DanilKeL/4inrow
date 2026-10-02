@@ -26,23 +26,25 @@ void main() {
       animations: false,
     );
 
-    const Size portrait = Size(390, 620);
-    for (final CameraView view in CameraView.values) {
-      final fs.PerspectiveCamera camera = _camera(view, portrait);
-      for (var y = 0; y < 5; y++) {
-        for (var x = 0; x < 5; x++) {
-          final Offset point = camera.worldToScreen(
-            vm.Vector3(
-              (x - 2) * GameSceneController.spacing,
-              .13,
-              (y - 2) * GameSceneController.spacing,
-            ),
-            portrait,
-          )!;
-          expect(controller.pick(camera.screenPointToRay(point, portrait)), (
-            x: x,
-            y: y,
-          ), reason: '$view must pick projected column ($x, $y)');
+    const List<Size> viewports = [Size(390, 620), Size(760, 390)];
+    for (final Size viewport in viewports) {
+      for (final CameraView view in CameraView.values) {
+        final fs.PerspectiveCamera camera = _camera(view, viewport);
+        for (var y = 0; y < 5; y++) {
+          for (var x = 0; x < 5; x++) {
+            final Offset point = camera.worldToScreen(
+              vm.Vector3(
+                (x - 2) * GameSceneController.spacing,
+                .13,
+                (y - 2) * GameSceneController.spacing,
+              ),
+              viewport,
+            )!;
+            expect(controller.pick(camera.screenPointToRay(point, viewport)), (
+              x: x,
+              y: y,
+            ), reason: '$viewport · $view must pick projected column ($x, $y)');
+          }
         }
       }
     }

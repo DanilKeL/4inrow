@@ -108,4 +108,26 @@ void main() {
       const MoveCandidate(3, 0),
     );
   });
+
+  test('runner cancellation also wins while the isolate is spawning', () async {
+    final AiMoveRunner runner = AiMoveRunner();
+    final Future<MoveCandidate?> pending = runner.run(
+      GameEngine.create(),
+      Difficulty.hard,
+    );
+    final Future<void> cancellation = expectLater(
+      pending,
+      throwsA(isA<AiMoveCancelled>()),
+    );
+
+    runner.cancel();
+
+    await cancellation;
+    final MoveCandidate? next = await runner.run(
+      GameEngine.create(),
+      Difficulty.easy,
+    );
+    expect(next, isNotNull);
+    runner.dispose();
+  });
 }

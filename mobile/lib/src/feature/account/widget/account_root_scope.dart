@@ -26,14 +26,25 @@ class _AccountRootScopeState extends State<AccountRootScope> {
     final RootDependencies root = RootScope.of(context);
     _accountBloc = AccountBloc(repository: root.accountRepository)
       ..add(const AccountEvent$Load());
-    _links = root.deepLinkService.links.listen((uri) {
-      final String? token = uri.queryParameters['token'];
-      if (token != null &&
-          token.isNotEmpty &&
-          (uri.host == 'verify' || uri.path.contains('verify'))) {
+    _links = root.deepLinkService.links.listen(_handleLink);
+    if (root.deepLinkService.takeInitialLink() case final initial?) {
+      _handleLink(initial);
+    }
+  }
+
+  void _handleLink(Uri uri) {
+    final String? token = uri.queryParameters['token'];
+    if (token != null && token.isNotEmpty) {
+      if (uri.host == 'verify' || uri.path.contains('verify')) {
         _accountBloc.add(AccountEvent$VerifyEmail(token));
+      } else if (uri.host == 'reset' || uri.path.contains('password-reset')) {
+        _accountBloc.add(AccountEvent$OpenPasswordReset(token));
       }
-    });
+    }
+    final String? reset = uri.queryParameters['reset'];
+    if (reset != null && reset.isNotEmpty) {
+      _accountBloc.add(AccountEvent$OpenPasswordReset(reset));
+    }
   }
 
   @override

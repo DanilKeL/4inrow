@@ -14,18 +14,26 @@ sealed class MatchmakingEvent extends Equatable {
   List<Object?> get props => const [];
 }
 
-final class MatchmakingEvent$Load extends MatchmakingEvent {
+sealed class MatchmakingEvent$Connection extends MatchmakingEvent {
   const new();
 }
 
-final class MatchmakingEvent$Create extends MatchmakingEvent {
+sealed class MatchmakingEvent$Sequential extends MatchmakingEvent {
+  const new();
+}
+
+final class MatchmakingEvent$Load extends MatchmakingEvent$Connection {
+  const new();
+}
+
+final class MatchmakingEvent$Create extends MatchmakingEvent$Connection {
   const new(this.name);
   final String name;
   @override
   List<Object> get props => [name];
 }
 
-final class MatchmakingEvent$Join extends MatchmakingEvent {
+final class MatchmakingEvent$Join extends MatchmakingEvent$Connection {
   const new(this.name, this.code);
   final String name;
   final String code;
@@ -33,26 +41,26 @@ final class MatchmakingEvent$Join extends MatchmakingEvent {
   List<Object> get props => [name, code];
 }
 
-final class MatchmakingEvent$Find extends MatchmakingEvent {
+final class MatchmakingEvent$Find extends MatchmakingEvent$Connection {
   const new(this.name);
   final String name;
   @override
   List<Object> get props => [name];
 }
 
-final class MatchmakingEvent$Accept extends MatchmakingEvent {
+final class MatchmakingEvent$Accept extends MatchmakingEvent$Sequential {
   const new();
 }
 
-final class MatchmakingEvent$Decline extends MatchmakingEvent {
+final class MatchmakingEvent$Decline extends MatchmakingEvent$Sequential {
   const new();
 }
 
-final class MatchmakingEvent$Cancel extends MatchmakingEvent {
+final class MatchmakingEvent$Cancel extends MatchmakingEvent$Sequential {
   const new();
 }
 
-final class MatchmakingEvent$Move extends MatchmakingEvent {
+final class MatchmakingEvent$Move extends MatchmakingEvent$Sequential {
   const new(this.x, this.y);
   final int x;
   final int y;
@@ -60,34 +68,34 @@ final class MatchmakingEvent$Move extends MatchmakingEvent {
   List<Object> get props => [x, y];
 }
 
-final class MatchmakingEvent$Rematch extends MatchmakingEvent {
+final class MatchmakingEvent$Rematch extends MatchmakingEvent$Sequential {
   const new();
 }
 
-final class MatchmakingEvent$Pause extends MatchmakingEvent {
+final class MatchmakingEvent$Pause extends MatchmakingEvent$Sequential {
   const new();
 }
 
-final class MatchmakingEvent$PauseAnswer extends MatchmakingEvent {
+final class MatchmakingEvent$PauseAnswer extends MatchmakingEvent$Sequential {
   const new({required this.accept});
   final bool accept;
   @override
   List<Object> get props => [accept];
 }
 
-final class MatchmakingEvent$Ready extends MatchmakingEvent {
+final class MatchmakingEvent$Ready extends MatchmakingEvent$Sequential {
   const new();
 }
 
-final class MatchmakingEvent$Leave extends MatchmakingEvent {
+final class MatchmakingEvent$Leave extends MatchmakingEvent$Sequential {
   const new();
 }
 
-final class MatchmakingEvent$Foreground extends MatchmakingEvent {
+final class MatchmakingEvent$Foreground extends MatchmakingEvent$Sequential {
   const new();
 }
 
-final class MatchmakingEvent$Transport extends MatchmakingEvent {
+final class MatchmakingEvent$Transport extends MatchmakingEvent$Sequential {
   const new(this.event);
   final OnlineTransportEvent event;
   @override
@@ -167,7 +175,8 @@ final class MatchmakingState$Failure extends MatchmakingState {
 
 final class MatchmakingBloc extends Bloc<MatchmakingEvent, MatchmakingState> {
   new({required this._transport}) : super(const MatchmakingState$Initial()) {
-    on<MatchmakingEvent>(_onEvent, transformer: sequential());
+    on<MatchmakingEvent$Connection>(_onConnection, transformer: restartable());
+    on<MatchmakingEvent$Sequential>(_onSequential, transformer: sequential());
     _subscription = _transport.events.listen(
       (event) => add(MatchmakingEvent$Transport(event)),
     );
@@ -179,8 +188,8 @@ final class MatchmakingBloc extends Bloc<MatchmakingEvent, MatchmakingState> {
   OnlineMatchSnapshot? _snapshot;
   OnlineConnectionStatus _connection = OnlineConnectionStatus.idle;
 
-  Future<void> _onEvent(
-    MatchmakingEvent event,
+  Future<void> _onConnection(
+    MatchmakingEvent$Connection event,
     Emitter<MatchmakingState> emit,
   ) async {
     switch (event) {
@@ -206,6 +215,14 @@ final class MatchmakingBloc extends Bloc<MatchmakingEvent, MatchmakingState> {
       case MatchmakingEvent$Find(:final name):
         emit(const MatchmakingState$Connecting());
         await _transport.connect({'type': 'quick_find', 'name': name});
+    }
+  }
+
+  Future<void> _onSequential(
+    MatchmakingEvent$Sequential event,
+    Emitter<MatchmakingState> emit,
+  ) async {
+    switch (event) {
       case MatchmakingEvent$Accept():
         if (state case MatchmakingState$Found(:final matchId)) {
           if (_transport.send({'type': 'quick_accept', 'matchId': matchId})) {

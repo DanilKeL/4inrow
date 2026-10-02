@@ -142,7 +142,10 @@ class _SettingSwitch extends StatelessWidget {
             children: [
               Text(
                 title,
-                style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700),
+                style: const TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w700,
+                ),
               ),
               const SizedBox(height: 3),
               Text(

@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:four3/src/feature/account/widget/account_root_scope.dart';
@@ -14,16 +16,33 @@ class OnlineSetupView extends StatefulWidget {
 
 class _OnlineSetupViewState extends State<OnlineSetupView> {
   final _code = TextEditingController();
+  late final MatchmakingBloc _bloc;
+  late final Timer _clock;
+
+  @override
+  void initState() {
+    super.initState();
+    _bloc = MatchmakingRootScope.of(context);
+    _clock = Timer.periodic(const Duration(seconds: 1), (_) {
+      if (mounted && _bloc.state is MatchmakingState$Found) setState(() {});
+    });
+  }
 
   @override
   void dispose() {
+    if (_bloc.state is! MatchmakingState$Initial &&
+        _bloc.state is! MatchmakingState$Idle &&
+        _bloc.state is! MatchmakingState$Match) {
+      _bloc.add(const MatchmakingEvent$Cancel());
+    }
+    _clock.cancel();
     _code.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    final MatchmakingBloc bloc = MatchmakingRootScope.of(context);
+    final MatchmakingBloc bloc = _bloc;
     final String name =
         AccountRootScope.of(context).profile?.displayName ?? 'Игрок';
     return BlocConsumer<MatchmakingBloc, MatchmakingState>(
@@ -53,12 +72,13 @@ class _OnlineSetupViewState extends State<OnlineSetupView> {
           :final rating,
           :final rated,
           :final accepted,
+          :final deadline,
         ) =>
           _Status(
             icon: LucideIcons.swords,
             title: 'Соперник найден',
             subtitle:
-                '$opponent${rating == null ? '' : ' · $rating Elo'}\n${rated ? 'Рейтинговая партия' : 'Матч без изменения рейтинга'}',
+                '$opponent${rating == null ? '' : ' · $rating Elo'}\n${rated ? 'Рейтинговая партия' : 'Матч без изменения рейтинга'} · ${_secondsLeft(deadline)} сек.',
             action: Row(
               children: [
                 Expanded(
@@ -100,6 +120,12 @@ class _OnlineSetupViewState extends State<OnlineSetupView> {
     );
   }
 }
+
+int _secondsLeft(int deadline) =>
+    ((deadline - DateTime.now().millisecondsSinceEpoch) / 1000).ceil().clamp(
+      0,
+      999,
+    );
 
 class _Setup extends StatelessWidget {
   const new({

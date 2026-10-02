@@ -17,9 +17,17 @@ For an Android emulator use `http://10.0.2.2:3000`. Override `FOUR_ONLINE_URL` o
 ```sh
 fvm flutter analyze
 fvm flutter test
+fvm flutter test integration_test/game_scene_picking_test.dart -d <ios-device-id>
+fvm flutter test integration_test/app_flow_test.dart -d <ios-device-id>
 fvm flutter build apk --debug
-fvm flutter build ios --debug --no-codesign
+fvm flutter build ios --simulator --debug
 ```
+
+Build artifacts are written to `build/app/outputs/flutter-apk/app-debug.apk`
+and `build/ios/iphonesimulator/Runner.app`. Android debug builds allow local
+cleartext traffic for `10.0.2.2`; iOS allows local-network debug servers. Store
+configuration remains HTTPS/WSS-only as described in
+`../docs/mobile-store-release.md`.
 
 The 3D acceptance run must use an iPhone 11 and a Snapdragon 730-class Android phone. In Flutter DevTools Performance view, warm up the scene, fill all 125 cells, orbit/zoom, raycast in every camera, toggle x-ray/layers, show a winning line, then enter/leave the scene 20 times. Acceptance: ≥55 FPS at `renderScale >= .75`, no black frames/GPU crashes, correct picks, and no sustained heap/GPU growth. Capture fixed empty/filled/x-ray/win frames and compare at SSIM ≥.95 against approved baselines.
 

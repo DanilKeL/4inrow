@@ -1,6 +1,7 @@
 import 'dart:math' as math;
 import 'dart:ui' show FrameTiming, Size;
 
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_scene/scene.dart' as fs;
 import 'package:four3/src/feature/game/bloc/game_bloc.dart';
@@ -41,6 +42,7 @@ class _GameSceneViewState extends State<GameSceneView> {
   Size _size = Size.zero;
   double _renderScale = 1;
   final List<double> _frameTimes = [];
+  final ValueNotifier<int> _sceneRepaint = ValueNotifier<int>(0);
 
   @override
   void initState() {
@@ -64,6 +66,9 @@ class _GameSceneViewState extends State<GameSceneView> {
   void didUpdateWidget(covariant GameSceneView oldWidget) {
     super.didUpdateWidget(oldWidget);
     _sync();
+    if (!widget.settings.hints || !widget.data.canPlace) {
+      _controller.hideGhost();
+    }
   }
 
   void _sync() {
@@ -73,6 +78,7 @@ class _GameSceneViewState extends State<GameSceneView> {
       xray: widget.data.xray,
       layers: widget.data.layers,
       animations: widget.settings.animations,
+      introduction: widget.demo,
     );
     if (_cameraReset != widget.data.cameraReset ||
         oldViewNeedsReset(widget.data.cameraView)) {
@@ -134,16 +140,35 @@ class _GameSceneViewState extends State<GameSceneView> {
         ? 1 - math.exp(-delta * 6)
         : 1.0;
     _target += (_targetGoal - _target) * response;
+    _sceneRepaint.value++;
   }
 
   void _onTapUp(TapUpDetails details) {
     if (!widget.data.canPlace || !_ready || _size.isEmpty) return;
     final vm.Ray ray = _camera().screenPointToRay(details.localPosition, _size);
     final ({int x, int y})? column = _controller.pick(ray);
+    _controller.hideGhost();
     if (column != null) widget.onPlace(column.x, column.y);
   }
 
-  void _onScaleStart(ScaleStartDetails details) => _startDistance = _distance;
+  void _onHover(PointerHoverEvent event) {
+    if (!widget.settings.hints || !widget.data.canPlace || !_ready) {
+      _controller.hideGhost();
+      return;
+    }
+    final vm.Ray ray = _camera().screenPointToRay(event.localPosition, _size);
+    final ({int x, int y})? column = _controller.pick(ray);
+    if (column == null) {
+      _controller.hideGhost();
+    } else {
+      _controller.showGhost(column.x, column.y);
+    }
+  }
+
+  void _onScaleStart(ScaleStartDetails details) {
+    _controller.hideGhost();
+    _startDistance = _distance;
+  }
 
   void _onScaleUpdate(ScaleUpdateDetails details) {
     if (details.pointerCount > 1) {
@@ -215,20 +240,41 @@ class _GameSceneViewState extends State<GameSceneView> {
           _renderScale = budgetScale;
           _controller.scene.renderScale = budgetScale;
         }
-        return GestureDetector(
-          behavior: HitTestBehavior.opaque,
-          onTapUp: _onTapUp,
-          onScaleStart: _onScaleStart,
-          onScaleUpdate: _onScaleUpdate,
-          child: fs.SceneView(
-            _controller.scene,
-            cameraBuilder: (_) => _camera(),
-            onTick: _tick,
-            pixelRatio: dpr,
-            loadingBuilder: (_, progress) => Center(
-              child: CircularProgressIndicator(
-                value: progress == 0 ? null : progress,
-              ),
+        return MouseRegion(
+          onHover: _onHover,
+          onExit: (_) => _controller.hideGhost(),
+          child: GestureDetector(
+            behavior: HitTestBehavior.opaque,
+            onTapUp: _onTapUp,
+            onScaleStart: _onScaleStart,
+            onScaleUpdate: _onScaleUpdate,
+            child: Stack(
+              fit: StackFit.expand,
+              children: [
+                fs.SceneView(
+                  _controller.scene,
+                  cameraBuilder: (_) => _camera(),
+                  onTick: _tick,
+                  pixelRatio: dpr,
+                  loadingBuilder: (_, progress) => Center(
+                    child: CircularProgressIndicator(
+                      value: progress == 0 ? null : progress,
+                    ),
+                  ),
+                ),
+                if (widget.data.displayedSnapshot.winningLines.isNotEmpty)
+                  IgnorePointer(
+                    child: CustomPaint(
+                      painter: _WinningLinesPainter(
+                        snapshot: widget.data.displayedSnapshot,
+                        layers: widget.data.layers,
+                        camera: _camera,
+                        devicePixelRatio: dpr,
+                        repaint: _sceneRepaint,
+                      ),
+                    ),
+                  ),
+              ],
             ),
           ),
         );
@@ -239,7 +285,53 @@ class _GameSceneViewState extends State<GameSceneView> {
   @override
   void dispose() {
     WidgetsBinding.instance.removeTimingsCallback(_onTimings);
+    _sceneRepaint.dispose();
     _controller.dispose();
     super.dispose();
   }
+}
+
+final class _WinningLinesPainter extends CustomPainter {
+  new({
+    required this.snapshot,
+    required this.layers,
+    required this.camera,
+    required this.devicePixelRatio,
+    required Listenable repaint,
+  }) : super(repaint: repaint);
+
+  final GameSnapshot snapshot;
+  final List<int> layers;
+  final fs.PerspectiveCamera Function() camera;
+  final double devicePixelRatio;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final fs.PerspectiveCamera activeCamera = camera();
+    final Paint paint = Paint()
+      ..color = const Color(0xFF2955E7).withValues(alpha: .83)
+      ..strokeWidth = 4 / devicePixelRatio
+      ..strokeCap = StrokeCap.round
+      ..style = PaintingStyle.stroke;
+    for (final List<BoardPosition> line in snapshot.winningLines) {
+      for (var index = 1; index < line.length; index++) {
+        final BoardPosition first = line[index - 1];
+        final BoardPosition second = line[index];
+        if (!layers.contains(first.z) || !layers.contains(second.z)) continue;
+        final vm.Vector3 firstWorld = GameSceneController.position(first)
+          ..y += .27;
+        final vm.Vector3 secondWorld = GameSceneController.position(second)
+          ..y += .27;
+        final Offset? a = activeCamera.worldToScreen(firstWorld, size);
+        final Offset? b = activeCamera.worldToScreen(secondWorld, size);
+        if (a != null && b != null) canvas.drawLine(a, b, paint);
+      }
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _WinningLinesPainter oldDelegate) =>
+      oldDelegate.snapshot != snapshot ||
+      oldDelegate.layers != layers ||
+      oldDelegate.devicePixelRatio != devicePixelRatio;
 }

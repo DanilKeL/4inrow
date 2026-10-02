@@ -13,4 +13,13 @@ void main() {
       expect(GameSceneController.displayedHeight(5, <int>[]), 0);
     });
   });
+
+  group('piece falling animation', () {
+    test('starts above the board before the first rendered frame', () {
+      expect(GameSceneController.fallingOffset(0), 2.2);
+      expect(GameSceneController.fallingOffset(.27), closeTo(0, 1e-9));
+      expect(GameSceneController.fallingOffset(.34), closeTo(.085, 1e-9));
+      expect(GameSceneController.fallingOffset(.41), 0);
+    });
+  });
 }

@@ -11,6 +11,11 @@ sealed class OnlineTransportEvent {
   const new();
 }
 
+typedef OnlineSocketFactory = WebSocketChannel Function(
+  Uri endpoint,
+  Map<String, String>? headers,
+);
+
 final class OnlineTransportEvent$Status extends OnlineTransportEvent {
   const new(this.status);
   final String status;
@@ -30,8 +35,11 @@ final class OnlineTransport {
   new({
     required this._endpoint,
     required this._preferences,
-    required this._cookieStorage,
-  });
+    required SessionCookieStorage cookieStorage,
+    OnlineSocketFactory? socketFactory,
+    Future<String?> Function()? cookieReader,
+  }) : _socketFactory = socketFactory ?? _defaultSocketFactory,
+       _cookieReader = cookieReader ?? cookieStorage.read;
 
   static const _sessionKey = 'four-cubed-online-session';
   static const _searchKey = 'four-cubed-online-search';
@@ -40,7 +48,8 @@ final class OnlineTransport {
 
   final Uri _endpoint;
   final SharedPreferences _preferences;
-  final SessionCookieStorage _cookieStorage;
+  final OnlineSocketFactory _socketFactory;
+  final Future<String?> Function() _cookieReader;
   final _events = StreamController<OnlineTransportEvent>.broadcast();
   WebSocketChannel? _socket;
   StreamSubscription<dynamic>? _subscription;
@@ -156,11 +165,10 @@ final class OnlineTransport {
     final int generation = ++_generation;
     _acknowledged = false;
     try {
-      final String? cookie = await _cookieStorage.read();
-      final IOWebSocketChannel socket = IOWebSocketChannel.connect(
+      final String? cookie = await _cookieReader();
+      final WebSocketChannel socket = _socketFactory(
         _endpoint,
-        headers: cookie == null ? null : {'Cookie': cookie},
-        connectTimeout: _handshakeTimeout,
+        cookie == null ? null : {'Cookie': cookie},
       );
       _socket = socket;
       _handshakeTimer = Timer(_handshakeTimeout, () {
@@ -324,6 +332,15 @@ final class OnlineTransport {
       (_) => random.nextInt(256).toRadixString(16).padLeft(2, '0'),
     ).join();
   }
+
+  static WebSocketChannel _defaultSocketFactory(
+    Uri endpoint,
+    Map<String, String>? headers,
+  ) => IOWebSocketChannel.connect(
+    endpoint,
+    headers: headers,
+    connectTimeout: _handshakeTimeout,
+  );
 
   Future<void> dispose() async {
     _disposed = true;

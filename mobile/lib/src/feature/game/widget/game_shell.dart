@@ -13,8 +13,10 @@ import 'package:four3/src/feature/game/widget/game_scene_view.dart';
 import 'package:four3/src/feature/game/widget/game_setup_view.dart';
 import 'package:four3/src/feature/leaderboard/widget/leaderboard_view.dart';
 import 'package:four3/src/feature/levels/widget/levels_view.dart';
+import 'package:four3/src/feature/match_history/widget/match_history_view.dart';
 import 'package:four3/src/feature/matchmaking/bloc/matchmaking_bloc.dart';
 import 'package:four3/src/feature/matchmaking/widget/matchmaking_root_scope.dart';
+import 'package:four3/src/feature/matchmaking/widget/online_setup_view.dart';
 import 'package:four3/src/feature/settings/bloc/settings_bloc.dart';
 import 'package:four3/src/feature/settings/model/app_settings.dart';
 import 'package:four3/src/feature/settings/widget/settings_root_scope.dart';
@@ -117,6 +119,7 @@ class _GameShellBody extends StatelessWidget {
                       final Widget menu = _MenuHero(
                         compact: landscape,
                         onMode: (mode) => _openSetup(context, mode),
+                        onRated: () => _openRated(context),
                       );
                       if (landscape) {
                         return Padding(
@@ -156,6 +159,17 @@ class _GameShellBody extends StatelessWidget {
     title: 'Новая игра',
     child: GameSetupView(initialMode: mode),
   );
+
+  void _openRated(BuildContext context) {
+    final String name =
+        AccountRootScope.of(context).profile?.displayName ?? 'Игрок';
+    MatchmakingRootScope.of(context).add(MatchmakingEvent$Find(name));
+    showAppDialog<void>(
+      context: context,
+      title: 'Рейтинговая игра',
+      child: const OnlineSetupView(),
+    );
+  }
 
   void _requestMenu(BuildContext context) {
     final GameBloc bloc = GameRootScope.of(context);
@@ -248,12 +262,7 @@ class _Header extends StatelessWidget {
                   icon: LucideIcons.userRound,
                   label: accountBloc.profile?.displayName ?? 'Гость',
                   showLabel: expanded,
-                  onTap: () => showAppDialog<void>(
-                    context: context,
-                    title: 'Личный кабинет',
-                    wide: true,
-                    child: const AccountView(),
-                  ),
+                  onTap: () => _openAccount(context),
                 ),
               ),
               _HeaderAction(
@@ -302,6 +311,29 @@ class _Header extends StatelessWidget {
         );
       },
     );
+  }
+
+  Future<void> _openAccount(BuildContext context) async {
+    var openHistory = false;
+    await showAppDialog<void>(
+      context: context,
+      title: 'Личный кабинет',
+      wide: true,
+      child: AccountView(
+        onHistory: () {
+          openHistory = true;
+          Navigator.pop(context);
+        },
+      ),
+    );
+    if (openHistory && context.mounted) {
+      await showAppDialog<void>(
+        context: context,
+        title: 'История и статистика',
+        wide: true,
+        child: const MatchHistoryView(),
+      );
+    }
   }
 }
 
@@ -407,8 +439,13 @@ class _SceneCard extends StatelessWidget {
 }
 
 class _MenuHero extends StatelessWidget {
-  const new({required this.onMode, required this.compact});
+  const new({
+    required this.onMode,
+    required this.onRated,
+    required this.compact,
+  });
   final void Function(GameMode mode) onMode;
+  final VoidCallback onRated;
   final bool compact;
 
   @override
@@ -448,7 +485,7 @@ class _MenuHero extends StatelessWidget {
           width: double.infinity,
           height: compact ? 39 : 45,
           child: FilledButton(
-            onPressed: () => onMode(GameMode.online),
+            onPressed: onRated,
             style: FilledButton.styleFrom(
               padding: const EdgeInsets.symmetric(horizontal: 13),
             ),
@@ -687,6 +724,7 @@ class _PlayingOverlay extends StatelessWidget {
     }
     final GameBloc bloc = GameRootScope.of(context)
       ..add(const GameEvent$Pause());
+    var resumeAfterDismiss = true;
     showAppDialog<void>(
       context: context,
       title: 'Пауза',
@@ -697,6 +735,7 @@ class _PlayingOverlay extends StatelessWidget {
           const SizedBox(height: 16),
           FilledButton(
             onPressed: () {
+              resumeAfterDismiss = false;
               Navigator.pop(context);
               bloc.add(const GameEvent$Resume());
             },
@@ -704,6 +743,7 @@ class _PlayingOverlay extends StatelessWidget {
           ),
           OutlinedButton.icon(
             onPressed: () {
+              resumeAfterDismiss = false;
               Navigator.pop(context);
               bloc.add(const GameEvent$Restart());
             },
@@ -712,6 +752,7 @@ class _PlayingOverlay extends StatelessWidget {
           ),
           OutlinedButton.icon(
             onPressed: () {
+              resumeAfterDismiss = false;
               Navigator.pop(context);
               bloc.add(const GameEvent$Menu());
             },
@@ -721,7 +762,10 @@ class _PlayingOverlay extends StatelessWidget {
         ],
       ),
     ).whenComplete(() {
-      if (bloc.data?.phase == GamePhase.paused) {
+      // A barrier/back dismissal resumes the game, while explicit actions
+      // own their transition. Checking the current bloc phase here races
+      // with its sequential event queue (Menu could be followed by Resume).
+      if (resumeAfterDismiss && bloc.data?.phase == GamePhase.paused) {
         bloc.add(const GameEvent$Resume());
       }
     });

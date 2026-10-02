@@ -6,10 +6,12 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:four3/main.dart' as app;
 import 'package:four3/src/feature/game/bloc/game_bloc.dart';
 import 'package:four3/src/feature/game/model/game_models.dart';
+import 'package:four3/src/feature/game/service/game_engine.dart';
 import 'package:four3/src/feature/game/widget/game_root_scope.dart';
 import 'package:four3/src/feature/game/widget/game_scene_view.dart';
 import 'package:four3/src/feature/game/widget/game_shell.dart';
 import 'package:integration_test/integration_test.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:vector_math/vector_math.dart' as vm;
 
 void main() {
@@ -79,6 +81,76 @@ void main() {
     expect(bloc.data?.snapshot.history.single.x, 2);
     expect(bloc.data?.snapshot.history.single.y, 2);
     await binding.takeScreenshot('local-game-center-move');
+    expect(tester.takeException(), isNull);
+
+    await tester.tap(find.byTooltip('Пауза'));
+    await tester.pump(const Duration(milliseconds: 300));
+    expect(find.text('Время остановлено.'), findsOneWidget);
+    await tester.tap(find.text('В главное меню'));
+    await tester.pump(const Duration(milliseconds: 500));
+    expect(bloc.data?.phase, GamePhase.menu);
+    expect(find.text('Четыре в ряд'), findsOneWidget);
+
+    bloc.add(
+      GameEvent$ReplaySaved(
+        snapshot: GameEngine.replay(const [
+          MoveCandidate(0, 0),
+          MoveCandidate(4, 4),
+          MoveCandidate(4, 0),
+          MoveCandidate(0, 4),
+          MoveCandidate(2, 2),
+          MoveCandidate(2, 3),
+          MoveCandidate(1, 4),
+          MoveCandidate(3, 0),
+          MoveCandidate(0, 2),
+          MoveCandidate(4, 2),
+          MoveCandidate(1, 1),
+          MoveCandidate(3, 3),
+        ]),
+        names: const ['Игрок 1', 'Игрок 2'],
+      ),
+    );
+    await tester.pump(const Duration(milliseconds: 500));
+    await binding.takeScreenshot('game-filled');
+    bloc.add(const GameEvent$ToggleXray());
+    await tester.pump(const Duration(milliseconds: 300));
+    await binding.takeScreenshot('game-xray');
+
+    bloc.add(
+      GameEvent$ReplaySaved(
+        snapshot: GameEngine.replay(const [
+          MoveCandidate(0, 0),
+          MoveCandidate(0, 4),
+          MoveCandidate(1, 0),
+          MoveCandidate(1, 4),
+          MoveCandidate(2, 0),
+          MoveCandidate(2, 4),
+          MoveCandidate(3, 0),
+        ]),
+        names: const ['Игрок 1', 'Игрок 2'],
+      ),
+    );
+    await tester.pump(const Duration(milliseconds: 500));
+    await binding.takeScreenshot('game-victory');
+    expect(tester.takeException(), isNull);
+
+    bloc.add(const GameEvent$Menu());
+    await tester.pump(const Duration(milliseconds: 500));
+    await tester.tap(find.byIcon(LucideIcons.userRound).first);
+    await tester.pump(const Duration(milliseconds: 300));
+    expect(find.text('Личный кабинет'), findsOneWidget);
+    expect(find.text('ТЕКУЩИЙ ПРОФИЛЬ'), findsOneWidget);
+    expect(find.text('Регистрация'), findsOneWidget);
+    await binding.takeScreenshot('account-guest-portrait');
+    expect(tester.takeException(), isNull);
+    await tester.tap(find.byTooltip('Закрыть'));
+    await tester.pump(const Duration(milliseconds: 300));
+
+    await tester.tap(find.byIcon(LucideIcons.settings2));
+    await tester.pump(const Duration(milliseconds: 300));
+    expect(find.text('Настройки'), findsOneWidget);
+    expect(find.text('Предпросмотр хода'), findsOneWidget);
+    await binding.takeScreenshot('settings-portrait');
     expect(tester.takeException(), isNull);
   });
 }

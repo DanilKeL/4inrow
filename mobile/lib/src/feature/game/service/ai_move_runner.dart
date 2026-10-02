@@ -13,7 +13,7 @@ final class AiMoveRunner {
     GameSnapshot snapshot,
     Difficulty difficulty, {
     BotOptions options = const BotOptions(),
-  }) async {
+  }) {
     cancel();
     final receivePort = ReceivePort();
     final completer = Completer<MoveCandidate?>();
@@ -30,12 +30,42 @@ final class AiMoveRunner {
       }
       _release();
     });
-    _isolate = await Isolate.spawn(
-      _calculate,
-      _AiRequest(receivePort.sendPort, snapshot, difficulty, options),
-      onError: receivePort.sendPort,
+    unawaited(
+      _spawn(
+        receivePort: receivePort,
+        completer: completer,
+        snapshot: snapshot,
+        difficulty: difficulty,
+        options: options,
+      ),
     );
     return completer.future;
+  }
+
+  Future<void> _spawn({
+    required ReceivePort receivePort,
+    required Completer<MoveCandidate?> completer,
+    required GameSnapshot snapshot,
+    required Difficulty difficulty,
+    required BotOptions options,
+  }) async {
+    try {
+      final Isolate isolate = await Isolate.spawn(
+        _calculate,
+        _AiRequest(receivePort.sendPort, snapshot, difficulty, options),
+        onError: receivePort.sendPort,
+      );
+      if (identical(_completer, completer) && !completer.isCompleted) {
+        _isolate = isolate;
+      } else {
+        isolate.kill(priority: Isolate.immediate);
+      }
+    } on Object catch (error, stackTrace) {
+      if (identical(_completer, completer) && !completer.isCompleted) {
+        completer.completeError(error, stackTrace);
+        _release();
+      }
+    }
   }
 
   void cancel() {

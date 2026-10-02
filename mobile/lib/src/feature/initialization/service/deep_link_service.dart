@@ -6,12 +6,18 @@ final class DeepLinkService {
   final AppLinks _links = AppLinks();
   final StreamController<Uri> _controller = StreamController.broadcast();
   StreamSubscription<Uri>? _subscription;
+  Uri? _initialLink;
 
   Stream<Uri> get links => _controller.stream;
 
+  Uri? takeInitialLink() {
+    final Uri? value = _initialLink;
+    _initialLink = null;
+    return value;
+  }
+
   Future<void> start() async {
-    final Uri? initial = await _links.getInitialLink();
-    if (initial != null) _controller.add(initial);
+    _initialLink = await _links.getInitialLink();
     _subscription = _links.uriLinkStream.listen(_controller.add);
   }
 

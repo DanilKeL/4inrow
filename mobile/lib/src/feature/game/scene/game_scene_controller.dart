@@ -12,19 +12,22 @@ final class GameSceneController {
 
   final fs.Scene scene = fs.Scene();
   final Map<int, _PieceVisual> _pieces = {};
-  final List<fs.Node> _winningLines = [];
   final List<fs.Node> _pickNodes = [];
+  _PieceVisual? _ghost;
+  int? _ghostColumn;
   late final fs.MeshGeometry _pieceGeometry;
   GameSnapshot? _snapshot;
   List<int> _layers = const [0, 1, 2, 3, 4];
   bool _xray = false;
   bool _animations = true;
+  bool _introduction = false;
   bool _ready = false;
 
   bool get ready => _ready;
 
   Future<void> initialize() async {
     await fs.Scene.initializeStaticResources();
+    _configureLighting();
     _pieceGeometry = _makePieceGeometry();
     final fs.Node board = await fs.loadScene('assets/models/four-board.glb');
     board.name = 'board';
@@ -38,12 +41,14 @@ final class GameSceneController {
     required bool xray,
     required List<int> layers,
     required bool animations,
+    bool introduction = false,
   }) {
     if (!_ready) return;
     _snapshot = snapshot;
     _xray = xray;
     _layers = layers;
     _animations = animations;
+    _introduction = introduction;
     _updatePickGeometry();
     final Set<int> existing = snapshot.history
         .map((move) => move.index)
@@ -60,23 +65,40 @@ final class GameSceneController {
       });
     }
     _updatePieceAppearance();
-    _rebuildWinningLines();
   }
 
   void tick(double elapsedSeconds, double deltaSeconds) {
     if (!_ready || _snapshot == null) return;
     for (final _PieceVisual visual in _pieces.values) {
       final double age = elapsedSeconds - visual.createdAt;
-      var fall = 0.0;
-      if (_animations && visual.move.index == _snapshot!.history.length - 1) {
-        if (age < .27) {
-          fall = 2.2 * (1 - math.pow(age / .27, 2));
-        } else if (age < .41) {
-          fall = math.sin(((age - .27) / .14) * math.pi) * .085;
-        }
-      }
+      final double fall =
+          _animations &&
+              !_introduction &&
+              visual.move.index == _snapshot!.history.length - 1
+          ? fallingOffset(age)
+          : 0;
       final vm.Vector3 base = position(visual.move.position);
-      visual.root.position = vm.Vector3(base.x, base.y + fall, base.z);
+      var introFall = 0.0;
+      var entranceOpacity = 1.0;
+      final double? introductionDelay = visual.introductionDelay;
+      if (_animations && introductionDelay != null) {
+        final double progress = ((age - introductionDelay) / .8).clamp(0, 1);
+        introFall = .7 * math.pow(1 - progress, 3);
+        final double fade = math.min(1, progress * 4);
+        entranceOpacity = fade * fade * (3 - 2 * fade);
+        visual.root.visible =
+            _layers.contains(visual.move.z) && age >= introductionDelay;
+      }
+      visual.root.position = vm.Vector3(
+        base.x,
+        base.y + fall + introFall,
+        base.z,
+      );
+      final double renderedOpacity = visual.baseOpacity * entranceOpacity;
+      _opacity(visual.bodyMaterial, renderedOpacity);
+      _opacity(visual.capMaterial, renderedOpacity);
+      visual.symbolMaterial.baseColorFactor.a = renderedOpacity * .85;
+      _opacity(visual.ringMaterial, renderedOpacity);
       if (visual.winner && _animations) {
         final double strength = .6 + math.sin(elapsedSeconds * 3) * .3;
         visual.ringMaterial.emissiveStrength = strength;
@@ -94,6 +116,48 @@ final class GameSceneController {
     final List<String> parts = hit.node.name.split('_');
     if (parts.length != 3) return null;
     return (x: int.parse(parts[1]), y: int.parse(parts[2]));
+  }
+
+  void showGhost(int x, int y) {
+    final GameSnapshot? snapshot = _snapshot;
+    if (snapshot == null || snapshot.status != GameStatus.playing) {
+      hideGhost();
+      return;
+    }
+    final int column = y * 5 + x;
+    final int height = snapshot.heights[column];
+    if (height >= 5 || !_layers.contains(height)) {
+      hideGhost();
+      return;
+    }
+    if (_ghostColumn == column && _ghost != null) return;
+    hideGhost();
+    final _PieceVisual visual = _createPiece(
+      GameMove(
+        x: x,
+        y: y,
+        z: height,
+        player: snapshot.currentPlayer,
+        index: -1,
+      ),
+    );
+    visual.root.position = visual.root.position + vm.Vector3(0, .045, 0);
+    _opacity(visual.bodyMaterial, .23);
+    _opacity(visual.capMaterial, .23);
+    visual.symbolMaterial.baseColorFactor.a = .23 * .85;
+    visual.symbolMaterial.alphaMode = fs.AlphaMode.blend;
+    _opacity(visual.ringMaterial, .8);
+    visual.ring.visible = true;
+    scene.add(visual.root);
+    _ghost = visual;
+    _ghostColumn = column;
+  }
+
+  void hideGhost() {
+    final _PieceVisual? visual = _ghost;
+    if (visual != null) scene.remove(visual.root);
+    _ghost = null;
+    _ghostColumn = null;
   }
 
   vm.Vector3 winningTarget() {
@@ -117,27 +181,34 @@ final class GameSceneController {
   _PieceVisual _createPiece(GameMove move) {
     final dark = move.player == Player.one;
     final fs.PhysicallyBasedMaterial bodyMaterial = _pbr(
-      dark ? vm.Vector4(.142, .153, .173, 1) : vm.Vector4(.855, .785, .68, 1),
+      dark ? _linearColor(0x24272C) : _linearColor(0xEEE4D2),
       roughness: dark ? .34 : .48,
       metallic: dark ? .2 : .08,
     );
     final fs.PhysicallyBasedMaterial capMaterial = _pbr(
-      dark ? vm.Vector4(.145, .16, .184, 1) : vm.Vector4(.92, .84, .72, 1),
+      dark ? _linearColor(0x24292F) : _linearColor(0xF5EDDE),
       roughness: .52,
     );
     final symbolMaterial = fs.UnlitMaterial()
       ..baseColorFactor = dark
-          ? vm.Vector4(.24, .25, .28, .85)
-          : vm.Vector4(.31, .29, .25, .85)
+          ? _linearColor(0x858992, .85)
+          : _linearColor(0x969286, .85)
       ..alphaMode = fs.AlphaMode.blend;
-    final fs.PhysicallyBasedMaterial ringMaterial = _pbr(
-      vm.Vector4(.036, .117, .855, 1),
-      roughness: .3,
-      metallic: .15,
-    )..emissiveFactor = vm.Vector4(.036, .117, .855, 1);
+    final fs.PhysicallyBasedMaterial ringMaterial =
+        _pbr(_linearColor(0x3661EE), roughness: 1, metallic: 0)
+          ..emissiveFactor = _linearColor(0x3661EE)
+          ..emissiveStrength = .35;
 
     final root = fs.Node(name: 'piece_${move.index}');
     root.position = position(move.position);
+    // Put a new piece at the beginning of its fall before the first render.
+    // Waiting for tick() produced one settled frame followed by a jump up.
+    if (_animations &&
+        !_introduction &&
+        move.index == _snapshot!.history.length - 1) {
+      root.position = root.position + vm.Vector3(0, fallingOffset(0), 0);
+    }
+    if (_introduction && _animations) root.visible = false;
     root.add(fs.Node(mesh: fs.Mesh(_pieceGeometry, bodyMaterial)));
     final cap = fs.Node(
       mesh: fs.Mesh(
@@ -178,6 +249,9 @@ final class GameSceneController {
       ringMaterial: ringMaterial,
       ring: ring,
       createdAt: _clockSeconds,
+      introductionDelay: _introduction
+          ? .45 + (move.x + move.y) * .055 + move.z * .14
+          : null,
     );
   }
 
@@ -196,12 +270,18 @@ final class GameSceneController {
     for (final _PieceVisual visual in _pieces.values) {
       final key = '${visual.move.x},${visual.move.y},${visual.move.z}';
       visual.winner = winners.contains(key);
-      visual.root.visible = _layers.contains(visual.move.z);
+      final bool introduced = switch (visual.introductionDelay) {
+        final double delay =>
+          !_animations || _clockSeconds - visual.createdAt >= delay,
+        null => true,
+      };
+      visual.root.visible = _layers.contains(visual.move.z) && introduced;
       final opacity = _xray
           ? .43
           : _snapshot!.status == GameStatus.won && !visual.winner
           ? .52
           : 1.0;
+      visual.baseOpacity = opacity;
       _opacity(visual.bodyMaterial, opacity);
       _opacity(visual.capMaterial, opacity);
       visual.symbolMaterial.baseColorFactor.a = opacity * .85;
@@ -209,37 +289,6 @@ final class GameSceneController {
           ? fs.AlphaMode.blend
           : fs.AlphaMode.opaque;
       visual.ring.visible = visual.winner || visual.move.index == latest;
-    }
-  }
-
-  void _rebuildWinningLines() {
-    for (final fs.Node node in _winningLines) {
-      scene.remove(node);
-    }
-    _winningLines.clear();
-    if (_snapshot == null) return;
-    for (final List<BoardPosition> line in _snapshot!.winningLines) {
-      for (var index = 1; index < line.length; index++) {
-        final BoardPosition a = line[index - 1];
-        final BoardPosition b = line[index];
-        if (!_layers.contains(a.z) || !_layers.contains(b.z)) continue;
-        final vm.Vector3 first = position(a)..y += .27;
-        final vm.Vector3 second = position(b)..y += .27;
-        final geometry = fs.PolylineGeometry(
-          [first, second],
-          width: 4,
-          cap: fs.PolylineCap.round,
-        );
-        final material = fs.UnlitMaterial()
-          ..baseColorFactor = vm.Vector4(.036, .117, .855, .83)
-          ..alphaMode = fs.AlphaMode.blend;
-        final node = fs.Node(mesh: fs.Mesh(geometry, material))
-          ..name = 'winning_line'
-          ..raycastable = false
-          ..castsShadows = false;
-        scene.add(node);
-        _winningLines.add(node);
-      }
     }
   }
 
@@ -296,6 +345,78 @@ final class GameSceneController {
     return result;
   }
 
+  static double fallingOffset(double age) {
+    if (age <= 0) return 2.2;
+    if (age < .27) return 2.2 * (1 - math.pow(age / .27, 2));
+    if (age < .41) {
+      return math.sin(((age - .27) / .14) * math.pi) * .085;
+    }
+    return 0;
+  }
+
+  void _configureLighting() {
+    // React Three Fiber defaults to ACES filmic. flutter_scene defaults to
+    // PBR Neutral, which noticeably changes the highlights and warm colors.
+    scene.toneMapping = fs.ToneMappingMode.aces;
+    scene.exposure = 1;
+
+    // Exact key/fill/rim setup from the web reference. The built-in studio
+    // environment supplies the web ambient + hemisphere fill and reflections.
+    _addDirectionalLight(
+      position: vm.Vector3(-4, 9, 3),
+      color: 0xFFF3DC,
+      intensity: 2.4,
+    );
+    _addDirectionalLight(
+      position: vm.Vector3(6, 4, -5),
+      color: 0xDDE7FF,
+      intensity: 1.4,
+    );
+    _addDirectionalLight(
+      position: vm.Vector3(-4, 2, -4),
+      color: 0xFFFFFF,
+      intensity: .6,
+    );
+  }
+
+  void _addDirectionalLight({
+    required vm.Vector3 position,
+    required int color,
+    required double intensity,
+  }) {
+    final vm.Vector3 direction = -position
+      ..normalize();
+    final fs.DirectionalLight light = fs.DirectionalLight(
+      direction: direction,
+      color: _linearColor3(color),
+      intensity: intensity,
+    );
+    scene.add(
+      fs.Node(name: 'reference-light')
+        ..addComponent(fs.DirectionalLightComponent.aimed(light, direction)),
+    );
+  }
+
+  static vm.Vector4 _linearColor(int rgb, [double alpha = 1]) => vm.Vector4(
+    _srgbChannel(rgb >> 16 & 0xFF),
+    _srgbChannel(rgb >> 8 & 0xFF),
+    _srgbChannel(rgb & 0xFF),
+    alpha,
+  );
+
+  static vm.Vector3 _linearColor3(int rgb) => vm.Vector3(
+    _srgbChannel(rgb >> 16 & 0xFF),
+    _srgbChannel(rgb >> 8 & 0xFF),
+    _srgbChannel(rgb & 0xFF),
+  );
+
+  static double _srgbChannel(int channel) {
+    final double value = channel / 255;
+    return value <= .04045
+        ? value / 12.92
+        : math.pow((value + .055) / 1.055, 2.4).toDouble();
+  }
+
   fs.PhysicallyBasedMaterial _pbr(
     vm.Vector4 color, {
     double roughness = .45,
@@ -349,7 +470,10 @@ final class GameSceneController {
     return fs.MeshGeometry.fromArrays(positions: positions, indices: indices);
   }
 
-  void dispose() => scene.removeAll();
+  void dispose() {
+    _ghost = null;
+    scene.removeAll();
+  }
 }
 
 final class _PieceVisual {
@@ -362,6 +486,7 @@ final class _PieceVisual {
     required this.ringMaterial,
     required this.ring,
     required this.createdAt,
+    required this.introductionDelay,
   });
   final fs.Node root;
   final GameMove move;
@@ -371,5 +496,7 @@ final class _PieceVisual {
   final fs.PhysicallyBasedMaterial ringMaterial;
   final fs.Node ring;
   final double createdAt;
+  final double? introductionDelay;
+  double baseOpacity = 1;
   bool winner = false;
 }
