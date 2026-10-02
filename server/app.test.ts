@@ -1192,6 +1192,22 @@ describe('online lobby server over real WebSockets', () => {
       ).headers.get('location'),
     ).toBe('/?emailVerified=0');
 
+    const mobileRegistration = await post('/auth/register', {
+      username: 'MobileMailPlayer',
+      email: 'mobile@example.com',
+      password: 'mobile-password-123',
+    });
+    expect(mobileRegistration.status).toBe(202);
+    const mobileToken = sent.at(-1)!.message.token;
+    const mobileVerified = await post('/auth/verify', { token: mobileToken });
+    expect(mobileVerified.status).toBe(200);
+    expect(await mobileVerified.json()).toMatchObject({
+      authenticated: true,
+      username: 'MobileMailPlayer',
+      emailVerified: true,
+    });
+    expect(mobileVerified.headers.get('set-cookie')).toContain('four_session=');
+
     const requested = await post('/auth/password-reset/request', { email: 'PLAYER@example.com' });
     expect(requested.status).toBe(200);
     expect(sent.at(-1)?.kind).toBe('reset');

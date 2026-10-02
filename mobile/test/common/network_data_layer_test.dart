@@ -1,0 +1,165 @@
+import 'package:flutter_test/flutter_test.dart';
+import 'package:four3/src/common/rest_client/rest_client.dart';
+import 'package:four3/src/feature/account/data/account_datasource.dart';
+import 'package:four3/src/feature/account/data/account_repository.dart';
+import 'package:four3/src/feature/account/model/account_profile.dart';
+import 'package:four3/src/feature/leaderboard/data/leaderboard_datasource.dart';
+import 'package:four3/src/feature/leaderboard/data/leaderboard_repository.dart';
+import 'package:four3/src/feature/leaderboard/model/leaderboard_player.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+
+void main() {
+  TestWidgetsFlutterBinding.ensureInitialized();
+
+  test('account datasource only forwards raw REST maps', () async {
+    final client = _FakeRestClient(<String, Map<String, dynamic>>{
+      'POST /auth/login': <String, dynamic>{'ok': true, 'raw': 7},
+    });
+    final datasource = AccountDatasource$RestClient(restClient: client);
+
+    final Map<String, dynamic> result = await datasource.login(
+      username: 'cube',
+      password: 'secret',
+    );
+
+    expect(result, <String, dynamic>{'ok': true, 'raw': 7});
+    expect(client.lastPath, '/auth/login');
+    expect(client.lastData, <String, Object?>{
+      'username': 'cube',
+      'password': 'secret',
+    });
+  });
+
+  test('account repository owns profile deserialization', () async {
+    SharedPreferences.setMockInitialValues(<String, Object>{});
+    final SharedPreferences preferences = await SharedPreferences.getInstance();
+    final datasource = _FakeAccountDatasource()
+      ..profileResponse = <String, dynamic>{
+        'username': 'cube',
+        'guestName': 'Гость_123456',
+        'email': 'cube@example.com',
+        'emailVerified': true,
+        'createdAt': 42.0,
+      };
+    final repository = AccountRepository(
+      datasource: datasource,
+      preferences: preferences,
+    );
+
+    final AccountProfile profile = await repository.load();
+
+    expect(profile.username, 'cube');
+    expect(profile.guestName, 'Гость_123456');
+    expect(profile.email, 'cube@example.com');
+    expect(profile.emailVerified, isTrue);
+    expect(profile.createdAt, 42);
+  });
+
+  test('leaderboard repository converts raw rows into models', () async {
+    final datasource = LeaderboardDatasource$RestClient(
+      restClient: _FakeRestClient(<String, Map<String, dynamic>>{
+        'GET /auth/leaderboard': <String, dynamic>{
+          'players': <Map<String, Object?>>[
+            <String, Object?>{
+              'rank': 1.0,
+              'username': 'winner',
+              'elo': 1512.0,
+              'games': 31.0,
+            },
+          ],
+        },
+      }),
+    );
+    final repository = LeaderboardRepository(datasource: datasource);
+
+    final List<LeaderboardPlayer> players = await repository.load();
+
+    expect(players, hasLength(1));
+    expect(players.single.rank, 1);
+    expect(players.single.username, 'winner');
+    expect(players.single.elo, 1512);
+    expect(players.single.games, 31);
+  });
+}
+
+final class _FakeRestClient implements RestClient {
+  new(this.responses);
+
+  final Map<String, Map<String, dynamic>> responses;
+  String? lastPath;
+  Map<String, Object?>? lastData;
+
+  @override
+  Future<Map<String, dynamic>> get(
+    String path, {
+    Map<String, String?>? queryParams,
+    Map<String, String>? headers,
+  }) async {
+    lastPath = path;
+    return responses['GET $path'] ?? <String, dynamic>{};
+  }
+
+  @override
+  Future<Map<String, dynamic>> post(
+    String path, {
+    Map<String, Object?>? data,
+    Map<String, String?>? queryParams,
+    Map<String, String>? headers,
+  }) async {
+    lastPath = path;
+    lastData = data;
+    return responses['POST $path'] ?? <String, dynamic>{};
+  }
+
+  @override
+  void dispose() {}
+}
+
+final class _FakeAccountDatasource implements AccountDatasource {
+  Map<String, dynamic> profileResponse = <String, dynamic>{};
+
+  @override
+  Future<Map<String, dynamic>> profile() async => profileResponse;
+
+  @override
+  Future<Map<String, dynamic>> login({
+    required String username,
+    required String password,
+  }) async => <String, dynamic>{};
+
+  @override
+  Future<Map<String, dynamic>> register({
+    required String username,
+    required String email,
+    required String password,
+  }) async => <String, dynamic>{};
+
+  @override
+  Future<Map<String, dynamic>> verifyEmail({required String token}) async =>
+      <String, dynamic>{};
+
+  @override
+  Future<Map<String, dynamic>> resendVerification({
+    required String identifier,
+  }) async => <String, dynamic>{};
+
+  @override
+  Future<Map<String, dynamic>> requestPasswordReset({
+    required String email,
+  }) async => <String, dynamic>{};
+
+  @override
+  Future<Map<String, dynamic>> completePasswordReset({
+    required String token,
+    required String password,
+  }) async => <String, dynamic>{};
+
+  @override
+  Future<Map<String, dynamic>> changePassword({
+    required String currentPassword,
+    required String newPassword,
+  }) async => <String, dynamic>{};
+
+  @override
+  Future<Map<String, dynamic>> logout() async => <String, dynamic>{};
+}

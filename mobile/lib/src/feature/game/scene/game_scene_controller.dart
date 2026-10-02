@@ -1,0 +1,375 @@
+import 'dart:math' as math;
+import 'dart:typed_data';
+
+import 'package:flutter_scene/scene.dart' as fs;
+import 'package:four3/src/feature/game/model/game_models.dart';
+import 'package:vector_math/vector_math.dart' as vm;
+
+final class GameSceneController {
+  static const spacing = 1.09;
+  static const step = 0.5;
+  static const firstHeight = 0.365;
+
+  final fs.Scene scene = fs.Scene();
+  final Map<int, _PieceVisual> _pieces = {};
+  final List<fs.Node> _winningLines = [];
+  final List<fs.Node> _pickNodes = [];
+  late final fs.MeshGeometry _pieceGeometry;
+  GameSnapshot? _snapshot;
+  List<int> _layers = const [0, 1, 2, 3, 4];
+  bool _xray = false;
+  bool _animations = true;
+  bool _ready = false;
+
+  bool get ready => _ready;
+
+  Future<void> initialize() async {
+    await fs.Scene.initializeStaticResources();
+    _pieceGeometry = _makePieceGeometry();
+    final fs.Node board = await fs.loadScene('assets/models/four-board.glb');
+    board.name = 'board';
+    scene.add(board);
+    _addPickGeometry();
+    _ready = true;
+  }
+
+  void sync({
+    required GameSnapshot snapshot,
+    required bool xray,
+    required List<int> layers,
+    required bool animations,
+  }) {
+    if (!_ready) return;
+    _snapshot = snapshot;
+    _xray = xray;
+    _layers = layers;
+    _animations = animations;
+    _updatePickGeometry();
+    final Set<int> existing = snapshot.history
+        .map((move) => move.index)
+        .toSet();
+    for (final int index
+        in _pieces.keys.where((index) => !existing.contains(index)).toList()) {
+      scene.remove(_pieces.remove(index)!.root);
+    }
+    for (final GameMove move in snapshot.history) {
+      _pieces.putIfAbsent(move.index, () {
+        final _PieceVisual visual = _createPiece(move);
+        scene.add(visual.root);
+        return visual;
+      });
+    }
+    _updatePieceAppearance();
+    _rebuildWinningLines();
+  }
+
+  void tick(double elapsedSeconds, double deltaSeconds) {
+    if (!_ready || _snapshot == null) return;
+    for (final _PieceVisual visual in _pieces.values) {
+      final double age = elapsedSeconds - visual.createdAt;
+      var fall = 0.0;
+      if (_animations && visual.move.index == _snapshot!.history.length - 1) {
+        if (age < .27) {
+          fall = 2.2 * (1 - math.pow(age / .27, 2));
+        } else if (age < .41) {
+          fall = math.sin(((age - .27) / .14) * math.pi) * .085;
+        }
+      }
+      final vm.Vector3 base = position(visual.move.position);
+      visual.root.position = vm.Vector3(base.x, base.y + fall, base.z);
+      if (visual.winner && _animations) {
+        final double strength = .6 + math.sin(elapsedSeconds * 3) * .3;
+        visual.ringMaterial.emissiveStrength = strength;
+      }
+    }
+  }
+
+  ({int x, int y})? pick(vm.Ray ray) {
+    if (!_ready) return null;
+    final fs.SceneRaycastHit? hit = scene.raycast(
+      ray,
+      where: (node) => node.name.startsWith('slot_'),
+    );
+    if (hit == null) return null;
+    final List<String> parts = hit.node.name.split('_');
+    if (parts.length != 3) return null;
+    return (x: int.parse(parts[1]), y: int.parse(parts[2]));
+  }
+
+  vm.Vector3 winningTarget() {
+    final List<List<BoardPosition>> lines = _snapshot?.winningLines ?? const [];
+    final List<BoardPosition> points = lines.expand((line) => line).toList();
+    if (points.isEmpty) return vm.Vector3(0, .25, 0);
+    final result = vm.Vector3.zero();
+    for (final point in points) {
+      result.add(position(point));
+    }
+    result.scale(.42 / points.length);
+    return result;
+  }
+
+  static vm.Vector3 position(BoardPosition position) => vm.Vector3(
+    (position.x - 2) * spacing,
+    firstHeight + position.z * step,
+    (position.y - 2) * spacing,
+  );
+
+  _PieceVisual _createPiece(GameMove move) {
+    final dark = move.player == Player.one;
+    final fs.PhysicallyBasedMaterial bodyMaterial = _pbr(
+      dark ? vm.Vector4(.142, .153, .173, 1) : vm.Vector4(.855, .785, .68, 1),
+      roughness: dark ? .34 : .48,
+      metallic: dark ? .2 : .08,
+    );
+    final fs.PhysicallyBasedMaterial capMaterial = _pbr(
+      dark ? vm.Vector4(.145, .16, .184, 1) : vm.Vector4(.92, .84, .72, 1),
+      roughness: .52,
+    );
+    final symbolMaterial = fs.UnlitMaterial()
+      ..baseColorFactor = dark
+          ? vm.Vector4(.24, .25, .28, .85)
+          : vm.Vector4(.31, .29, .25, .85)
+      ..alphaMode = fs.AlphaMode.blend;
+    final fs.PhysicallyBasedMaterial ringMaterial = _pbr(
+      vm.Vector4(.036, .117, .855, 1),
+      roughness: .3,
+      metallic: .15,
+    )..emissiveFactor = vm.Vector4(.036, .117, .855, 1);
+
+    final root = fs.Node(name: 'piece_${move.index}');
+    root.position = position(move.position);
+    root.add(fs.Node(mesh: fs.Mesh(_pieceGeometry, bodyMaterial)));
+    final cap = fs.Node(
+      mesh: fs.Mesh(
+        fs.CylinderGeometry(
+          bottomRadius: .317,
+          topRadius: .317,
+          height: .009,
+          radialSegments: 40,
+        ),
+        capMaterial,
+      ),
+    )..position = vm.Vector3(0, .2505, 0);
+    root.add(cap);
+    final fs.MeshGeometry symbolGeometry = dark
+        ? fs.DiscGeometry(radius: .052, segments: 24)
+        : fs.RingGeometry(innerRadius: .067, outerRadius: .085);
+    final symbol = fs.Node(mesh: fs.Mesh(symbolGeometry, symbolMaterial))
+      ..position = vm.Vector3(0, .258, 0);
+    root.add(symbol);
+    final ring = fs.Node(
+      mesh: fs.Mesh(
+        fs.TorusGeometry(
+          radius: .353,
+          tubeRadius: .012,
+          radialSegments: 48,
+          tubularSegments: 8,
+        ),
+        ringMaterial,
+      ),
+    )..position = vm.Vector3(0, .242, 0);
+    root.add(ring);
+    return _PieceVisual(
+      root: root,
+      move: move,
+      bodyMaterial: bodyMaterial,
+      capMaterial: capMaterial,
+      symbolMaterial: symbolMaterial,
+      ringMaterial: ringMaterial,
+      ring: ring,
+      createdAt: _clockSeconds,
+    );
+  }
+
+  double _clockSeconds = 0;
+  void setClock(double elapsedSeconds) => _clockSeconds = elapsedSeconds;
+
+  void _updatePieceAppearance() {
+    if (_snapshot == null) return;
+    final Set<String> winners = {
+      for (final point in _snapshot!.winningLines.expand((line) => line))
+        '${point.x},${point.y},${point.z}',
+    };
+    final int latest = _snapshot!.history.isEmpty
+        ? -1
+        : _snapshot!.history.last.index;
+    for (final _PieceVisual visual in _pieces.values) {
+      final key = '${visual.move.x},${visual.move.y},${visual.move.z}';
+      visual.winner = winners.contains(key);
+      visual.root.visible = _layers.contains(visual.move.z);
+      final opacity = _xray
+          ? .43
+          : _snapshot!.status == GameStatus.won && !visual.winner
+          ? .52
+          : 1.0;
+      _opacity(visual.bodyMaterial, opacity);
+      _opacity(visual.capMaterial, opacity);
+      visual.symbolMaterial.baseColorFactor.a = opacity * .85;
+      visual.symbolMaterial.alphaMode = opacity < 1
+          ? fs.AlphaMode.blend
+          : fs.AlphaMode.opaque;
+      visual.ring.visible = visual.winner || visual.move.index == latest;
+    }
+  }
+
+  void _rebuildWinningLines() {
+    for (final fs.Node node in _winningLines) {
+      scene.remove(node);
+    }
+    _winningLines.clear();
+    if (_snapshot == null) return;
+    for (final List<BoardPosition> line in _snapshot!.winningLines) {
+      for (var index = 1; index < line.length; index++) {
+        final BoardPosition a = line[index - 1];
+        final BoardPosition b = line[index];
+        if (!_layers.contains(a.z) || !_layers.contains(b.z)) continue;
+        final vm.Vector3 first = position(a)..y += .27;
+        final vm.Vector3 second = position(b)..y += .27;
+        final geometry = fs.PolylineGeometry(
+          [first, second],
+          width: 4,
+          cap: fs.PolylineCap.round,
+        );
+        final material = fs.UnlitMaterial()
+          ..baseColorFactor = vm.Vector4(.036, .117, .855, .83)
+          ..alphaMode = fs.AlphaMode.blend;
+        final node = fs.Node(mesh: fs.Mesh(geometry, material))
+          ..name = 'winning_line'
+          ..raycastable = false
+          ..castsShadows = false;
+        scene.add(node);
+        _winningLines.add(node);
+      }
+    }
+  }
+
+  void _addPickGeometry() {
+    final material = fs.UnlitMaterial()
+      ..baseColorFactor = vm.Vector4(1, 1, 1, 0)
+      ..alphaMode = fs.AlphaMode.blend;
+    final geometry = fs.CylinderGeometry(
+      bottomRadius: .49,
+      topRadius: .49,
+      radialSegments: 16,
+    );
+    for (var y = 0; y < 5; y++) {
+      for (var x = 0; x < 5; x++) {
+        final node =
+            fs.Node(name: 'slot_${x}_$y', mesh: fs.Mesh(geometry, material))
+              ..position = vm.Vector3(
+                (x - 2) * spacing,
+                .0775,
+                (y - 2) * spacing,
+              )
+              ..scale = vm.Vector3(1, .155, 1)
+              ..castsShadows = false;
+        scene.add(node);
+        _pickNodes.add(node);
+      }
+    }
+  }
+
+  void _updatePickGeometry() {
+    final GameSnapshot? snapshot = _snapshot;
+    if (snapshot == null || _pickNodes.length != 25) return;
+    for (var column = 0; column < 25; column++) {
+      final int x = column % 5;
+      final int y = column ~/ 5;
+      final int height = displayedHeight(snapshot.heights[column], _layers);
+      final double pickHeight = .13 + height * step + .025;
+      final fs.Node node = _pickNodes[column]
+        ..position = vm.Vector3(
+          (x - 2) * spacing,
+          pickHeight / 2,
+          (y - 2) * spacing,
+        )
+        ..scale = vm.Vector3(1, pickHeight, 1);
+      node.raycastable = snapshot.heights[column] < 5;
+    }
+  }
+
+  static int displayedHeight(int height, List<int> layers) {
+    var result = 0;
+    for (final layer in layers) {
+      if (layer < height) result = math.max(result, layer + 1);
+    }
+    return result;
+  }
+
+  fs.PhysicallyBasedMaterial _pbr(
+    vm.Vector4 color, {
+    double roughness = .45,
+    double metallic = .1,
+  }) => fs.PhysicallyBasedMaterial()
+    ..baseColorFactor = color.clone()
+    ..roughnessFactor = roughness
+    ..metallicFactor = metallic;
+
+  void _opacity(fs.PhysicallyBasedMaterial material, double opacity) {
+    final vm.Vector4 color = material.baseColorFactor.clone()..a = opacity;
+    material.baseColorFactor = color;
+    material.alphaMode = opacity < 1 ? fs.AlphaMode.blend : fs.AlphaMode.opaque;
+  }
+
+  fs.MeshGeometry _makePieceGeometry() {
+    const profile = <(double, double)>[
+      (0, -.25),
+      (.342, -.25),
+      (.377, -.241),
+      (.397, -.214),
+      (.4, -.18),
+      (.4, .175),
+      (.394, .211),
+      (.375, .237),
+      (.342, .25),
+      (0, .25),
+    ];
+    const segments = 48;
+    final positions = Float32List(profile.length * segments * 3);
+    var cursor = 0;
+    for (final point in profile) {
+      for (var segment = 0; segment < segments; segment++) {
+        final double angle = segment / segments * math.pi * 2;
+        positions[cursor++] = point.$1 * math.cos(angle);
+        positions[cursor++] = point.$2;
+        positions[cursor++] = point.$1 * math.sin(angle);
+      }
+    }
+    final indices = <int>[];
+    for (var row = 0; row < profile.length - 1; row++) {
+      for (var segment = 0; segment < segments; segment++) {
+        final int next = (segment + 1) % segments;
+        final int a = row * segments + segment;
+        final int b = row * segments + next;
+        final int c = (row + 1) * segments + segment;
+        final int d = (row + 1) * segments + next;
+        indices.addAll([a, c, b, b, c, d]);
+      }
+    }
+    return fs.MeshGeometry.fromArrays(positions: positions, indices: indices);
+  }
+
+  void dispose() => scene.removeAll();
+}
+
+final class _PieceVisual {
+  new({
+    required this.root,
+    required this.move,
+    required this.bodyMaterial,
+    required this.capMaterial,
+    required this.symbolMaterial,
+    required this.ringMaterial,
+    required this.ring,
+    required this.createdAt,
+  });
+  final fs.Node root;
+  final GameMove move;
+  final fs.PhysicallyBasedMaterial bodyMaterial;
+  final fs.PhysicallyBasedMaterial capMaterial;
+  final fs.UnlitMaterial symbolMaterial;
+  final fs.PhysicallyBasedMaterial ringMaterial;
+  final fs.Node ring;
+  final double createdAt;
+  bool winner = false;
+}

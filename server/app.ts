@@ -610,6 +610,24 @@ export function createOnlineServer(options: OnlineServerOptions = {}) {
           }
           return;
         }
+        if (pathname === '/auth/verify' && req.method === 'POST') {
+          try {
+            checkRate(mailAttempts, 10);
+            const data = await readAuthJson();
+            const result = await auth.verifyEmail(data.token);
+            res.setHeader('Set-Cookie', auth.cookie(result.token, secure));
+            respond(200, {
+              authenticated: true,
+              username: result.username,
+              emailVerified: true,
+            });
+          } catch (error) {
+            respond(error instanceof AuthError ? error.status : 400, {
+              error: error instanceof AuthError ? error.message : 'Не удалось подтвердить email.',
+            });
+          }
+          return;
+        }
         if (pathname === '/auth/verify' && req.method === 'GET') {
           try {
             const result = await auth.verifyEmail(requestUrl.searchParams.get('token'));
