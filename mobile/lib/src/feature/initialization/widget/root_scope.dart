@@ -79,7 +79,7 @@ final class RootDependencies {
       cookieStorage: cookieStorage,
       settingsRepository: SettingsRepository(preferences),
       gameStorageRepository: GameStorageRepository(preferences),
-      levelRepository: LevelRepository(preferences),
+      levelRepository: LevelRepository(preferences, restClient),
       deepLinkService: deepLinkService,
       accountRepository: accountRepository,
       onlineTransport: onlineTransport,
@@ -113,7 +113,7 @@ class RootScope extends StatefulWidget {
 }
 
 class _RootScopeState extends State<RootScope> {
-  late final Future<RootDependencies> _future = RootDependencies.create();
+  late Future<RootDependencies> _future = RootDependencies.create();
   RootDependencies? _dependencies;
 
   @override
@@ -128,18 +128,15 @@ class _RootScopeState extends State<RootScope> {
     builder: (context, snapshot) {
       if (snapshot.hasError) {
         return MaterialApp(
-          home: Scaffold(
-            body: Center(
-              child: Text('Не удалось запустить приложение: ${snapshot.error}'),
-            ),
+          home: _LaunchScreen(
+            error: 'Не удалось запустить приложение: ${snapshot.error}',
+            onRetry: () => setState(() => _future = RootDependencies.create()),
           ),
         );
       }
       final RootDependencies? dependencies = snapshot.data;
       if (dependencies == null) {
-        return const MaterialApp(
-          home: Scaffold(body: Center(child: CircularProgressIndicator())),
-        );
+        return const MaterialApp(home: _LaunchScreen());
       }
       _dependencies ??= dependencies;
       return _InheritedRootScope(
@@ -147,6 +144,102 @@ class _RootScopeState extends State<RootScope> {
         child: widget.child,
       );
     },
+  );
+}
+
+class _LaunchScreen extends StatelessWidget {
+  const new({this.error, this.onRetry});
+  final String? error;
+  final VoidCallback? onRetry;
+
+  @override
+  Widget build(BuildContext context) => Scaffold(
+    backgroundColor: const Color(0xFFF3F2EE),
+    body: SafeArea(
+      child: Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text.rich(
+              TextSpan(
+                text: 'FOUR',
+                children: [
+                  TextSpan(
+                    text: '3',
+                    style: TextStyle(color: Color(0xFF2955E7), fontSize: 18),
+                  ),
+                ],
+              ),
+              style: TextStyle(
+                fontSize: 34,
+                fontWeight: FontWeight.w800,
+                letterSpacing: -2,
+              ),
+            ),
+            const SizedBox(height: 28),
+            SizedBox(
+              width: 160,
+              height: 150,
+              child: Stack(
+                alignment: Alignment.bottomCenter,
+                children: [
+                  Container(
+                    width: 130,
+                    height: 58,
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFE5E2DA),
+                      border: Border.all(color: const Color(0xFFD0CEC6)),
+                      borderRadius: BorderRadius.circular(65),
+                    ),
+                  ),
+                  for (final value in const <(double, Color)>[
+                    (42.0, Color(0xFF30353C)),
+                    (68.0, Color(0xFFF8F1E3)),
+                    (94.0, Color(0xFF416BED)),
+                  ])
+                    Positioned(
+                      bottom: value.$1,
+                      child: Container(
+                        width: 68,
+                        height: 35,
+                        decoration: BoxDecoration(
+                          color: value.$2,
+                          borderRadius: BorderRadius.circular(34),
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 16),
+            Text(
+              error == null ? 'Загрузка игры' : 'Не удалось загрузить поле',
+              style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w700),
+            ),
+            const SizedBox(height: 10),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 24),
+              child: Text(
+                error ?? 'Доска и фишки…',
+                textAlign: TextAlign.center,
+                style: const TextStyle(color: Color(0xFF777A75), fontSize: 12),
+              ),
+            ),
+            const SizedBox(height: 20),
+            if (error == null)
+              const SizedBox(
+                width: 128,
+                child: LinearProgressIndicator(minHeight: 2),
+              )
+            else
+              FilledButton(
+                onPressed: onRetry,
+                child: const Text('Попробовать снова'),
+              ),
+          ],
+        ),
+      ),
+    ),
   );
 }
 

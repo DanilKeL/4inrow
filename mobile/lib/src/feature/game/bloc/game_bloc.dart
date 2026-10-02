@@ -34,6 +34,7 @@ final class GameViewData extends Equatable {
     this.onlinePlayer,
     this.onlineConnection = OnlineConnectionStatus.idle,
     this.onlineCode,
+    this.onlineSnapshot,
   });
 
   final GameSnapshot snapshot;
@@ -53,6 +54,7 @@ final class GameViewData extends Equatable {
   final Player? onlinePlayer;
   final OnlineConnectionStatus onlineConnection;
   final String? onlineCode;
+  final OnlineMatchSnapshot? onlineSnapshot;
 
   bool get canPlace =>
       phase == GamePhase.playing &&
@@ -84,6 +86,7 @@ final class GameViewData extends Equatable {
     Object? onlinePlayer = _unset,
     OnlineConnectionStatus? onlineConnection,
     Object? onlineCode = _unset,
+    Object? onlineSnapshot = _unset,
   }) => GameViewData(
     snapshot: snapshot ?? this.snapshot,
     phase: phase ?? this.phase,
@@ -108,6 +111,9 @@ final class GameViewData extends Equatable {
     onlineCode: identical(onlineCode, _unset)
         ? this.onlineCode
         : onlineCode as String?,
+    onlineSnapshot: identical(onlineSnapshot, _unset)
+        ? this.onlineSnapshot
+        : onlineSnapshot as OnlineMatchSnapshot?,
   );
 
   @override
@@ -129,6 +135,7 @@ final class GameViewData extends Equatable {
     onlinePlayer,
     onlineConnection,
     onlineCode,
+    onlineSnapshot,
   ];
 }
 
@@ -789,6 +796,7 @@ final class GameBloc extends Bloc<GameEvent, GameState> {
           onlinePlayer: player,
           onlineConnection: connection,
           onlineCode: snapshot.code,
+          onlineSnapshot: snapshot,
         ),
       ),
     );

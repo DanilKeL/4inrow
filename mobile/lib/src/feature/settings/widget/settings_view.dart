@@ -18,72 +18,82 @@ class SettingsView extends StatelessWidget {
       builder: (context, state) {
         final AppSettings settings = bloc.settings;
         void update(AppSettings value) => bloc.add(SettingsEvent$Update(value));
-        return ListView(
-          shrinkWrap: true,
-          children: [
-            _SettingRow(
-              icon: LucideIcons.volume2,
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      const Expanded(
-                        child: Text(
-                          'Громкость звуков',
-                          style: TextStyle(
-                            fontSize: 12,
-                            fontWeight: FontWeight.w700,
-                          ),
-                        ),
-                      ),
-                      Text(
-                        '${(settings.volume * 100).round()}%',
-                        style: const TextStyle(
-                          color: AppColors.accent,
+        final items = <Widget>[
+          _SettingRow(
+            icon: LucideIcons.volume2,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    const Expanded(
+                      child: Text(
+                        'Громкость звуков',
+                        style: TextStyle(
                           fontSize: 12,
+                          fontWeight: FontWeight.w700,
                         ),
                       ),
-                    ],
-                  ),
-                  Slider(
-                    value: settings.volume,
-                    onChanged: settings.sound
-                        ? (value) => update(settings.copyWith(volume: value))
-                        : null,
-                  ),
-                  if (!settings.sound)
-                    const Text(
-                      'Звук выключен кнопкой в шапке',
-                      style: TextStyle(color: AppColors.muted, fontSize: 10),
                     ),
-                ],
-              ),
+                    Text(
+                      '${(settings.volume * 100).round()}%',
+                      style: const TextStyle(
+                        color: AppColors.accent,
+                        fontSize: 12,
+                      ),
+                    ),
+                  ],
+                ),
+                Slider(
+                  value: settings.volume,
+                  onChanged: settings.sound
+                      ? (value) => update(settings.copyWith(volume: value))
+                      : null,
+                ),
+                if (!settings.sound)
+                  const Text(
+                    'Звук выключен кнопкой в шапке',
+                    style: TextStyle(color: AppColors.muted, fontSize: 10),
+                  ),
+              ],
             ),
-            _SettingSwitch(
-              icon: LucideIcons.sparkles,
-              value: settings.animations,
-              title: 'Анимации',
-              subtitle: 'Падение фишек и плавная камера',
-              onChanged: (value) =>
-                  update(settings.copyWith(animations: value)),
-            ),
-            _SettingSwitch(
-              icon: LucideIcons.mousePointer2,
-              value: settings.hints,
-              title: 'Предпросмотр хода',
-              subtitle: 'Показывать фишку перед ходом',
-              onChanged: (value) => update(settings.copyWith(hints: value)),
-            ),
-            _SettingSwitch(
-              icon: LucideIcons.scanLine,
-              value: settings.xrayDefault,
-              title: 'Рентген по умолчанию',
-              subtitle: 'Прозрачные фишки в новой партии',
-              onChanged: (value) =>
-                  update(settings.copyWith(xrayDefault: value)),
-            ),
-          ],
+          ),
+          _SettingSwitch(
+            icon: LucideIcons.sparkles,
+            value: settings.animations,
+            title: 'Анимации',
+            subtitle: 'Падение фишек и плавная камера',
+            onChanged: (value) => update(settings.copyWith(animations: value)),
+          ),
+          _SettingSwitch(
+            icon: LucideIcons.mousePointer2,
+            value: settings.hints,
+            title: 'Предпросмотр хода',
+            subtitle: 'Показывать фишку перед ходом',
+            onChanged: (value) => update(settings.copyWith(hints: value)),
+          ),
+          _SettingSwitch(
+            icon: LucideIcons.scanLine,
+            value: settings.xrayDefault,
+            title: 'Рентген по умолчанию',
+            subtitle: 'Прозрачные фишки в новой партии',
+            onChanged: (value) => update(settings.copyWith(xrayDefault: value)),
+          ),
+        ];
+        return LayoutBuilder(
+          builder: (context, constraints) {
+            final bool landscape =
+                MediaQuery.orientationOf(context) == Orientation.landscape &&
+                MediaQuery.sizeOf(context).height <= 550;
+            if (!landscape) return ListView(shrinkWrap: true, children: items);
+            return GridView.count(
+              shrinkWrap: true,
+              crossAxisCount: 2,
+              childAspectRatio: 3.7,
+              crossAxisSpacing: 20,
+              children: items,
+            );
+          },
         );
       },
     );

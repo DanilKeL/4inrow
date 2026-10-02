@@ -1,19 +1,26 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:four3/src/common/theme/app_theme.dart';
 import 'package:four3/src/feature/game/bloc/game_bloc.dart';
+import 'package:four3/src/feature/game/model/game_models.dart';
 import 'package:four3/src/feature/game/widget/game_root_scope.dart';
 import 'package:four3/src/feature/match_history/bloc/match_history_bloc.dart';
 import 'package:four3/src/feature/match_history/model/match_history_models.dart';
 import 'package:four3/src/feature/match_history/widget/match_history_root_scope.dart';
-import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 class MatchHistoryView extends StatefulWidget {
-  const new({super.key});
+  const new({this.onSignIn, super.key});
+  final VoidCallback? onSignIn;
+
   @override
   State<MatchHistoryView> createState() => _MatchHistoryViewState();
 }
 
 class _MatchHistoryViewState extends State<MatchHistoryView> {
+  int _page = 0;
+  String? _editing;
+  final _title = TextEditingController();
+
   @override
   void initState() {
     super.initState();
@@ -28,148 +35,266 @@ class _MatchHistoryViewState extends State<MatchHistoryView> {
       builder: (context, state) => switch (state) {
         MatchHistoryState$Loading() || MatchHistoryState$Initial() =>
           const Center(child: CircularProgressIndicator()),
-        MatchHistoryState$Guest() => const _Empty(
-          icon: LucideIcons.logIn,
-          text: 'Войдите в аккаунт, чтобы видеть историю и статистику.',
+        MatchHistoryState$Guest() => _Guest(onSignIn: widget.onSignIn),
+        MatchHistoryState$Failure(:final message) => _Failure(
+          message: message,
+          retry: () => bloc.add(const MatchHistoryEvent$Load()),
         ),
-        MatchHistoryState$Failure(:final message) => _Empty(
-          icon: LucideIcons.triangleAlert,
-          text: message,
-          action: () => bloc.add(const MatchHistoryEvent$Load()),
-        ),
-        MatchHistoryState$Ready(:final data) => _History(data: data),
+        MatchHistoryState$Ready(:final data) => _history(context, bloc, data),
       },
+    );
+  }
+
+  Widget _history(
+    BuildContext context,
+    MatchHistoryBloc bloc,
+    MatchHistorySnapshot data,
+  ) {
+    final int pages = (data.matches.length / 2).ceil().clamp(1, 999);
+    final int page = _page.clamp(0, pages - 1);
+    final List<SavedMatch> shown = data.matches
+        .skip(page * 2)
+        .take(2)
+        .toList(growable: false);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Text.rich(
+          TextSpan(
+            text: 'Рейтинг: ',
+            children: [
+              TextSpan(
+                text: '${data.rating.points}',
+                style: const TextStyle(fontWeight: FontWeight.w800),
+              ),
+              const TextSpan(
+                text: '. Последние 50 партий; статистика всех режимов.',
+              ),
+            ],
+          ),
+          style: const TextStyle(color: AppColors.muted, fontSize: 11),
+        ),
+        const SizedBox(height: 10),
+        Row(
+          children: [
+            _Stat('Партий', data.statistics.total),
+            _Stat('Побед', data.statistics.wins),
+            _Stat('Поражений', data.statistics.losses),
+            _Stat('Ничьих', data.statistics.draws),
+          ],
+        ),
+        const SizedBox(height: 10),
+        Expanded(
+          child: shown.isEmpty
+              ? const Center(
+                  child: Text(
+                    'Сыграйте партию до конца — она появится здесь автоматически.',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(color: AppColors.muted),
+                  ),
+                )
+              : ListView.separated(
+                  physics: const NeverScrollableScrollPhysics(),
+                  itemCount: shown.length,
+                  separatorBuilder: (_, _) => const SizedBox(height: 8),
+                  itemBuilder: (context, index) => ExpandedMatchCard(
+                    match: shown[index],
+                    editing: _editing == shown[index].id,
+                    title: _title,
+                    onWatch: () {
+                      GameRootScope.of(context).add(
+                        GameEvent$ReplaySaved(
+                          snapshot: shown[index].game,
+                          names: shown[index].names,
+                        ),
+                      );
+                      Navigator.pop(context);
+                    },
+                    onEdit: () {
+                      if (_editing == shown[index].id) {
+                        bloc.add(
+                          MatchHistoryEvent$Rename(
+                            shown[index].id,
+                            _title.text,
+                          ),
+                        );
+                        setState(() => _editing = null);
+                      } else {
+                        _title.text = shown[index].title;
+                        setState(() => _editing = shown[index].id);
+                      }
+                    },
+                    onRemove: () =>
+                        bloc.add(MatchHistoryEvent$Remove(shown[index].id)),
+                  ),
+                ),
+        ),
+        if (data.matches.isNotEmpty)
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              TextButton(
+                onPressed: page == 0
+                    ? null
+                    : () => setState(() => _page = page - 1),
+                child: const Text('Назад'),
+              ),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 12),
+                child: Text('${page + 1} / $pages'),
+              ),
+              TextButton(
+                onPressed: page + 1 == pages
+                    ? null
+                    : () => setState(() => _page = page + 1),
+                child: const Text('Дальше'),
+              ),
+            ],
+          ),
+      ],
+    );
+  }
+
+  @override
+  void dispose() {
+    _title.dispose();
+    super.dispose();
+  }
+}
+
+class _Stat extends StatelessWidget {
+  const new(this.label, this.value);
+  final String label;
+  final int value;
+
+  @override
+  Widget build(BuildContext context) => Expanded(
+    child: Container(
+      margin: const EdgeInsets.symmetric(horizontal: 2),
+      padding: const EdgeInsets.symmetric(vertical: 8),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF2F4EE),
+        borderRadius: BorderRadius.circular(9),
+      ),
+      child: Column(
+        children: [
+          Text(
+            '$value',
+            style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w800),
+          ),
+          Text(
+            label,
+            style: const TextStyle(color: AppColors.muted, fontSize: 8),
+          ),
+        ],
+      ),
+    ),
+  );
+}
+
+class ExpandedMatchCard extends StatelessWidget {
+  const new({
+    required this.match,
+    required this.editing,
+    required this.title,
+    required this.onWatch,
+    required this.onEdit,
+    required this.onRemove,
+    super.key,
+  });
+  final SavedMatch match;
+  final bool editing;
+  final TextEditingController title;
+  final VoidCallback onWatch;
+  final VoidCallback onEdit;
+  final VoidCallback onRemove;
+
+  @override
+  Widget build(BuildContext context) {
+    final Player? winner = match.game.winner;
+    final String mode = switch (match.mode) {
+      'ai' => 'Против AI',
+      'online' => 'Онлайн',
+      _ => 'Вдвоём',
+    };
+    final DateTime date = DateTime.fromMillisecondsSinceEpoch(match.date);
+    return Container(
+      padding: const EdgeInsets.all(11),
+      decoration: BoxDecoration(
+        color: const Color(0xFFFAFBF8),
+        border: Border.all(color: AppColors.border),
+        borderRadius: BorderRadius.circular(10),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          if (editing)
+            TextField(controller: title, autofocus: true, maxLength: 80)
+          else
+            Text(
+              match.title,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(fontWeight: FontWeight.w800),
+            ),
+          Text(
+            '${date.day.toString().padLeft(2, '0')}.${date.month.toString().padLeft(2, '0')}.${date.year} · $mode · ${match.game.history.length} ходов',
+            style: const TextStyle(color: AppColors.muted, fontSize: 9),
+          ),
+          Text(
+            '${winner == null ? 'Ничья' : 'Победа: ${match.names[winner.index]}'}${match.ratingChange == null ? '' : ' · ${match.ratingChange! >= 0 ? '+' : ''}${match.ratingChange} Elo'}${match.endReason == null ? '' : ' · досрочно'}',
+            style: const TextStyle(color: AppColors.muted, fontSize: 9),
+          ),
+          const SizedBox(height: 6),
+          Row(
+            children: [
+              TextButton(onPressed: onWatch, child: const Text('Смотреть')),
+              TextButton(
+                onPressed: onEdit,
+                child: Text(editing ? 'Сохранить' : 'Название'),
+              ),
+              TextButton(onPressed: onRemove, child: const Text('Удалить')),
+            ],
+          ),
+        ],
+      ),
     );
   }
 }
 
-class _History extends StatelessWidget {
-  const new({required this.data});
-  final MatchHistorySnapshot data;
+class _Guest extends StatelessWidget {
+  const new({required this.onSignIn});
+  final VoidCallback? onSignIn;
   @override
   Widget build(BuildContext context) => Column(
+    mainAxisSize: MainAxisSize.min,
+    crossAxisAlignment: CrossAxisAlignment.stretch,
     children: [
-      Wrap(
-        spacing: 8,
-        runSpacing: 8,
-        children: [
-          _Stat(label: 'Elo', value: '${data.rating.points}'),
-          _Stat(label: 'Партий', value: '${data.statistics.total}'),
-          _Stat(label: 'Побед', value: '${data.statistics.wins}'),
-          _Stat(label: 'Ничьих', value: '${data.statistics.draws}'),
-        ],
+      const Text(
+        'Войдите в аккаунт, чтобы сохранять статистику и историю партий на сервере. Гостевые партии не учитываются.',
+        style: TextStyle(color: AppColors.muted),
       ),
       const SizedBox(height: 12),
-      if (data.matches.isEmpty)
-        const Expanded(
-          child: _Empty(
-            icon: LucideIcons.history,
-            text: 'Завершённые партии появятся здесь.',
-          ),
-        )
-      else
-        Expanded(
-          child: ListView.separated(
-            itemCount: data.matches.length,
-            separatorBuilder: (_, _) => const Divider(height: 1),
-            itemBuilder: (context, index) =>
-                _MatchTile(match: data.matches[index]),
-          ),
-        ),
+      FilledButton(
+        onPressed: onSignIn,
+        child: const Text('Войти или зарегистрироваться'),
+      ),
     ],
   );
 }
 
-class _MatchTile extends StatelessWidget {
-  const new({required this.match});
-  final SavedMatch match;
+class _Failure extends StatelessWidget {
+  const new({required this.message, required this.retry});
+  final String message;
+  final VoidCallback retry;
   @override
-  Widget build(BuildContext context) => ListTile(
-    contentPadding: EdgeInsets.zero,
-    title: Text(match.title, maxLines: 1, overflow: TextOverflow.ellipsis),
-    subtitle: Text(
-      '${match.names.join(' — ')} · ${match.game.history.length} ходов · ${_duration(match.elapsed)}',
-    ),
-    onTap: () {
-      GameRootScope.of(context)
-          .add(GameEvent$ReplaySaved(snapshot: match.game, names: match.names));
-      Navigator.of(context).pop();
-    },
-    trailing: PopupMenuButton<String>(
-      onSelected: (value) =>
-          value == 'remove' ? _remove(context) : _rename(context),
-      itemBuilder: (_) => const [
-        PopupMenuItem(value: 'rename', child: Text('Переименовать')),
-        PopupMenuItem(value: 'remove', child: Text('Удалить')),
+  Widget build(BuildContext context) => Center(
+    child: Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Text(message),
+        OutlinedButton(onPressed: retry, child: const Text('Повторить')),
       ],
     ),
   );
-  Future<void> _rename(BuildContext context) async {
-    final controller = TextEditingController(text: match.title);
-    final String? value = await showDialog<String>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Название партии'),
-        content: TextField(
-          controller: controller,
-          maxLength: 80,
-          autofocus: true,
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Отмена'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(context, controller.text),
-            child: const Text('Сохранить'),
-          ),
-        ],
-      ),
-    );
-    controller.dispose();
-    if (value != null && value.trim().isNotEmpty && context.mounted) {
-      MatchHistoryRootScope.of(context)
-          .add(MatchHistoryEvent$Rename(match.id, value));
-    }
-  }
-
-  void _remove(BuildContext context) =>
-      MatchHistoryRootScope.of(context).add(MatchHistoryEvent$Remove(match.id));
 }
-
-class _Stat extends StatelessWidget {
-  const new({required this.label, required this.value});
-  final String label;
-  final String value;
-  @override
-  Widget build(BuildContext context) => Chip(label: Text('$label · $value'));
-}
-
-class _Empty extends StatelessWidget {
-  const new({required this.icon, required this.text, this.action});
-  final IconData icon;
-  final String text;
-  final VoidCallback? action;
-  @override
-  Widget build(BuildContext context) => Center(
-    child: Padding(
-      padding: const EdgeInsets.all(24),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, size: 40),
-          const SizedBox(height: 10),
-          Text(text, textAlign: TextAlign.center),
-          if (action != null) ...[
-            const SizedBox(height: 12),
-            OutlinedButton(onPressed: action, child: const Text('Повторить')),
-          ],
-        ],
-      ),
-    ),
-  );
-}
-
-String _duration(int value) =>
-    '${value ~/ 60}:${(value % 60).toString().padLeft(2, '0')}';

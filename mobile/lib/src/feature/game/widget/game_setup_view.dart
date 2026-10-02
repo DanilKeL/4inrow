@@ -1,11 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:four3/src/common/theme/app_theme.dart';
+import 'package:four3/src/common/widget/app_dialog.dart';
 import 'package:four3/src/feature/account/model/account_profile.dart';
 import 'package:four3/src/feature/account/widget/account_root_scope.dart';
 import 'package:four3/src/feature/game/bloc/game_bloc.dart';
 import 'package:four3/src/feature/game/model/game_models.dart';
 import 'package:four3/src/feature/game/widget/game_root_scope.dart';
 import 'package:four3/src/feature/matchmaking/widget/online_setup_view.dart';
+import 'package:four3/src/feature/settings/bloc/settings_bloc.dart';
+import 'package:four3/src/feature/settings/widget/settings_root_scope.dart';
+import 'package:four3/src/feature/tutorial/widget/tutorial_view.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 class GameSetupView extends StatefulWidget {
@@ -124,16 +128,7 @@ class _GameSetupViewState extends State<GameSetupView> {
           SizedBox(
             height: 48,
             child: FilledButton.icon(
-              onPressed: () {
-                GameRootScope.of(context).add(
-                  GameEvent$Start(
-                    mode: _mode,
-                    difficulty: _difficulty,
-                    names: <String>[player, 'Игрок 2'],
-                  ),
-                );
-                Navigator.pop(context);
-              },
+              onPressed: () => _start(context, player),
               iconAlignment: IconAlignment.end,
               icon: const Icon(LucideIcons.arrowRight, size: 18),
               label: const Text('Начать игру'),
@@ -142,6 +137,42 @@ class _GameSetupViewState extends State<GameSetupView> {
         ],
       ],
     );
+  }
+
+  void _start(BuildContext context, String player) {
+    final GameBloc game = GameRootScope.of(context);
+    final SettingsBloc settings = SettingsRootScope.of(context);
+    final BuildContext appContext = Navigator.of(context).context;
+    game.add(
+      GameEvent$Start(
+        mode: _mode,
+        difficulty: _difficulty,
+        names: <String>[player, 'Игрок 2'],
+      ),
+    );
+    Navigator.pop(context);
+    if (settings.settings.tutorialSeen) return;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!appContext.mounted) return;
+      game.add(const GameEvent$Pause());
+      showAppDialog<void>(
+        context: appContext,
+        title: 'Как играть',
+        wide: true,
+        child: TutorialView(
+          starting: true,
+          onDone: () {
+            settings.add(
+              SettingsEvent$Update(
+                settings.settings.copyWith(tutorialSeen: true),
+              ),
+            );
+            Navigator.pop(appContext);
+            game.add(const GameEvent$Resume());
+          },
+        ),
+      );
+    });
   }
 }
 

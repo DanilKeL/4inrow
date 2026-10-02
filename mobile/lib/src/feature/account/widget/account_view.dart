@@ -4,6 +4,9 @@ import 'package:four3/src/common/theme/app_theme.dart';
 import 'package:four3/src/feature/account/bloc/account_bloc.dart';
 import 'package:four3/src/feature/account/model/account_profile.dart';
 import 'package:four3/src/feature/account/widget/account_root_scope.dart';
+import 'package:four3/src/feature/match_history/bloc/match_history_bloc.dart';
+import 'package:four3/src/feature/match_history/model/match_history_models.dart';
+import 'package:four3/src/feature/match_history/widget/match_history_root_scope.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 enum _AccountMode { register, login, forgot }
@@ -173,6 +176,8 @@ class _AccountViewState extends State<AccountView> {
         if (notice.isNotEmpty) _Notice(notice),
         if (!_security) ...[
           _SignedProfile(profile: profile),
+          const SizedBox(height: 12),
+          const _AccountOverviewCards(),
           const SizedBox(height: 12),
           _ActionTile(
             icon: LucideIcons.history,
@@ -492,6 +497,263 @@ class _SignedProfile extends StatelessWidget {
       ),
     ),
   );
+}
+
+class _AccountOverviewCards extends StatelessWidget {
+  const new();
+
+  @override
+  Widget build(BuildContext context) {
+    final MatchHistoryBloc bloc = MatchHistoryRootScope.of(context);
+    if (bloc.state is MatchHistoryState$Initial ||
+        bloc.state is MatchHistoryState$Guest) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!bloc.isClosed) bloc.add(const MatchHistoryEvent$Load());
+      });
+    }
+    return BlocBuilder<MatchHistoryBloc, MatchHistoryState>(
+      bloc: bloc,
+      builder: (context, state) {
+        if (state case MatchHistoryState$Ready(:final data)) {
+          return _OverviewData(data: data);
+        }
+        if (state case MatchHistoryState$Failure(:final message)) {
+          return Text(
+            message,
+            style: const TextStyle(color: AppColors.danger, fontSize: 10),
+          );
+        }
+        return const Center(
+          child: Padding(
+            padding: EdgeInsets.all(12),
+            child: CircularProgressIndicator(),
+          ),
+        );
+      },
+    );
+  }
+}
+
+class _OverviewData extends StatelessWidget {
+  const new({required this.data});
+  final MatchHistorySnapshot data;
+
+  @override
+  Widget build(BuildContext context) {
+    final (String, int, int, String) league = _league(data.rating.points);
+    final double progress =
+        ((data.rating.points - league.$2) / (league.$3 - league.$2))
+            .clamp(0, 1)
+            .toDouble();
+    final int winRate = data.statistics.total == 0
+        ? 0
+        : (data.statistics.wins * 100 / data.statistics.total).round();
+    final bool short = MediaQuery.sizeOf(context).height <= 650;
+    return Column(
+      children: [
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Expanded(
+              flex: 4,
+              child: Container(
+                padding: const EdgeInsets.all(13),
+                decoration: BoxDecoration(
+                  gradient: const LinearGradient(
+                    colors: [Color(0xFF244BD0), Color(0xFF456DF0)],
+                  ),
+                  borderRadius: BorderRadius.circular(14),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'РЕЙТИНГ',
+                      style: TextStyle(color: Color(0xFFDBE3FF), fontSize: 8),
+                    ),
+                    Text(
+                      league.$1,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 11,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      '${data.rating.points} ELO',
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 25,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    LinearProgressIndicator(
+                      value: progress,
+                      color: Colors.white,
+                      backgroundColor: const Color(0x44FFFFFF),
+                    ),
+                    const SizedBox(height: 5),
+                    Text(
+                      '${(league.$3 - data.rating.points).clamp(0, 9999)} очков до «${league.$4}»',
+                      style: const TextStyle(
+                        color: Color(0xFFDBE3FF),
+                        fontSize: 7,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              flex: 6,
+              child: Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  border: Border.all(color: AppColors.border),
+                  borderRadius: BorderRadius.circular(14),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      '${data.rating.games} рейтинговых партий',
+                      style: const TextStyle(
+                        fontSize: 10,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Row(
+                      children: [
+                        _MiniStat('${data.statistics.total}', 'Партий'),
+                        _MiniStat('${data.statistics.wins}', 'Побед'),
+                        _MiniStat('$winRate%', 'Винрейт'),
+                        _MiniStat('${data.statistics.losses}', 'Поражений'),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
+        if (!short) ...[
+          const SizedBox(height: 8),
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(11),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              border: Border.all(color: AppColors.border),
+              borderRadius: BorderRadius.circular(14),
+            ),
+            child: data.matches.isEmpty
+                ? const Text(
+                    'Завершите первую партию — здесь появится ваша игровая форма.',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(color: AppColors.muted, fontSize: 9),
+                  )
+                : _RecentMatch(
+                    match: data.matches.first,
+                    username: data.username,
+                  ),
+          ),
+        ],
+      ],
+    );
+  }
+}
+
+class _MiniStat extends StatelessWidget {
+  const new(this.value, this.label);
+  final String value;
+  final String label;
+  @override
+  Widget build(BuildContext context) => Expanded(
+    child: Container(
+      margin: const EdgeInsets.symmetric(horizontal: 2),
+      padding: const EdgeInsets.symmetric(vertical: 6),
+      color: const Color(0xFFF2F4EE),
+      child: Column(
+        children: [
+          Text(value, style: const TextStyle(fontWeight: FontWeight.w800)),
+          Text(
+            label,
+            style: const TextStyle(fontSize: 6, color: AppColors.muted),
+          ),
+        ],
+      ),
+    ),
+  );
+}
+
+class _RecentMatch extends StatelessWidget {
+  const new({required this.match, required this.username});
+  final SavedMatch match;
+  final String username;
+  @override
+  Widget build(BuildContext context) {
+    final int seat = match.names.indexOf(username);
+    final bool draw = match.game.winner == null;
+    final bool won = !draw && match.game.winner!.index == seat;
+    return Row(
+      children: [
+        Container(
+          width: 27,
+          height: 27,
+          alignment: Alignment.center,
+          decoration: BoxDecoration(
+            color: draw
+                ? const Color(0xFFE8EBEE)
+                : won
+                ? const Color(0xFFE3F2E5)
+                : const Color(0xFFF7E7E4),
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Text(
+            draw
+                ? 'Н'
+                : won
+                ? 'В'
+                : 'П',
+          ),
+        ),
+        const SizedBox(width: 8),
+        Expanded(
+          child: Text(
+            draw
+                ? 'Ничья'
+                : won
+                ? 'Победа'
+                : 'Поражение',
+            style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 10),
+          ),
+        ),
+        if (match.ratingChange != null)
+          Text(
+            '${match.ratingChange! >= 0 ? '+' : ''}${match.ratingChange} Elo',
+            style: TextStyle(
+              fontSize: 8,
+              color: match.ratingChange! >= 0
+                  ? AppColors.success
+                  : AppColors.danger,
+            ),
+          ),
+      ],
+    );
+  }
+}
+
+(String, int, int, String) _league(int points) {
+  if (points < 900) return ('Бронза', 600, 900, 'Серебро');
+  if (points < 1100) return ('Серебро', 900, 1100, 'Золото');
+  if (points < 1300) return ('Золото', 1100, 1300, 'Платина');
+  if (points < 1500) return ('Платина', 1300, 1500, 'Мастер');
+  return ('Мастер', 1500, 1800, 'Высшая лига');
 }
 
 class _SecurityIntro extends StatelessWidget {
