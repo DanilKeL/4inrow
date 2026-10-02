@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:four3/src/common/theme/app_theme.dart';
+import 'package:four3/src/common/widget/app_controls.dart';
 import 'package:four3/src/common/widget/app_dialog.dart';
 import 'package:four3/src/feature/account/model/account_profile.dart';
 import 'package:four3/src/feature/account/widget/account_root_scope.dart';
@@ -107,16 +108,14 @@ class _GameSetupViewState extends State<GameSetupView> {
           const SizedBox(height: 14),
           const Text('Сложность', style: TextStyle(fontSize: 11)),
           const SizedBox(height: 7),
-          SegmentedButton<Difficulty>(
-            showSelectedIcon: false,
-            segments: const [
-              ButtonSegment(value: Difficulty.easy, label: Text('Легко')),
-              ButtonSegment(value: Difficulty.medium, label: Text('Средне')),
-              ButtonSegment(value: Difficulty.hard, label: Text('Сложно')),
+          AppSegmentedControl<Difficulty>(
+            options: const [
+              AppSegment(value: Difficulty.easy, label: 'Легко'),
+              AppSegment(value: Difficulty.medium, label: 'Средне'),
+              AppSegment(value: Difficulty.hard, label: 'Сложно'),
             ],
-            selected: <Difficulty>{_difficulty},
-            onSelectionChanged: (value) =>
-                setState(() => _difficulty = value.first),
+            selected: _difficulty,
+            onChanged: (value) => setState(() => _difficulty = value),
           ),
         ],
         if (_mode == GameMode.online) ...[

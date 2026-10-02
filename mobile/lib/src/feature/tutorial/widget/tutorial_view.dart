@@ -51,10 +51,16 @@ const _lessons = [
 ];
 
 class TutorialView extends StatefulWidget {
-  const new({this.starting = false, this.onDone, super.key});
+  const new({
+    this.starting = false,
+    this.onDone,
+    this.loadVideos = true,
+    super.key,
+  });
 
   final bool starting;
   final VoidCallback? onDone;
+  final bool loadVideos;
 
   @override
   State<TutorialView> createState() => _TutorialViewState();
@@ -68,7 +74,11 @@ class _TutorialViewState extends State<TutorialView> {
   @override
   void initState() {
     super.initState();
-    _load();
+    if (widget.loadVideos) {
+      _load();
+    } else {
+      _failed = true;
+    }
   }
 
   Future<void> _load() async {
@@ -122,7 +132,11 @@ class _TutorialViewState extends State<TutorialView> {
           Expanded(
             child: Row(
               children: [
-                SizedBox(width: 170, child: _lessonButtons(vertical: true)),
+                SizedBox(
+                  key: const ValueKey('tutorial-selector'),
+                  width: 170,
+                  child: _lessonButtons(vertical: true),
+                ),
                 const SizedBox(width: 16),
                 Expanded(
                   child: Column(
@@ -145,7 +159,11 @@ class _TutorialViewState extends State<TutorialView> {
       children: [
         goal,
         const SizedBox(height: 10),
-        SizedBox(height: 78, child: _lessonButtons(vertical: false)),
+        SizedBox(
+          key: const ValueKey('tutorial-selector'),
+          height: 78,
+          child: _lessonButtons(vertical: false),
+        ),
         const SizedBox(height: 10),
         Expanded(child: _media(lesson)),
         const SizedBox(height: 10),
@@ -162,7 +180,7 @@ class _TutorialViewState extends State<TutorialView> {
         OutlinedButton(
           onPressed: () {
             setState(() => _selected = index);
-            _load();
+            if (widget.loadVideos) _load();
           },
           style: OutlinedButton.styleFrom(
             minimumSize: Size(0, vertical ? 31 : 36),
@@ -207,30 +225,31 @@ class _TutorialViewState extends State<TutorialView> {
   }
 
   Widget _media(_Lesson lesson) => ClipRRect(
+    key: const ValueKey('tutorial-media'),
     borderRadius: BorderRadius.circular(12),
     child: ColoredBox(
       color: const Color(0xFFE7E4DE),
-      child: Stack(
-        fit: StackFit.expand,
+      child: Column(
         children: [
-          Center(
-            child: _failed
-                ? Image.asset(
-                    'assets/tutorial/${lesson.id}.webp',
-                    fit: BoxFit.contain,
-                  )
-                : _video?.value.isInitialized == true
-                ? AspectRatio(
-                    aspectRatio: _video!.value.aspectRatio,
-                    child: VideoPlayer(_video!),
-                  )
-                : const CircularProgressIndicator(),
+          Expanded(
+            child: ClipRect(
+              child: Center(
+                child: _failed
+                    ? Image.asset(
+                        'assets/tutorial/${lesson.id}.webp',
+                        fit: BoxFit.contain,
+                      )
+                    : _video?.value.isInitialized == true
+                    ? AspectRatio(
+                        aspectRatio: _video!.value.aspectRatio,
+                        child: VideoPlayer(_video!),
+                      )
+                    : const CircularProgressIndicator(),
+              ),
+            ),
           ),
           if (_video?.value.isInitialized == true)
-            Positioned(
-              left: 0,
-              right: 0,
-              bottom: 0,
+            SizedBox(
               height: 36,
               child: ColoredBox(
                 color: const Color(0xF2EEEEE8),
@@ -306,7 +325,7 @@ class _TutorialViewState extends State<TutorialView> {
         child: TextButton.icon(
           onPressed: () {
             setState(() => _selected = (_selected + 1) % _lessons.length);
-            _load();
+            if (widget.loadVideos) _load();
           },
           iconAlignment: IconAlignment.end,
           icon: const Icon(LucideIcons.arrowRight),

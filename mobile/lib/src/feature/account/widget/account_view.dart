@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:four3/src/common/theme/app_theme.dart';
+import 'package:four3/src/common/widget/app_controls.dart';
 import 'package:four3/src/feature/account/bloc/account_bloc.dart';
 import 'package:four3/src/feature/account/model/account_profile.dart';
 import 'package:four3/src/feature/account/widget/account_root_scope.dart';
@@ -375,14 +376,13 @@ class _AuthTabs extends StatelessWidget {
   final _AccountMode mode;
   final ValueChanged<_AccountMode> onChanged;
   @override
-  Widget build(BuildContext context) => SegmentedButton<_AccountMode>(
-    showSelectedIcon: false,
-    segments: const [
-      ButtonSegment(value: _AccountMode.register, label: Text('Регистрация')),
-      ButtonSegment(value: _AccountMode.login, label: Text('Вход')),
+  Widget build(BuildContext context) => AppSegmentedControl<_AccountMode>(
+    options: const [
+      AppSegment(value: _AccountMode.register, label: 'Регистрация'),
+      AppSegment(value: _AccountMode.login, label: 'Вход'),
     ],
-    selected: {mode},
-    onSelectionChanged: (value) => onChanged(value.first),
+    selected: mode,
+    onChanged: onChanged,
   );
 }
 
@@ -391,22 +391,18 @@ class _SignedTabs extends StatelessWidget {
   final bool security;
   final ValueChanged<bool> onChanged;
   @override
-  Widget build(BuildContext context) => SegmentedButton<bool>(
-    showSelectedIcon: false,
-    segments: const [
-      ButtonSegment(
-        value: false,
-        icon: Icon(LucideIcons.activity),
-        label: Text('Обзор'),
-      ),
-      ButtonSegment(
+  Widget build(BuildContext context) => AppSegmentedControl<bool>(
+    options: const [
+      AppSegment(value: false, icon: LucideIcons.activity, label: 'Обзор'),
+      AppSegment(
         value: true,
-        icon: Icon(LucideIcons.shieldCheck),
-        label: Text('Безопасность'),
+        icon: LucideIcons.shieldCheck,
+        label: 'Безопасность',
       ),
     ],
-    selected: {security},
-    onSelectionChanged: (value) => onChanged(value.first),
+    selected: security,
+    onChanged: onChanged,
+    style: AppSegmentedStyle.pill,
   );
 }
 
@@ -829,12 +825,12 @@ class _Field extends StatelessWidget {
   final bool autocorrect;
   final TextInputType? keyboardType;
   @override
-  Widget build(BuildContext context) => TextField(
+  Widget build(BuildContext context) => AppTextField(
     controller: controller,
     obscureText: obscureText,
     autocorrect: autocorrect,
     keyboardType: keyboardType,
-    decoration: InputDecoration(labelText: label),
+    label: label,
   );
 }
 

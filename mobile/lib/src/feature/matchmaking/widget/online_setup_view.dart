@@ -1,7 +1,9 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:four3/src/common/widget/app_controls.dart';
 import 'package:four3/src/feature/account/widget/account_root_scope.dart';
 import 'package:four3/src/feature/matchmaking/bloc/matchmaking_bloc.dart';
 import 'package:four3/src/feature/matchmaking/widget/matchmaking_root_scope.dart';
@@ -180,21 +182,32 @@ class _Setup extends StatelessWidget {
         label: const Text('Создать приватное лобби'),
       ),
       const SizedBox(height: 10),
-      TextField(
+      AppTextField(
         controller: code,
+        label: 'Код лобби',
+        hintText: 'ABCDE',
         textCapitalization: TextCapitalization.characters,
         maxLength: 5,
-        decoration: const InputDecoration(
-          labelText: 'Код лобби',
-          hintText: 'ABCDE',
-          counterText: '',
-        ),
+        inputFormatters: [
+          FilteringTextInputFormatter.allow(RegExp('[A-Za-z]')),
+          _UpperCaseFormatter(),
+        ],
+        fontSize: 23,
+        letterSpacing: 7,
         onSubmitted: (_) => onJoin(),
       ),
       const SizedBox(height: 8),
       OutlinedButton(onPressed: onJoin, child: const Text('Войти по коду')),
     ],
   );
+}
+
+final class _UpperCaseFormatter extends TextInputFormatter {
+  @override
+  TextEditingValue formatEditUpdate(
+    TextEditingValue oldValue,
+    TextEditingValue newValue,
+  ) => newValue.copyWith(text: newValue.text.toUpperCase());
 }
 
 class _Status extends StatelessWidget {

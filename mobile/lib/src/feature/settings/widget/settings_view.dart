@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
 import 'package:four3/src/common/theme/app_theme.dart';
+import 'package:four3/src/common/widget/app_controls.dart';
 import 'package:four3/src/feature/settings/bloc/settings_bloc.dart';
 import 'package:four3/src/feature/settings/model/app_settings.dart';
 import 'package:four3/src/feature/settings/widget/settings_root_scope.dart';
@@ -165,7 +166,7 @@ class _SettingSwitch extends StatelessWidget {
             ],
           ),
         ),
-        Switch.adaptive(value: value, onChanged: onChanged),
+        AppToggle(value: value, onChanged: onChanged, semanticLabel: title),
       ],
     ),
   );

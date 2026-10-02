@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:four3/src/common/theme/app_theme.dart';
+import 'package:four3/src/common/widget/app_controls.dart';
 import 'package:four3/src/feature/game/bloc/game_bloc.dart';
 import 'package:four3/src/feature/game/model/game_models.dart';
 import 'package:four3/src/feature/game/widget/game_root_scope.dart';
@@ -229,7 +230,13 @@ class ExpandedMatchCard extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           if (editing)
-            TextField(controller: title, autofocus: true, maxLength: 80)
+            AppTextField(
+              controller: title,
+              autofocus: true,
+              maxLength: 80,
+              semanticLabel: 'Название партии',
+              fontSize: 14,
+            )
           else
             Text(
               match.title,

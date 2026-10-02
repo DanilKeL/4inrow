@@ -50,11 +50,14 @@ final class GameSceneController {
     _animations = animations;
     _introduction = introduction;
     _updatePickGeometry();
-    final Set<int> existing = snapshot.history
-        .map((move) => move.index)
-        .toSet();
-    for (final int index
-        in _pieces.keys.where((index) => !existing.contains(index)).toList()) {
+    final Map<int, GameMove> nextMoves = {
+      for (final GameMove move in snapshot.history) move.index: move,
+    };
+    final Set<int> stale = staleMoveIndices(
+      existing: _pieces.values.map((visual) => visual.move),
+      next: nextMoves.values,
+    );
+    for (final int index in stale) {
       scene.remove(_pieces.remove(index)!.root);
     }
     for (final GameMove move in snapshot.history) {
@@ -94,10 +97,25 @@ final class GameSceneController {
         base.y + fall + introFall,
         base.z,
       );
-      final double renderedOpacity = visual.baseOpacity * entranceOpacity;
+      if (visual.opacityElapsed < opacityDuration) {
+        visual.opacityElapsed = math.min(
+          opacityDuration,
+          visual.opacityElapsed + deltaSeconds,
+        );
+        visual.opacity = opacityAt(
+          from: visual.opacityFrom,
+          target: visual.targetOpacity,
+          elapsed: visual.opacityElapsed,
+          animations: _animations,
+        );
+      }
+      final double renderedOpacity = visual.opacity * entranceOpacity;
       _opacity(visual.bodyMaterial, renderedOpacity);
       _opacity(visual.capMaterial, renderedOpacity);
       visual.symbolMaterial.baseColorFactor.a = renderedOpacity * .85;
+      visual.symbolMaterial.alphaMode = renderedOpacity < 1
+          ? fs.AlphaMode.blend
+          : fs.AlphaMode.opaque;
       _opacity(visual.ringMaterial, renderedOpacity);
       if (visual.winner && _animations) {
         final double strength = .6 + math.sin(elapsedSeconds * 3) * .3;
@@ -276,20 +294,57 @@ final class GameSceneController {
         null => true,
       };
       visual.root.visible = _layers.contains(visual.move.z) && introduced;
-      final opacity = _xray
+      final double opacity = _xray
           ? .43
           : _snapshot!.status == GameStatus.won && !visual.winner
           ? .52
           : 1.0;
-      visual.baseOpacity = opacity;
-      _opacity(visual.bodyMaterial, opacity);
-      _opacity(visual.capMaterial, opacity);
-      visual.symbolMaterial.baseColorFactor.a = opacity * .85;
-      visual.symbolMaterial.alphaMode = opacity < 1
+      if (!visual.opacityInitialized || !_animations) {
+        visual.opacityInitialized = true;
+        visual.opacity = opacity;
+        visual.opacityFrom = opacity;
+        visual.targetOpacity = opacity;
+        visual.opacityElapsed = opacityDuration;
+      } else if (visual.targetOpacity != opacity) {
+        visual.opacityFrom = visual.opacity;
+        visual.targetOpacity = opacity;
+        visual.opacityElapsed = 0;
+      }
+      _opacity(visual.bodyMaterial, visual.opacity);
+      _opacity(visual.capMaterial, visual.opacity);
+      visual.symbolMaterial.baseColorFactor.a = visual.opacity * .85;
+      visual.symbolMaterial.alphaMode = visual.opacity < 1
           ? fs.AlphaMode.blend
           : fs.AlphaMode.opaque;
+      _opacity(visual.ringMaterial, visual.opacity);
       visual.ring.visible = visual.winner || visual.move.index == latest;
     }
+  }
+
+  static const double opacityDuration = .15;
+
+  static Set<int> staleMoveIndices({
+    required Iterable<GameMove> existing,
+    required Iterable<GameMove> next,
+  }) {
+    final Map<int, GameMove> nextByIndex = {
+      for (final GameMove move in next) move.index: move,
+    };
+    return {
+      for (final GameMove move in existing)
+        if (nextByIndex[move.index] != move) move.index,
+    };
+  }
+
+  static double opacityAt({
+    required double from,
+    required double target,
+    required double elapsed,
+    required bool animations,
+  }) {
+    if (!animations) return target;
+    final double progress = (elapsed / opacityDuration).clamp(0, 1);
+    return from + (target - from) * progress;
   }
 
   void _addPickGeometry() {
@@ -497,6 +552,10 @@ final class _PieceVisual {
   final fs.Node ring;
   final double createdAt;
   final double? introductionDelay;
-  double baseOpacity = 1;
+  double opacity = 1;
+  double opacityFrom = 1;
+  double targetOpacity = 1;
+  double opacityElapsed = GameSceneController.opacityDuration;
+  bool opacityInitialized = false;
   bool winner = false;
 }

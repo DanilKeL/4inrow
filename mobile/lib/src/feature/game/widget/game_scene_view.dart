@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_scene/scene.dart' as fs;
 import 'package:four3/src/feature/game/bloc/game_bloc.dart';
 import 'package:four3/src/feature/game/model/game_models.dart';
+import 'package:four3/src/feature/game/scene/game_camera_orbit.dart';
 import 'package:four3/src/feature/game/scene/game_scene_controller.dart';
 import 'package:four3/src/feature/settings/model/app_settings.dart';
 import 'package:vector_math/vector_math.dart' as vm;
@@ -36,6 +37,13 @@ class _GameSceneViewState extends State<GameSceneView> {
   double _polar = .65;
   double _distance = 15;
   double _startDistance = 15;
+  double _azimuthVelocity = 0;
+  double _polarVelocity = 0;
+  double? _goalAzimuth;
+  double? _goalPolar;
+  double? _goalDistance;
+  bool _cameraInitialized = false;
+  bool _rotating = false;
   vm.Vector3 _target = vm.Vector3(0, .25, 0);
   vm.Vector3 _targetGoal = vm.Vector3(0, .25, 0);
   int _cameraReset = -1;
@@ -80,8 +88,8 @@ class _GameSceneViewState extends State<GameSceneView> {
       animations: widget.settings.animations,
       introduction: widget.demo,
     );
-    if (_cameraReset != widget.data.cameraReset ||
-        oldViewNeedsReset(widget.data.cameraView)) {
+    final bool viewChanged = oldViewNeedsReset(widget.data.cameraView);
+    if (_cameraReset != widget.data.cameraReset || viewChanged) {
       _cameraReset = widget.data.cameraReset;
       _resetCamera(widget.data.cameraView);
     }
@@ -107,11 +115,30 @@ class _GameSceneViewState extends State<GameSceneView> {
         widget.demo ? vm.Vector3(8.7, 7.25, 9.8) : vm.Vector3(7.4, 9.2, 9.3),
     }..scale(fit * (widget.demo ? .92 : 1));
     _targetGoal = vm.Vector3(0, .25, 0);
-    _target = _targetGoal.clone();
-    final vm.Vector3 offset = raw - _target;
-    _distance = offset.length.clamp(7, 23);
-    _azimuth = math.atan2(-offset.x, -offset.z);
-    _polar = math.asin((offset.y / _distance).clamp(-1, 1));
+    final vm.Vector3 offset = raw - _targetGoal;
+    final double distance = offset.length.clamp(7, 23);
+    final double azimuth = math.atan2(-offset.x, -offset.z);
+    final double polar = math.asin((offset.y / distance).clamp(-1, 1));
+    _azimuthVelocity = 0;
+    _polarVelocity = 0;
+    if (!_cameraInitialized || !widget.settings.animations) {
+      _azimuth = azimuth;
+      _polar = polar;
+      _distance = distance;
+      _target = _targetGoal.clone();
+      _clearCameraGoal();
+    } else {
+      _goalAzimuth = azimuth;
+      _goalPolar = polar;
+      _goalDistance = distance;
+    }
+    _cameraInitialized = true;
+  }
+
+  void _clearCameraGoal() {
+    _goalAzimuth = null;
+    _goalPolar = null;
+    _goalDistance = null;
   }
 
   fs.PerspectiveCamera _camera() {
@@ -124,9 +151,7 @@ class _GameSceneViewState extends State<GameSceneView> {
       fovRadiansY: 35 * math.pi / 180,
       position: position,
       target: _target,
-      up: widget.data.cameraView == CameraView.top
-          ? vm.Vector3(0, 0, 1)
-          : vm.Vector3(0, 1, 0),
+      up: vm.Vector3(0, 1, 0),
       fovFar: 100,
     );
   }
@@ -140,8 +165,37 @@ class _GameSceneViewState extends State<GameSceneView> {
         ? 1 - math.exp(-delta * 6)
         : 1.0;
     _target += (_targetGoal - _target) * response;
+    if (_goalAzimuth case final goalAzimuth?) {
+      final double goalPolar = _goalPolar!;
+      final double goalDistance = _goalDistance!;
+      _azimuth += _shortestAngle(_azimuth, goalAzimuth) * response;
+      _polar += (goalPolar - _polar) * response;
+      _distance += (goalDistance - _distance) * response;
+      if (_shortestAngle(_azimuth, goalAzimuth).abs() < .0005 &&
+          (_polar - goalPolar).abs() < .0005 &&
+          (_distance - goalDistance).abs() < .005) {
+        _azimuth = goalAzimuth;
+        _polar = goalPolar;
+        _distance = goalDistance;
+        _clearCameraGoal();
+      }
+    } else if (_azimuthVelocity != 0 || _polarVelocity != 0) {
+      final GameCameraMotion motion =
+          GameCameraOrbit(azimuth: _azimuth, polar: _polar).applyInertia(
+            azimuthVelocity: _azimuthVelocity,
+            polarVelocity: _polarVelocity,
+            deltaSeconds: delta,
+          );
+      _azimuth = motion.orbit.azimuth;
+      _polar = motion.orbit.polar;
+      _azimuthVelocity = motion.settled ? 0 : motion.azimuthVelocity;
+      _polarVelocity = motion.settled ? 0 : motion.polarVelocity;
+    }
     _sceneRepaint.value++;
   }
+
+  static double _shortestAngle(double from, double to) =>
+      (to - from + math.pi) % (2 * math.pi) - math.pi;
 
   void _onTapUp(TapUpDetails details) {
     if (!widget.data.canPlace || !_ready || _size.isEmpty) return;
@@ -168,18 +222,42 @@ class _GameSceneViewState extends State<GameSceneView> {
   void _onScaleStart(ScaleStartDetails details) {
     _controller.hideGhost();
     _startDistance = _distance;
+    _azimuthVelocity = 0;
+    _polarVelocity = 0;
+    _clearCameraGoal();
+    _targetGoal = _target.clone();
+    _rotating = false;
   }
 
   void _onScaleUpdate(ScaleUpdateDetails details) {
     if (details.pointerCount > 1) {
       _distance = (_startDistance / details.scale).clamp(7, 23);
+      _rotating = false;
     } else if (_size.height > 0) {
-      _azimuth -= details.focalPointDelta.dx / _size.height * math.pi * .65;
-      _polar =
-          (_polar - details.focalPointDelta.dy / _size.height * math.pi * .65)
-              .clamp(.001, math.pi / 2.16);
+      _rotating = true;
+      final GameCameraOrbit orbit =
+          GameCameraOrbit(azimuth: _azimuth, polar: _polar).applyDrag(
+            deltaX: details.focalPointDelta.dx,
+            deltaY: details.focalPointDelta.dy,
+            viewportHeight: _size.height,
+          );
+      _azimuth = orbit.azimuth;
+      _polar = orbit.polar;
     }
     _targetGoal = _target.clone();
+  }
+
+  void _onScaleEnd(ScaleEndDetails details) {
+    if (!_rotating || _size.height <= 0) return;
+    final ({double azimuth, double polar}) velocity =
+        GameCameraOrbit.velocityFromPixels(
+          pixelsPerSecondX: details.velocity.pixelsPerSecond.dx,
+          pixelsPerSecondY: details.velocity.pixelsPerSecond.dy,
+          viewportHeight: _size.height,
+        );
+    _azimuthVelocity = velocity.azimuth;
+    _polarVelocity = velocity.polar;
+    _rotating = false;
   }
 
   void _onTimings(List<FrameTiming> timings) {
@@ -248,6 +326,7 @@ class _GameSceneViewState extends State<GameSceneView> {
             onTapUp: _onTapUp,
             onScaleStart: _onScaleStart,
             onScaleUpdate: _onScaleUpdate,
+            onScaleEnd: _onScaleEnd,
             child: Stack(
               fit: StackFit.expand,
               children: [

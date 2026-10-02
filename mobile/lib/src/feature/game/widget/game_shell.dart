@@ -1,9 +1,11 @@
 import 'dart:async';
+import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:four3/src/common/theme/app_theme.dart';
+import 'package:four3/src/common/widget/app_controls.dart';
 import 'package:four3/src/common/widget/app_dialog.dart';
 import 'package:four3/src/feature/account/bloc/account_bloc.dart';
 import 'package:four3/src/feature/account/widget/account_root_scope.dart';
@@ -74,7 +76,7 @@ class _GameShellBody extends StatelessWidget {
     return PopScope(
       canPop: isMenu,
       onPopInvokedWithResult: (didPop, _) {
-        if (!didPop) _requestMenu(context);
+        if (!didPop) _requestGameMenu(context, data);
       },
       child: Scaffold(
         body: Stack(
@@ -86,7 +88,7 @@ class _GameShellBody extends StatelessWidget {
                   children: [
                     _Header(
                       onBrand: () {
-                        if (!isMenu) _requestMenu(context);
+                        if (!isMenu) _requestGameMenu(context, data);
                       },
                     ),
                     Expanded(
@@ -222,47 +224,6 @@ class _GameShellBody extends StatelessWidget {
       title: 'Рейтинговая игра',
       child: const OnlineSetupView(),
     );
-  }
-
-  void _requestMenu(BuildContext context) {
-    final GameBloc bloc = GameRootScope.of(context);
-    final bool online = data.mode == GameMode.online;
-    if (data.snapshot.status == GameStatus.playing &&
-        data.snapshot.history.isNotEmpty) {
-      bloc.add(const GameEvent$Pause());
-      showDialog<void>(
-        context: context,
-        builder: (context) => AlertDialog(
-          title: const Text('Завершить текущую партию?'),
-          content: const Text('Текущий прогресс этой партии будет очищен.'),
-          actions: [
-            TextButton(
-              onPressed: () {
-                Navigator.pop(context);
-                bloc.add(const GameEvent$Resume());
-              },
-              child: const Text('Продолжить'),
-            ),
-            FilledButton(
-              onPressed: () {
-                Navigator.pop(context);
-                if (online) {
-                  MatchmakingRootScope.of(context)
-                      .add(const MatchmakingEvent$Leave());
-                }
-                bloc.add(const GameEvent$Menu());
-              },
-              child: const Text('Выйти в меню'),
-            ),
-          ],
-        ),
-      );
-    } else {
-      if (online) {
-        MatchmakingRootScope.of(context).add(const MatchmakingEvent$Leave());
-      }
-      bloc.add(const GameEvent$Menu());
-    }
   }
 }
 
@@ -964,11 +925,7 @@ class _ToolBar extends StatelessWidget {
           selected: data.xray,
           onTap: () => bloc.add(const GameEvent$ToggleXray()),
         ),
-        _Tool(
-          icon: LucideIcons.layers3,
-          label: '',
-          onTap: () => _showViewControls(context, data),
-        ),
+        const _ViewTool(label: ''),
         _Tool(
           icon: LucideIcons.maximize,
           label: '',
@@ -1296,73 +1253,304 @@ class _RankedResultOverlayState extends State<_RankedResultOverlay> {
   }
 }
 
-void _showViewControls(BuildContext context, GameViewData data) {
+void _showViewControls(BuildContext context) {
   final GameBloc bloc = GameRootScope.of(context);
-  showAppDialog<void>(
+  final RenderBox? anchor = context.findRenderObject() as RenderBox?;
+  final Size screen = MediaQuery.sizeOf(context);
+  final Offset offset = anchor?.localToGlobal(Offset.zero) ?? Offset.zero;
+  final double anchorWidth = anchor?.size.width ?? 44;
+  final double right = math.max(12, screen.width - offset.dx - anchorWidth);
+  final double bottom = math.max(12, screen.height - offset.dy + 8);
+  showGeneralDialog<void>(
     context: context,
-    title: 'Вид',
-    child: Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
+    barrierDismissible: true,
+    barrierLabel: MaterialLocalizations.of(context).modalBarrierDismissLabel,
+    barrierColor: Colors.transparent,
+    transitionDuration: const Duration(milliseconds: 150),
+    transitionBuilder: (context, animation, _, child) => FadeTransition(
+      opacity: animation,
+      child: ScaleTransition(
+        alignment: Alignment.bottomRight,
+        scale: Tween<double>(begin: .97, end: 1).animate(animation),
+        child: child,
+      ),
+    ),
+    pageBuilder: (context, _, _) => Stack(
       children: [
-        const Text(
-          'Камера',
-          style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700),
-        ),
-        const SizedBox(height: 8),
-        Row(
-          children: [
-            for (final value in CameraView.values)
-              Expanded(
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 2),
-                  child: OutlinedButton(
-                    onPressed: () => bloc.add(GameEvent$View(value)),
-                    style: value == data.cameraView
-                        ? OutlinedButton.styleFrom(
-                            backgroundColor: const Color(0xFFE8EDFE),
-                          )
-                        : null,
-                    child: Text(switch (value) {
-                      CameraView.perspective => '3D',
-                      CameraView.top => 'Сверху',
-                      CameraView.front => 'Спереди',
-                    }),
-                  ),
+        Positioned(
+          right: right,
+          bottom: bottom,
+          child: ConstrainedBox(
+            constraints: BoxConstraints(
+              maxWidth: math.min(290, screen.width - 24),
+              maxHeight: screen.height - 24,
+            ),
+            child: Material(
+              color: const Color(0xFFFCFDF9),
+              shape: RoundedRectangleBorder(
+                side: const BorderSide(color: Color(0xFFE2E7D8)),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              elevation: 12,
+              shadowColor: const Color(0x22273C25),
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.all(12),
+                child: BlocBuilder<GameBloc, GameState>(
+                  bloc: bloc,
+                  builder: (context, state) {
+                    final GameViewData? data = switch (state) {
+                      GameState$Ready(:final data) => data,
+                      _ => null,
+                    };
+                    if (data == null) return const SizedBox.shrink();
+                    return Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        Row(
+                          children: [
+                            const Expanded(
+                              child: Text(
+                                'Камера',
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                            ),
+                            IconButton(
+                              tooltip: 'Закрыть меню вида',
+                              visualDensity: VisualDensity.compact,
+                              onPressed: () => Navigator.pop(context),
+                              icon: const Icon(LucideIcons.x, size: 18),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 4),
+                        AppSegmentedControl<CameraView>(
+                          options: const [
+                            AppSegment(
+                              value: CameraView.perspective,
+                              label: '3D',
+                            ),
+                            AppSegment(value: CameraView.top, label: 'Сверху'),
+                            AppSegment(
+                              value: CameraView.front,
+                              label: 'Спереди',
+                            ),
+                          ],
+                          selected: data.cameraView,
+                          onChanged: (value) => bloc.add(GameEvent$View(value)),
+                        ),
+                        const SizedBox(height: 16),
+                        const Text(
+                          'Показать слои',
+                          style: TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: _LayerChoice(
+                                label: 'Все',
+                                selected: data.layers.length == 5,
+                                onTap: () =>
+                                    bloc.add(const GameEvent$ShowAllLayers()),
+                              ),
+                            ),
+                            for (var layer = 0; layer < 5; layer++) ...[
+                              const SizedBox(width: 4),
+                              Expanded(
+                                child: _LayerChoice(
+                                  label: '${layer + 1}',
+                                  selected: data.layers.contains(layer),
+                                  onTap: () =>
+                                      bloc.add(GameEvent$ToggleLayer(layer)),
+                                ),
+                              ),
+                            ],
+                          ],
+                        ),
+                        const SizedBox(height: 10),
+                        const Text(
+                          'Включайте и скрывайте каждый слой отдельно.\nНовый ход вернёт все слои.',
+                          style: TextStyle(
+                            color: Color(0xFF959D89),
+                            fontSize: 9,
+                            height: 1.7,
+                          ),
+                        ),
+                      ],
+                    );
+                  },
                 ),
               ),
-          ],
-        ),
-        const SizedBox(height: 14),
-        const Text(
-          'Показать слои',
-          style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700),
-        ),
-        const SizedBox(height: 8),
-        Wrap(
-          spacing: 6,
-          children: [
-            OutlinedButton(
-              onPressed: () => bloc.add(const GameEvent$ShowAllLayers()),
-              child: const Text('Все'),
             ),
-            for (var layer = 0; layer < 5; layer++)
-              OutlinedButton(
-                onPressed: () => bloc.add(GameEvent$ToggleLayer(layer)),
-                child: Text('${layer + 1}'),
-              ),
-          ],
-        ),
-        const Text(
-          'Включайте и скрывайте каждый слой отдельно. Новый ход вернёт все слои.',
-          style: TextStyle(color: AppColors.muted, fontSize: 10),
+          ),
         ),
       ],
     ),
   );
 }
 
+class _LayerChoice extends StatelessWidget {
+  const new({required this.label, required this.selected, required this.onTap});
+
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) => SizedBox(
+    height: 40,
+    child: OutlinedButton(
+      onPressed: onTap,
+      style: OutlinedButton.styleFrom(
+        padding: EdgeInsets.zero,
+        minimumSize: const Size(0, 40),
+        backgroundColor: selected ? const Color(0xFFE8EDFE) : Colors.white,
+        foregroundColor: selected ? AppColors.accent : AppColors.ink,
+        side: BorderSide(
+          color: selected ? const Color(0xFF9FB2F4) : AppColors.border,
+        ),
+        textStyle: const TextStyle(fontSize: 10),
+      ),
+      child: Text(label),
+    ),
+  );
+}
+
+Future<void> _requestGameMenu(
+  BuildContext context,
+  GameViewData fallback,
+) async {
+  final GameBloc bloc = GameRootScope.of(context);
+  final GameViewData current = bloc.data ?? fallback;
+  final bool online = current.mode == GameMode.online;
+  final bool unfinished =
+      current.snapshot.status == GameStatus.playing &&
+      current.snapshot.history.isNotEmpty;
+  if (!unfinished) {
+    if (online) {
+      MatchmakingRootScope.of(context).add(const MatchmakingEvent$Leave());
+    }
+    bloc.add(const GameEvent$Menu());
+    return;
+  }
+  if (current.phase != GamePhase.paused) {
+    bloc.add(const GameEvent$Pause());
+  }
+  final bool? leave = await showAppDialog<bool>(
+    context: context,
+    title: online ? 'Выйти из лобби?' : 'Завершить текущую партию?',
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Text(
+          online && current.onlineSnapshot?.ranking?.rated == true
+              ? 'Выход засчитается как поражение и уменьшит рейтинг. При потере соединения у вас до 60 секунд на возврат.'
+              : online
+              ? 'Лобби закроется для обоих игроков.'
+              : 'Текущие ходы будут потеряны.',
+          style: const TextStyle(
+            color: AppColors.muted,
+            fontSize: 12,
+            height: 1.6,
+          ),
+        ),
+        const SizedBox(height: 20),
+        _ConfirmationActions(
+          confirmLabel: online ? 'Выйти из лобби' : 'Выйти в меню',
+        ),
+      ],
+    ),
+  );
+  if (!context.mounted) return;
+  if (leave == true) {
+    if (online) {
+      MatchmakingRootScope.of(context).add(const MatchmakingEvent$Leave());
+    }
+    bloc.add(const GameEvent$Menu());
+  } else {
+    bloc.add(const GameEvent$Resume());
+  }
+}
+
+Future<void> _requestRestart(
+  BuildContext context,
+  GameViewData fallback,
+) async {
+  final GameBloc bloc = GameRootScope.of(context);
+  final GameViewData current = bloc.data ?? fallback;
+  if (current.snapshot.history.length <= 1) {
+    bloc.add(const GameEvent$Restart());
+    return;
+  }
+  final bool? restart = await showAppDialog<bool>(
+    context: context,
+    title: 'Начать партию заново?',
+    child: const Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Text(
+          'Текущие ходы будут потеряны.',
+          style: TextStyle(color: AppColors.muted, fontSize: 12),
+        ),
+        SizedBox(height: 20),
+        _ConfirmationActions(confirmLabel: 'Начать заново'),
+      ],
+    ),
+  );
+  if (restart == true) {
+    bloc.add(const GameEvent$Restart());
+  } else {
+    bloc.add(const GameEvent$Resume());
+  }
+}
+
+class _ConfirmationActions extends StatelessWidget {
+  const new({required this.confirmLabel});
+
+  final String confirmLabel;
+
+  @override
+  Widget build(BuildContext context) => Row(
+    children: [
+      Expanded(
+        child: FilledButton(
+          onPressed: () => Navigator.pop(context, true),
+          style: FilledButton.styleFrom(
+            padding: const EdgeInsets.symmetric(horizontal: 6),
+            textStyle: const TextStyle(
+              fontSize: 11,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          child: Text(confirmLabel, textAlign: TextAlign.center),
+        ),
+      ),
+      const SizedBox(width: 8),
+      Expanded(
+        child: OutlinedButton(
+          onPressed: () => Navigator.pop(context, false),
+          style: OutlinedButton.styleFrom(
+            padding: const EdgeInsets.symmetric(horizontal: 6),
+            textStyle: const TextStyle(
+              fontSize: 11,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          child: const Text('Остаться в игре', textAlign: TextAlign.center),
+        ),
+      ),
+    ],
+  );
+}
+
 void _confirmOnlineLeave(BuildContext context, GameViewData data) {
-  showAppDialog<void>(
+  showAppDialog<bool>(
     context: context,
     title: 'Выйти из лобби?',
     child: Column(
@@ -1375,22 +1563,14 @@ void _confirmOnlineLeave(BuildContext context, GameViewData data) {
               : 'Лобби закроется для обоих игроков.',
         ),
         const SizedBox(height: 14),
-        FilledButton(
-          onPressed: () {
-            Navigator.pop(context);
-            MatchmakingRootScope.of(context)
-                .add(const MatchmakingEvent$Leave());
-            GameRootScope.of(context).add(const GameEvent$Menu());
-          },
-          child: const Text('Выйти из лобби'),
-        ),
-        OutlinedButton(
-          onPressed: () => Navigator.pop(context),
-          child: const Text('Остаться в игре'),
-        ),
+        const _ConfirmationActions(confirmLabel: 'Выйти из лобби'),
       ],
     ),
-  );
+  ).then((leave) {
+    if (leave != true || !context.mounted) return;
+    MatchmakingRootScope.of(context).add(const MatchmakingEvent$Leave());
+    GameRootScope.of(context).add(const GameEvent$Menu());
+  });
 }
 
 class _PlayingOverlay extends StatelessWidget {
@@ -1431,6 +1611,14 @@ class _PlayingOverlay extends StatelessWidget {
   );
 
   void _pauseDialog(BuildContext context) {
+    final GameBloc bloc = GameRootScope.of(context);
+    void afterClose(FutureOr<void> Function() action) {
+      Navigator.pop(context);
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (context.mounted) unawaited(Future<void>.sync(action));
+      });
+    }
+
     if (data.mode == GameMode.online) {
       showAppDialog<void>(
         context: context,
@@ -1444,9 +1632,11 @@ class _PlayingOverlay extends StatelessWidget {
               onPressed: data.onlineSnapshot?.pause?.used == true
                   ? null
                   : () {
-                      Navigator.pop(context);
-                      MatchmakingRootScope.of(context)
-                          .add(const MatchmakingEvent$Pause());
+                      afterClose(
+                        () =>
+                            MatchmakingRootScope.of(context)
+                                .add(const MatchmakingEvent$Pause()),
+                      );
                     },
               child: Text(
                 data.onlineSnapshot?.pause?.used == true
@@ -1454,12 +1644,26 @@ class _PlayingOverlay extends StatelessWidget {
                     : 'Предложить паузу · 2 мин',
               ),
             ),
+            const SizedBox(height: 6),
             FilledButton(
               onPressed: () => Navigator.pop(context),
               child: const Text('Продолжить'),
             ),
+            const SizedBox(height: 8),
             OutlinedButton.icon(
-              onPressed: () => _confirmOnlineLeave(context, data),
+              onPressed: () => afterClose(
+                () => showAppDialog<void>(
+                  context: context,
+                  title: 'Настройки',
+                  child: const SettingsView(),
+                ),
+              ),
+              icon: const Icon(LucideIcons.settings2),
+              label: const Text('Настройки'),
+            ),
+            TextButton.icon(
+              onPressed: () =>
+                  afterClose(() => _requestGameMenu(context, data)),
               icon: const Icon(LucideIcons.home),
               label: const Text('Главное меню'),
             ),
@@ -1468,8 +1672,7 @@ class _PlayingOverlay extends StatelessWidget {
       );
       return;
     }
-    final GameBloc bloc = GameRootScope.of(context)
-      ..add(const GameEvent$Pause());
+    bloc.add(const GameEvent$Pause());
     var resumeAfterDismiss = true;
     showAppDialog<void>(
       context: context,
@@ -1487,31 +1690,67 @@ class _PlayingOverlay extends StatelessWidget {
             },
             child: const Text('Продолжить'),
           ),
+          const SizedBox(height: 6),
           OutlinedButton.icon(
             onPressed: () {
               resumeAfterDismiss = false;
-              Navigator.pop(context);
-              bloc.add(const GameEvent$Restart());
+              afterClose(() => _requestRestart(context, data));
             },
             icon: const Icon(LucideIcons.rotateCcw),
             label: const Text('Начать заново'),
           ),
+          const SizedBox(height: 8),
           OutlinedButton.icon(
             onPressed: () {
               resumeAfterDismiss = false;
-              Navigator.pop(context);
-              bloc.add(const GameEvent$Menu());
+              afterClose(() async {
+                await showAppDialog<void>(
+                  context: context,
+                  title: 'Настройки',
+                  child: const SettingsView(),
+                );
+                if (bloc.data?.phase == GamePhase.paused) {
+                  bloc.add(const GameEvent$Resume());
+                }
+              });
+            },
+            icon: const Icon(LucideIcons.settings2),
+            label: const Text('Настройки'),
+          ),
+          if (data.mode == GameMode.level) ...[
+            const SizedBox(height: 8),
+            OutlinedButton.icon(
+              onPressed: () {
+                resumeAfterDismiss = false;
+                final int initialId = data.levelId ?? 1;
+                bloc.add(const GameEvent$Menu());
+                afterClose(
+                  () => showAppDialog<void>(
+                    context: context,
+                    title: 'Уровни',
+                    wide: true,
+                    child: LevelsView(initialId: initialId),
+                  ),
+                );
+              },
+              icon: const Icon(LucideIcons.puzzle),
+              label: const Text('К уровням'),
+            ),
+          ],
+          TextButton.icon(
+            onPressed: () {
+              resumeAfterDismiss = false;
+              afterClose(() => _requestGameMenu(context, data));
             },
             icon: const Icon(LucideIcons.home),
-            label: const Text('В главное меню'),
+            label: const Text('Главное меню'),
           ),
         ],
       ),
     ).whenComplete(() {
-      // A barrier/back dismissal resumes the game, while explicit actions
-      // own their transition. Checking the current bloc phase here races
-      // with its sequential event queue (Menu could be followed by Resume).
-      if (resumeAfterDismiss && bloc.data?.phase == GamePhase.paused) {
+      // Pause and resume stay ordered in the bloc even if the dialog is
+      // dismissed before the pause event has been reduced.
+      if (resumeAfterDismiss) {
         bloc.add(const GameEvent$Resume());
       }
     });
@@ -1527,6 +1766,20 @@ class _GamePanel extends StatelessWidget {
     final GameBloc bloc = GameRootScope.of(context);
     final finished = data.snapshot.status != GameStatus.playing;
     final Player? winner = data.snapshot.winner;
+    final bool completedLevel =
+        data.mode == GameMode.level && winner == Player.one;
+    final bool hasNextLevel = completedLevel && (data.levelId ?? 40) < 40;
+    void openLevels() {
+      final int initialId = data.levelId ?? 1;
+      bloc.add(const GameEvent$Menu());
+      showAppDialog<void>(
+        context: context,
+        title: 'Уровни',
+        wide: true,
+        child: LevelsView(initialId: initialId),
+      );
+    }
+
     return Container(
       padding: const EdgeInsets.fromLTRB(8, 0, 8, 4),
       decoration: const BoxDecoration(
@@ -1543,9 +1796,15 @@ class _GamePanel extends StatelessWidget {
                 Expanded(
                   child: Text(
                     finished
-                        ? (winner == null
-                              ? 'Ничья'
-                              : 'Победа: ${data.names[winner.index]}')
+                        ? data.mode == GameMode.level
+                              ? completedLevel
+                                    ? 'Уровень пройден'
+                                    : winner == null
+                                    ? 'Ничья'
+                                    : 'Поражение'
+                              : (winner == null
+                                    ? 'Ничья'
+                                    : 'Победа: ${data.names[winner.index]}')
                         : '● ${data.names[0]}',
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
@@ -1628,11 +1887,7 @@ class _GamePanel extends StatelessWidget {
                   selected: data.xray,
                   onTap: () => bloc.add(const GameEvent$ToggleXray()),
                 ),
-                _Tool(
-                  icon: LucideIcons.layers3,
-                  label: 'Вид',
-                  onTap: () => _showViewControls(context, data),
-                ),
+                const _ViewTool(label: 'Вид'),
                 _Tool(
                   icon: LucideIcons.maximize,
                   label: '',
@@ -1650,19 +1905,36 @@ class _GamePanel extends StatelessWidget {
           ),
           if (finished && data.mode == GameMode.level) ...[
             const SizedBox(height: 8),
-            if (data.snapshot.winner == Player.one && (data.levelId ?? 40) < 40)
-              FilledButton.icon(
-                onPressed: () =>
-                    bloc.add(GameEvent$StartLevel(data.levelId! + 1)),
-                iconAlignment: IconAlignment.end,
-                icon: const Icon(LucideIcons.chevronRight),
-                label: const Text('Следующий уровень'),
-              ),
-            OutlinedButton.icon(
-              onPressed: () => bloc.add(const GameEvent$Restart()),
-              icon: const Icon(LucideIcons.rotateCcw),
-              label: const Text('Повторить уровень'),
+            Row(
+              children: [
+                if (hasNextLevel) ...[
+                  Expanded(
+                    child: FilledButton.icon(
+                      onPressed: () =>
+                          bloc.add(GameEvent$StartLevel(data.levelId! + 1)),
+                      iconAlignment: IconAlignment.end,
+                      icon: const Icon(LucideIcons.chevronRight, size: 17),
+                      label: const Text('Следующий уровень'),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                ],
+                Expanded(
+                  child: hasNextLevel
+                      ? OutlinedButton.icon(
+                          onPressed: () => bloc.add(const GameEvent$Restart()),
+                          icon: const Icon(LucideIcons.rotateCcw, size: 16),
+                          label: const Text('Повторить уровень'),
+                        )
+                      : FilledButton.icon(
+                          onPressed: () => bloc.add(const GameEvent$Restart()),
+                          icon: const Icon(LucideIcons.rotateCcw, size: 16),
+                          label: const Text('Повторить уровень'),
+                        ),
+                ),
+              ],
             ),
+            TextButton(onPressed: openLevels, child: const Text('К уровням')),
           ] else if (finished) ...[
             const SizedBox(height: 8),
             Row(
@@ -1702,6 +1974,21 @@ class _GamePanel extends StatelessWidget {
       ),
     );
   }
+}
+
+class _ViewTool extends StatelessWidget {
+  const new({required this.label});
+
+  final String label;
+
+  @override
+  Widget build(BuildContext context) => Builder(
+    builder: (anchorContext) => _Tool(
+      icon: LucideIcons.layers3,
+      label: label,
+      onTap: () => _showViewControls(anchorContext),
+    ),
+  );
 }
 
 class _Tool extends StatelessWidget {
