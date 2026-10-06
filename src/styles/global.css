@@ -30,6 +30,7 @@ body {
   margin: 0;
   min-width: 320px;
   overflow: hidden;
+  background: var(--background);
 }
 button,
 input,
@@ -87,6 +88,26 @@ input {
 #root {
   height: 100dvh;
   min-height: 0;
+}
+#status-bar-background {
+  display: none;
+}
+/* WebKit's status-bar sampler needs a real viewport-pinned painted element;
+   a pseudo-element does not suppress the native scroll-edge blur. */
+html[data-ios-standalone] #status-bar-background {
+  display: block;
+  position: fixed;
+  inset: 0 0 auto;
+  height: max(1px, var(--safe-area-inset-top, env(safe-area-inset-top, 0px)));
+  background: var(--background);
+  pointer-events: none;
+  z-index: 1001;
+}
+@media (display-mode: standalone) {
+  html,
+  body {
+    overscroll-behavior: none;
+  }
 }
 @media (prefers-reduced-motion: reduce) {
   *,

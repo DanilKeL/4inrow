@@ -22,6 +22,22 @@ function winningMoves(state: GameState, player: Player) {
   return getLegalMoves(state).filter((move) => after(state, move, player).status === 'won');
 }
 
+function singleThreatAfterTenMoves() {
+  return play([
+    [0, 0],
+    [4, 4],
+    [1, 0],
+    [4, 3],
+    [2, 0],
+    [0, 4],
+    [2, 2],
+    [3, 3],
+    [1, 4],
+    [0, 2],
+    [2, 4],
+  ]);
+}
+
 // Independent rules-engine oracle: a fork must survive the opponent's own wins
 // and offer two distinct legal winning placements on the following turn.
 function winningForks(state: GameState) {
@@ -64,7 +80,7 @@ describe('bot tactics', () => {
   );
 
   it.each<Difficulty>(['easy', 'medium', 'hard'])(
-    '%s never randomizes away the forced defense',
+    '%s always blocks an early forced defense',
     (difficulty) => {
       vi.spyOn(Math, 'random').mockReturnValue(0);
       const state = play([
@@ -77,10 +93,106 @@ describe('bot tactics', () => {
       expect(chooseMove(state, difficulty)).toEqual({ x: 3, y: 0 });
     },
   );
+  it('medium misses a single immediate defense in exactly 7 of 100 evenly spaced rolls', () => {
+    const state = singleThreatAfterTenMoves();
+    expect(winningMoves(state, 1)).toEqual([{ x: 3, y: 0 }]);
+    expect(winningMoves(state, 2)).toHaveLength(0);
+    const before = JSON.stringify(state);
+    const random = vi.spyOn(Math, 'random');
+    let missed = 0;
+    for (let i = 0; i < 100; i++) {
+      random.mockReturnValue((i + 0.5) / 100);
+      const move = chooseMove(state, 'medium')!;
+      expect(getLegalMoves(state)).toContainEqual(move);
+      if (winningMoves(after(state, move), 1).length) missed++;
+      else expect(move).toEqual({ x: 3, y: 0 });
+    }
+    expect(missed).toBe(7);
+    expect(JSON.stringify(state)).toBe(before);
+  });
+
+  it('medium still blocks with nine completed moves, without rolling for an error', () => {
+    const random = vi.spyOn(Math, 'random').mockReturnValue(0);
+    const state = play(
+      singleThreatAfterTenMoves()
+        .history.slice(0, 9)
+        .map(({ x, y }) => [x, y]),
+    );
+    expect(state.history).toHaveLength(9);
+    expect(chooseMove(state, 'medium')).toEqual({ x: 3, y: 0 });
+    expect(random).not.toHaveBeenCalled();
+  });
+
+  it('medium can first miss the block on the eleventh move of a game it started', () => {
+    vi.spyOn(Math, 'random').mockReturnValue(0);
+    const state = play([
+      [4, 4],
+      [0, 0],
+      [4, 3],
+      [1, 0],
+      [0, 4],
+      [2, 0],
+      [3, 3],
+      [1, 4],
+      [0, 2],
+      [2, 4],
+    ]);
+    expect(state.history).toHaveLength(10);
+    expect(winningMoves(state, 1)).toHaveLength(0);
+    expect(winningMoves(state, 2)).toEqual([{ x: 3, y: 0 }]);
+    const move = chooseMove(state, 'medium')!;
+    expect(move).not.toEqual({ x: 3, y: 0 });
+    expect(winningMoves(after(state, move), 2)).toContainEqual({ x: 3, y: 0 });
+  });
+
+  it.each([0.07, 0.070001, 0.999999])(
+    'medium blocks at and above the 7%% boundary (%s)',
+    (roll) => {
+      vi.spyOn(Math, 'random').mockReturnValue(roll);
+      const state = singleThreatAfterTenMoves();
+      expect(chooseMove(state, 'medium')).toEqual({ x: 3, y: 0 });
+    },
+  );
+
+  it('deterministic medium always blocks without drawing a random roll', () => {
+    const random = vi.spyOn(Math, 'random').mockReturnValue(0);
+    const state = singleThreatAfterTenMoves();
+    expect(chooseMove(state, 'medium', { deterministic: true })).toEqual({ x: 3, y: 0 });
+    expect(random).not.toHaveBeenCalled();
+  });
+
+  it.each<Difficulty>(['easy', 'hard'])(
+    '%s still blocks late threats on the lowest random roll',
+    (difficulty) => {
+      const random = vi.spyOn(Math, 'random').mockReturnValue(0);
+      expect(chooseMove(singleThreatAfterTenMoves(), difficulty)).toEqual({ x: 3, y: 0 });
+      expect(random).not.toHaveBeenCalled();
+    },
+  );
+
+  it('medium preserves its existing defense against multiple winning columns', () => {
+    const random = vi.spyOn(Math, 'random').mockReturnValue(0);
+    const state = play([
+      [1, 2],
+      [0, 0],
+      [2, 2],
+      [4, 4],
+      [3, 2],
+      [0, 4],
+      [2, 4],
+      [4, 0],
+      [1, 0],
+      [0, 1],
+      [3, 4],
+    ]);
+    expect(winningMoves(state, 1)).toHaveLength(2);
+    expect(chooseMove(state, 'medium')).toEqual({ x: 0, y: 2 });
+    expect(random).not.toHaveBeenCalled();
+  });
   it.each<Difficulty>(['easy', 'medium', 'hard'])(
     '%s takes a win before blocking',
     (difficulty) => {
-      vi.spyOn(Math, 'random').mockReturnValue(0.99);
+      const random = vi.spyOn(Math, 'random').mockReturnValue(0);
       const state = play([
         [0, 0],
         [0, 4],
@@ -88,8 +200,13 @@ describe('bot tactics', () => {
         [1, 4],
         [2, 0],
         [2, 4],
+        [2, 2],
+        [4, 3],
+        [3, 3],
+        [0, 2],
       ]);
       expect(chooseMove(state, difficulty)).toEqual({ x: 3, y: 0 });
+      expect(random).not.toHaveBeenCalled();
     },
   );
 

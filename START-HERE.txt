@@ -1,6 +1,7 @@
 FOUR³ source and current web release
 
-Open https://116.206.95.180/ to play.
+Open https://4inrow.ru/ to play.
+Production address: https://4inrow.ru/. Deployment access: ssh four-game-server (domain-based).
 For development: install Node.js 24 LTS, run npm ci, then npm run dev.
 For production: run npm run build, then npm start behind an HTTPS reverse proxy.
 The live account database is /srv/four-game-data/accounts.json and is not included with the source.

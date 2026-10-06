@@ -11,6 +11,8 @@ export interface MoveCandidate {
 }
 const AREA = SIZE * SIZE;
 const WIN = 1_000_000;
+const MEDIUM_DEFENSE_MISS_CHANCE = 0.07;
+const MEDIUM_DEFENSE_MISS_AFTER_MOVES = 10;
 const WEIGHTS = [0, 3, 32, 180, WIN];
 const other = (player: Player): Player => (player === 1 ? 2 : 1);
 const inside = (n: number) => n >= 0 && n < SIZE;
@@ -310,8 +312,22 @@ export function chooseMove(
   const blocks = position.threats(other(player));
   let column: number;
   if (wins.length) column = wins[0];
-  else if (blocks.length) column = blocks[0];
-  else {
+  else if (blocks.length) {
+    column = blocks[0];
+    // Ordinary medium games occasionally overlook a single immediate threat.
+    // Levels remain deterministic, and an available win always takes priority.
+    if (
+      difficulty === 'medium' &&
+      !options.deterministic &&
+      state.history.length >= MEDIUM_DEFENSE_MISS_AFTER_MOVES &&
+      blocks.length === 1
+    ) {
+      const alternatives = position.legal().filter((move) => move !== column);
+      if (alternatives.length && Math.random() < MEDIUM_DEFENSE_MISS_CHANCE) {
+        column = position.ordered(player, alternatives)[0];
+      }
+    }
+  } else {
     const ranked = candidates(position, player);
     if (ranked[0].score === WIN) column = ranked[0].column;
     else if (difficulty === 'easy') {

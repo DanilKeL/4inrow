@@ -721,7 +721,7 @@ export function createOnlineServer(options: OnlineServerOptions = {}) {
             )
               throw new AuthError(
                 400,
-                'Не удалось подтвердить почтовый домен. Проверьте email и попробуйте снова.',
+                'У этого домена не найден почтовый сервер. Проверьте адрес email.',
               );
             const result =
               pathname === '/auth/register'

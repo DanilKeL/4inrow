@@ -4,17 +4,22 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <meta name="theme-color" content="#f3f2ee" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
     <meta
       name="description"
       content="FOUR³ — четыре в ряд в трёх измерениях. Играйте вдвоём или против AI."
     />
-    <link rel="icon" type="image/x-icon" href="/favicon.ico" sizes="32x32 48x48" />
+    <link rel="icon" type="image/x-icon" href="/favicon.ico?v=20261002" sizes="16x16 32x32 48x48 96x96" />
     <link rel="icon" type="image/png" href="/favicon.png" sizes="96x96" />
+    <link rel="icon" type="image/png" href="/favicon-search.png" sizes="120x120" />
     <link rel="manifest" href="/manifest.json" />
     <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png" sizes="180x180" />
     <title>FOUR³ — Четыре в ряд</title>
   </head>
   <body>
+    <div id="status-bar-background" aria-hidden="true"></div>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
