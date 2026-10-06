@@ -4,6 +4,7 @@ import 'dart:ui' show FrameTiming, Size;
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_scene/scene.dart' as fs;
+import 'package:four3/src/common/utils/build_context_extension.dart';
 import 'package:four3/src/feature/game/bloc/game_bloc.dart';
 import 'package:four3/src/feature/game/model/game_models.dart';
 import 'package:four3/src/feature/game/scene/game_camera_orbit.dart';
@@ -285,13 +286,13 @@ class _GameSceneViewState extends State<GameSceneView> {
   @override
   Widget build(BuildContext context) {
     if (_error != null) {
-      return const ColoredBox(
-        color: Color(0xFFE8E5DF),
+      return ColoredBox(
+        color: const Color(0xFFE8E5DF),
         child: Center(
           child: Padding(
-            padding: EdgeInsets.all(32),
+            padding: const EdgeInsets.all(32),
             child: Text(
-              'Не удалось загрузить 3D-поле.\nПерезапустите приложение.',
+              context.l10n.sceneLoadFailed,
               textAlign: TextAlign.center,
             ),
           ),

@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:four3/src/common/theme/app_theme.dart';
+import 'package:four3/src/common/utils/build_context_extension.dart';
 import 'package:four3/src/common/widget/app_controls.dart';
 import 'package:four3/src/feature/account/model/account_profile.dart';
 import 'package:four3/src/feature/account/widget/account_root_scope.dart';
@@ -53,7 +54,7 @@ class _OnlineSetupViewState extends State<OnlineSetupView> {
   Widget build(BuildContext context) {
     final MatchmakingBloc bloc = _bloc;
     final AccountProfile? profile = AccountRootScope.of(context).profile;
-    final String name = profile?.displayName ?? 'Игрок';
+    final String name = profile?.displayName ?? context.l10n.player;
     final bool signedIn = profile?.username != null;
     return BlocConsumer<MatchmakingBloc, MatchmakingState>(
       bloc: bloc,
@@ -100,15 +101,16 @@ class _OnlineSetupViewState extends State<OnlineSetupView> {
               Navigator.maybePop(context);
             },
           ),
-        MatchmakingState$Failure(:final message) when widget.quickOnly =>
+        MatchmakingState$Failure(:final message, :final failure)
+            when widget.quickOnly =>
           _QuickFailure(
-            message: message,
+            message: _failureText(context, message, failure),
             onRetry: () => bloc.add(MatchmakingEvent$Find(name)),
             onMenu: () => _cancelAndClose(context, bloc),
           ),
-        MatchmakingState$Failure(:final message) => _Setup(
+        MatchmakingState$Failure(:final message, :final failure) => _Setup(
           code: _code,
-          error: message,
+          error: _failureText(context, message, failure),
           onCreate: () => bloc.add(MatchmakingEvent$Create(name)),
           onJoin: () => bloc.add(MatchmakingEvent$Join(name, _code.text)),
           onFind: widget.onQuickStart == null
@@ -140,6 +142,23 @@ class _OnlineSetupViewState extends State<OnlineSetupView> {
     _handingOffQuickSearch = true;
     widget.onQuickStart?.call();
   }
+}
+
+String _failureText(
+  BuildContext context,
+  String remoteMessage,
+  MatchmakingFailure? failure,
+) {
+  if (remoteMessage.isNotEmpty) return remoteMessage;
+  return switch (failure) {
+    MatchmakingFailure.invalidCode => context.l10n.enterFiveLetterCode,
+    MatchmakingFailure.moveNotSent => context.l10n.moveNotSent,
+    MatchmakingFailure.invalidServerResponse =>
+      context.l10n.invalidServerResponse,
+    MatchmakingFailure.connectionLost => context.l10n.connectionLost,
+    MatchmakingFailure.lobbyClosed => context.l10n.connectionClosed,
+    MatchmakingFailure.generic || null => context.l10n.matchSearchFailed,
+  };
 }
 
 int _secondsLeft(int deadline) =>
@@ -181,19 +200,21 @@ class _Setup extends StatelessWidget {
       ],
       OutlinedButton(
         onPressed: connecting ? null : onFind,
-        child: const Text('Рейтинговая игра — найти соперника'),
+        child: Text(context.l10n.findRankedOpponent),
       ),
       const SizedBox(height: 6),
       FilledButton.icon(
         onPressed: connecting ? null : onCreate,
         iconAlignment: IconAlignment.end,
         icon: const Icon(LucideIcons.arrowRight, size: 18),
-        label: Text(connecting ? 'Подключаемся…' : 'Создать лобби'),
+        label: Text(
+          connecting ? context.l10n.connecting : context.l10n.createLobby,
+        ),
       ),
       const SizedBox(height: 6),
       AppTextField(
         controller: code,
-        label: 'Код лобби',
+        label: context.l10n.lobbyCode,
         hintText: 'ABCDE',
         textCapitalization: TextCapitalization.characters,
         maxLength: 5,
@@ -212,7 +233,7 @@ class _Setup extends StatelessWidget {
           onPressed: connecting || !RegExp(r'^[A-Z]{5}$').hasMatch(code.text)
               ? null
               : onJoin,
-          child: const Text('Войти в лобби'),
+          child: Text(context.l10n.joinLobby),
         ),
       ),
     ],
@@ -245,14 +266,18 @@ class _QuickSearching extends StatelessWidget {
         const Icon(LucideIcons.search, size: 32, color: Color(0xFF2955E7)),
         const SizedBox(height: 14),
         Text(
-          reconnecting ? 'Восстанавливаем поиск…' : 'Ищем соперника…',
+          reconnecting
+              ? context.l10n.restoringSearch
+              : context.l10n.searchingOpponent,
           style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w800),
         ),
         const SizedBox(height: 14),
         Text(
           reconnecting
-              ? 'Соединение прервалось. Поиск продолжится автоматически после подключения.'
-              : '${signedIn ? 'Рейтинговый поиск среди аккаунтов.' : 'Поиск среди гостей, без рейтинга.'} На подтверждение — 15 секунд.',
+              ? context.l10n.searchReconnectHint
+              : signedIn
+              ? context.l10n.ratedSearchHint
+              : context.l10n.guestSearchHint,
           textAlign: TextAlign.center,
           style: const TextStyle(
             color: Color(0xFF7A8073),
@@ -265,7 +290,7 @@ class _QuickSearching extends StatelessWidget {
           width: double.infinity,
           child: OutlinedButton(
             onPressed: onCancel,
-            child: const Text('Отменить поиск'),
+            child: Text(context.l10n.cancelSearch),
           ),
         ),
       ],
@@ -299,21 +324,23 @@ class _QuickFound extends StatelessWidget {
         const Icon(LucideIcons.usersRound, size: 32, color: AppColors.accent),
         const SizedBox(height: 14),
         Text(
-          'Соперник найден: $opponent',
+          context.l10n.opponentFound(opponent),
           textAlign: TextAlign.center,
           style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w800),
         ),
         const SizedBox(height: 8),
         Text(
           rating == null
-              ? 'Гостевая игра без рейтинга'
-              : 'Рейтинг соперника: $rating · ${rated ? 'На рейтинг' : 'Без очков: лимит встреч'}',
+              ? context.l10n.guestUnratedGame
+              : '${context.l10n.opponentRating(rating!)} · ${rated ? context.l10n.ratedLabel : context.l10n.unratedMeetingLimit}',
           textAlign: TextAlign.center,
           style: const TextStyle(fontSize: 11),
         ),
         const SizedBox(height: 14),
         Text(
-          'Подтвердите игру за $seconds сек. Матч начнётся, когда согласитесь оба.${rated ? ' На ход — 90 сек. Выход — поражение.' : ''}',
+          rated
+              ? context.l10n.confirmRatedMatch(seconds)
+              : context.l10n.confirmMatch(seconds),
           textAlign: TextAlign.center,
           style: const TextStyle(
             color: Color(0xFF7A8073),
@@ -331,7 +358,9 @@ class _QuickFound extends StatelessWidget {
                 ? const SizedBox.shrink()
                 : const Icon(LucideIcons.arrowRight, size: 18),
             label: Text(
-              accepted ? 'Ждём подтверждения соперника…' : 'Принять матч',
+              accepted
+                  ? context.l10n.waitingMatchConfirmation
+                  : context.l10n.acceptMatch,
             ),
           ),
         ),
@@ -340,7 +369,7 @@ class _QuickFound extends StatelessWidget {
           width: double.infinity,
           child: OutlinedButton(
             onPressed: onDecline,
-            child: const Text('Отказаться'),
+            child: Text(context.l10n.refuse),
           ),
         ),
       ],
@@ -363,7 +392,7 @@ class _QuickFailure extends StatelessWidget {
     crossAxisAlignment: CrossAxisAlignment.stretch,
     children: [
       Text(
-        message.isEmpty ? 'Не удалось найти игру.' : message,
+        message.isEmpty ? context.l10n.matchSearchFailed : message,
         textAlign: TextAlign.center,
         style: const TextStyle(color: AppColors.danger, fontSize: 12),
       ),
@@ -372,10 +401,10 @@ class _QuickFailure extends StatelessWidget {
         onPressed: onRetry,
         iconAlignment: IconAlignment.end,
         icon: const Icon(LucideIcons.arrowRight, size: 18),
-        label: const Text('Искать снова'),
+        label: Text(context.l10n.searchAgain),
       ),
       const SizedBox(height: 6),
-      OutlinedButton(onPressed: onMenu, child: const Text('В главное меню')),
+      OutlinedButton(onPressed: onMenu, child: Text(context.l10n.toMainMenu)),
     ],
   );
 }

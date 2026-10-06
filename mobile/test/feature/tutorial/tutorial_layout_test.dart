@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:four3/l10n/generated/app_localizations.dart';
 import 'package:four3/src/feature/tutorial/widget/tutorial_view.dart';
 
 void main() {
@@ -12,6 +13,8 @@ void main() {
     addTearDown(tester.view.resetPhysicalSize);
     await tester.pumpWidget(
       const MaterialApp(
+        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        supportedLocales: AppLocalizations.supportedLocales,
         home: Scaffold(body: SafeArea(child: TutorialView(loadVideos: false))),
       ),
     );

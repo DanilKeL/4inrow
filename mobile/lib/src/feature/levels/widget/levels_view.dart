@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:four3/src/common/theme/app_theme.dart';
+import 'package:four3/src/common/utils/build_context_extension.dart';
 import 'package:four3/src/feature/account/widget/account_root_scope.dart';
 import 'package:four3/src/feature/game/bloc/game_bloc.dart';
 import 'package:four3/src/feature/game/widget/game_root_scope.dart';
@@ -37,11 +38,7 @@ class _LevelsViewState extends State<LevelsView> {
     try {
       return (levels, await repository.sync(owner), '');
     } on Exception {
-      return (
-        levels,
-        await repository.best(),
-        'Нет связи с сервером. Прогресс будет сохранён при подключении.',
-      );
+      return (levels, await repository.best(), 'offline');
     }
   }
 
@@ -70,9 +67,9 @@ class _LevelsViewState extends State<LevelsView> {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             if (!(landscape && short)) ...[
-              const Text(
-                'Победи из готовой позиции за меньшее число ходов.',
-                style: TextStyle(color: AppColors.muted, fontSize: 12),
+              Text(
+                context.l10n.levelsIntro,
+                style: const TextStyle(color: AppColors.muted, fontSize: 12),
               ),
               const SizedBox(height: 10),
             ],
@@ -80,7 +77,7 @@ class _LevelsViewState extends State<LevelsView> {
               children: [
                 Expanded(
                   child: Text(
-                    shown.first.chapter,
+                    _chapter(context, shown.first.chapter),
                     style: const TextStyle(
                       fontSize: 13,
                       fontWeight: FontWeight.w700,
@@ -88,7 +85,7 @@ class _LevelsViewState extends State<LevelsView> {
                   ),
                 ),
                 Text(
-                  '${best.length} / ${levels.length} пройдено',
+                  context.l10n.completedProgress(best.length, levels.length),
                   style: const TextStyle(color: AppColors.muted, fontSize: 11),
                 ),
               ],
@@ -154,8 +151,10 @@ class _LevelsViewState extends State<LevelsView> {
                           ),
                           Text(
                             record == null
-                                ? 'Рекорд: —'
-                                : 'Рекорд: ${_moves(record)}',
+                                ? context.l10n.recordEmpty
+                                : context.l10n.recordValue(
+                                    context.l10n.moves(record),
+                                  ),
                             style: const TextStyle(
                               color: AppColors.muted,
                               fontSize: 11,
@@ -190,10 +189,10 @@ class _LevelsViewState extends State<LevelsView> {
             if (!(landscape && short))
               Text(
                 AccountRootScope.of(context).profile?.username == null
-                    ? 'Войдите в аккаунт, чтобы сохранять прогресс на сервере.'
+                    ? context.l10n.levelSignInHint
                     : syncError.isNotEmpty
-                    ? syncError
-                    : 'Прогресс сохранён в аккаунте.',
+                    ? context.l10n.levelSyncOffline
+                    : context.l10n.levelProgressSaved,
                 textAlign: TextAlign.center,
                 style: const TextStyle(color: AppColors.muted, fontSize: 11),
               ),
@@ -226,15 +225,11 @@ class _PageButton extends StatelessWidget {
   );
 }
 
-String _moves(int value) {
-  final int mod100 = value % 100;
-  final int mod10 = value % 10;
-  final String suffix = mod100 >= 11 && mod100 <= 14
-      ? 'ходов'
-      : mod10 == 1
-      ? 'ход'
-      : mod10 >= 2 && mod10 <= 4
-      ? 'хода'
-      : 'ходов';
-  return '$value $suffix';
-}
+String _chapter(BuildContext context, LevelChapter chapter) =>
+    switch (chapter) {
+      LevelChapter.firstSteps => context.l10n.chapterFirstSteps,
+      LevelChapter.tactics => context.l10n.chapterTactics,
+      LevelChapter.combinations => context.l10n.chapterCombinations,
+      LevelChapter.counterattack => context.l10n.chapterCounterattack,
+      LevelChapter.advanced => context.l10n.chapterAdvanced,
+    };

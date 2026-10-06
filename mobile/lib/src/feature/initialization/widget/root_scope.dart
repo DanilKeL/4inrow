@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'package:four3/l10n/generated/app_localizations.dart';
+import 'package:four3/src/app/locale_scope.dart';
 import 'package:four3/src/common/rest_client/rest_client.dart';
 import 'package:four3/src/common/utils/build_context_extension.dart';
 import 'package:four3/src/feature/account/data/account_datasource.dart';
@@ -128,15 +130,23 @@ class _RootScopeState extends State<RootScope> {
     builder: (context, snapshot) {
       if (snapshot.hasError) {
         return MaterialApp(
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: appSupportedLocales,
+          localeListResolutionCallback: resolveAppLocale,
           home: _LaunchScreen(
-            error: 'Проверьте соединение и попробуйте ещё раз.',
+            failed: true,
             onRetry: () => setState(() => _future = RootDependencies.create()),
           ),
         );
       }
       final RootDependencies? dependencies = snapshot.data;
       if (dependencies == null) {
-        return const MaterialApp(home: _LaunchScreen());
+        return const MaterialApp(
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: appSupportedLocales,
+          localeListResolutionCallback: resolveAppLocale,
+          home: _LaunchScreen(),
+        );
       }
       _dependencies ??= dependencies;
       return _InheritedRootScope(
@@ -148,8 +158,8 @@ class _RootScopeState extends State<RootScope> {
 }
 
 class _LaunchScreen extends StatelessWidget {
-  const new({this.error, this.onRetry});
-  final String? error;
+  const new({this.failed = false, this.onRetry});
+  final bool failed;
   final VoidCallback? onRetry;
 
   @override
@@ -180,20 +190,22 @@ class _LaunchScreen extends StatelessWidget {
             const _LoadingSculpture(),
             const SizedBox(height: 20),
             Text(
-              error == null ? 'Загрузка игры' : 'Не удалось загрузить поле',
+              failed ? context.l10n.loadBoardFailed : context.l10n.loadingGame,
               style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w700),
             ),
             const SizedBox(height: 10),
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 24),
               child: Text(
-                error ?? 'Доска и фишки…',
+                failed
+                    ? context.l10n.checkConnection
+                    : context.l10n.loadingBoard,
                 textAlign: TextAlign.center,
                 style: const TextStyle(color: Color(0xFF777A75), fontSize: 12),
               ),
             ),
             const SizedBox(height: 20),
-            if (error == null)
+            if (!failed)
               const SizedBox(
                 width: 128,
                 child: LinearProgressIndicator(
@@ -203,10 +215,7 @@ class _LaunchScreen extends StatelessWidget {
                 ),
               )
             else
-              FilledButton(
-                onPressed: onRetry,
-                child: const Text('Попробовать снова'),
-              ),
+              FilledButton(onPressed: onRetry, child: Text(context.l10n.retry)),
           ],
         ),
       ),

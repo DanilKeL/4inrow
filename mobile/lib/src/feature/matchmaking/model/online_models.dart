@@ -13,7 +13,7 @@ final class OnlinePlayer extends Equatable {
   final bool connected;
 
   factory fromJson(Map<String, dynamic> json) => OnlinePlayer(
-    name: json['name']?.toString() ?? 'Игрок',
+    name: json['name']?.toString() ?? 'Player',
     connected: json['connected'] == true,
   );
 

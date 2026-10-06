@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:four3/src/common/theme/app_theme.dart';
+import 'package:four3/src/common/utils/build_context_extension.dart';
 import 'package:four3/src/feature/account/widget/account_root_scope.dart';
 import 'package:four3/src/feature/leaderboard/bloc/leaderboard_bloc.dart';
 import 'package:four3/src/feature/leaderboard/model/leaderboard_player.dart';
@@ -32,10 +33,10 @@ class _LeaderboardViewState extends State<LeaderboardView> {
           children: [
             const Icon(LucideIcons.trophy, size: 18, color: AppColors.accent),
             const SizedBox(width: 8),
-            const Expanded(
+            Expanded(
               child: Text(
-                'Топ 100 · Elo',
-                style: TextStyle(color: AppColors.muted, fontSize: 12),
+                context.l10n.leaderboardTop,
+                style: const TextStyle(color: AppColors.muted, fontSize: 12),
               ),
             ),
             SizedBox(
@@ -43,7 +44,7 @@ class _LeaderboardViewState extends State<LeaderboardView> {
               height: 36,
               child: IconButton.outlined(
                 padding: EdgeInsets.zero,
-                tooltip: 'Обновить рейтинг',
+                tooltip: context.l10n.refreshLeaderboard,
                 onPressed: () => bloc.add(const LeaderboardEvent$Load()),
                 style: IconButton.styleFrom(
                   side: const BorderSide(color: Color(0xFFDFE3DA)),
@@ -62,7 +63,7 @@ class _LeaderboardViewState extends State<LeaderboardView> {
           builder: (context, state) => switch (state) {
             LeaderboardState$Ready(:final players) =>
               players.isEmpty
-                  ? const _StateText('В рейтинге пока нет игроков.')
+                  ? _StateText(context.l10n.leaderboardEmpty)
                   : SizedBox(
                       height:
                           ((MediaQuery.sizeOf(context).width <= 650
@@ -76,10 +77,10 @@ class _LeaderboardViewState extends State<LeaderboardView> {
                       ),
                     ),
             LeaderboardState$Failure() => _StateText(
-              'Не удалось загрузить рейтинг.',
+              context.l10n.leaderboardFailed,
               action: () => bloc.add(const LeaderboardEvent$Load()),
             ),
-            _ => const _StateText('Загрузка рейтинга…'),
+            _ => _StateText(context.l10n.leaderboardLoading),
           },
         ),
       ],
@@ -156,7 +157,7 @@ class _TableRow extends StatelessWidget {
             SizedBox(
               width: compact ? 43 : 65,
               child: header
-                  ? const Text('Место', textAlign: TextAlign.center)
+                  ? Text(context.l10n.place, textAlign: TextAlign.center)
                   : Center(
                       child: Container(
                         width: 28,
@@ -178,7 +179,7 @@ class _TableRow extends StatelessWidget {
                 children: [
                   Flexible(
                     child: Text(
-                      header ? 'Игрок' : player!.username,
+                      header ? context.l10n.player : player!.username,
                       overflow: TextOverflow.ellipsis,
                       style: TextStyle(
                         fontWeight: header ? FontWeight.w600 : FontWeight.w700,
@@ -196,9 +197,12 @@ class _TableRow extends StatelessWidget {
                         color: AppColors.accent,
                         borderRadius: BorderRadius.circular(4),
                       ),
-                      child: const Text(
-                        'Вы',
-                        style: TextStyle(color: Colors.white, fontSize: 8),
+                      child: Text(
+                        context.l10n.you,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 8,
+                        ),
                       ),
                     ),
                   ],
@@ -218,7 +222,7 @@ class _TableRow extends StatelessWidget {
             Expanded(
               flex: 2,
               child: Text(
-                header ? 'Игры' : '${player!.games}',
+                header ? context.l10n.rankedGames : '${player!.games}',
                 textAlign: TextAlign.right,
               ),
             ),
@@ -249,10 +253,7 @@ class _StateText extends StatelessWidget {
         ),
         if (action != null) ...[
           const SizedBox(height: 10),
-          OutlinedButton(
-            onPressed: action,
-            child: const Text('Попробовать снова'),
-          ),
+          OutlinedButton(onPressed: action, child: Text(context.l10n.retry)),
         ],
       ],
     ),

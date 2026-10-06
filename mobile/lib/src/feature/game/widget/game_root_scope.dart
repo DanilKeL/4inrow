@@ -32,7 +32,7 @@ class _GameRootScopeState extends State<GameRootScope> {
       levels: root.levelRepository,
       settings: () => SettingsRootScope.of(context).settings,
       playerName: () =>
-          AccountRootScope.of(context).profile?.displayName ?? 'Игрок 1',
+          AccountRootScope.of(context).profile?.displayName ?? 'Player 1',
     )..add(const GameEvent$Load());
   }
 
@@ -53,15 +53,15 @@ class _GameRootScopeState extends State<GameRootScope> {
               previous.data.snapshot.history.length ||
           (previous.data.snapshot.status == GameStatus.playing &&
               current.data.snapshot.status == GameStatus.won) ||
-          (current.data.message.contains('заполнен') &&
-              current.data.message != previous.data.message);
+          (current.data.notice == GameNotice.columnFull &&
+              current.data.notice != previous.data.notice);
     },
     listener: (context, state) {
       if (state case GameState$Ready(:final data)) {
         final AppSettings settings = SettingsRootScope.of(context).settings;
         final SoundEffect effect = data.snapshot.status == GameStatus.won
             ? SoundEffect.win
-            : data.message.contains('заполнен')
+            : data.notice == GameNotice.columnFull
             ? SoundEffect.invalid
             : SoundEffect.place;
         RootScope.of(context).audioService

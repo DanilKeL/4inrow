@@ -11,6 +11,8 @@ sealed class OnlineTransportEvent {
   const new();
 }
 
+enum OnlineTransportFailure { invalidResponse, connectionLost }
+
 typedef OnlineSocketFactory = WebSocketChannel Function(
   Uri endpoint,
   Map<String, String>? headers,
@@ -27,8 +29,9 @@ final class OnlineTransportEvent$Message extends OnlineTransportEvent {
 }
 
 final class OnlineTransportEvent$Failure extends OnlineTransportEvent {
-  const new(this.message);
+  const new(this.message, {this.failure});
   final String message;
+  final OnlineTransportFailure? failure;
 }
 
 final class OnlineTransport {
@@ -199,7 +202,8 @@ final class OnlineTransport {
     } on FormatException {
       _events.add(
         const OnlineTransportEvent$Failure(
-          'Сервер прислал некорректный ответ.',
+          '',
+          failure: OnlineTransportFailure.invalidResponse,
         ),
       );
       return;
@@ -258,7 +262,8 @@ final class OnlineTransport {
     if (DateTime.now().difference(_retryStarted!) >= _reconnectLimit) {
       _events.add(
         const OnlineTransportEvent$Failure(
-          'Связь с сервером потеряна. Подключитесь снова.',
+          '',
+          failure: OnlineTransportFailure.connectionLost,
         ),
       );
       _emitStatus('error');

@@ -17,7 +17,7 @@ void main() {
             child: Center(
               child: AppToggle(
                 value: value,
-                semanticLabel: 'Анимации',
+                semanticLabel: 'Animations',
                 onChanged: (next) => setState(() => value = next),
               ),
             ),
@@ -31,7 +31,7 @@ void main() {
     await tester.pump(const Duration(milliseconds: 200));
     expect(value, isTrue);
     final SemanticsNode semantics = tester.getSemantics(find.byType(AppToggle));
-    expect(semantics.label, 'Анимации');
+    expect(semantics.label, 'Animations');
     expect(semantics.flagsCollection.isButton, isTrue);
     expect(semantics.flagsCollection.isToggled, Tristate.isTrue);
   });
@@ -44,8 +44,8 @@ void main() {
           builder: (context, setState) => Material(
             child: AppSegmentedControl<int>(
               options: const [
-                AppSegment(value: 1, label: 'Первый'),
-                AppSegment(value: 2, label: 'Второй'),
+                AppSegment(value: 1, label: 'First'),
+                AppSegment(value: 2, label: 'Second'),
               ],
               selected: selected,
               onChanged: (value) => setState(() => selected = value),
@@ -55,7 +55,7 @@ void main() {
       ),
     );
 
-    await tester.tap(find.text('Второй'));
+    await tester.tap(find.text('Second'));
     await tester.pump(const Duration(milliseconds: 180));
     expect(selected, 2);
   });

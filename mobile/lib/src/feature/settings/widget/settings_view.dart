@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
+import 'package:four3/l10n/generated/app_localizations.dart';
+import 'package:four3/src/app/locale_scope.dart';
 import 'package:four3/src/common/theme/app_theme.dart';
+import 'package:four3/src/common/utils/build_context_extension.dart';
 import 'package:four3/src/common/widget/app_controls.dart';
 import 'package:four3/src/feature/settings/bloc/settings_bloc.dart';
 import 'package:four3/src/feature/settings/model/app_settings.dart';
@@ -18,8 +21,13 @@ class SettingsView extends StatelessWidget {
       bloc: bloc,
       builder: (context, state) {
         final AppSettings settings = bloc.settings;
+        final AppLocalizations l10n = context.l10n;
         void update(AppSettings value) => bloc.add(SettingsEvent$Update(value));
         final items = <Widget>[
+          _SettingRow(
+            icon: LucideIcons.languages,
+            child: _LanguagePicker(scope: AppLocaleScope.of(context)),
+          ),
           _SettingRow(
             icon: LucideIcons.volume2,
             child: Column(
@@ -27,10 +35,10 @@ class SettingsView extends StatelessWidget {
               children: [
                 Row(
                   children: [
-                    const Expanded(
+                    Expanded(
                       child: Text(
-                        'Громкость звуков',
-                        style: TextStyle(
+                        l10n.soundVolume,
+                        style: const TextStyle(
                           fontSize: 12,
                           fontWeight: FontWeight.w700,
                         ),
@@ -51,9 +59,12 @@ class SettingsView extends StatelessWidget {
                       update(settings.copyWith(volume: value)),
                 ),
                 if (!settings.sound)
-                  const Text(
-                    'Звук выключен кнопкой в шапке',
-                    style: TextStyle(color: AppColors.muted, fontSize: 10),
+                  Text(
+                    l10n.soundDisabledInHeader,
+                    style: const TextStyle(
+                      color: AppColors.muted,
+                      fontSize: 10,
+                    ),
                   ),
               ],
             ),
@@ -61,22 +72,22 @@ class SettingsView extends StatelessWidget {
           _SettingSwitch(
             icon: LucideIcons.sparkles,
             value: settings.animations,
-            title: 'Анимации',
-            subtitle: 'Падение фишек и плавная камера',
+            title: l10n.animations,
+            subtitle: l10n.animationsDescription,
             onChanged: (value) => update(settings.copyWith(animations: value)),
           ),
           _SettingSwitch(
             icon: LucideIcons.mousePointer2,
             value: settings.hints,
-            title: 'Предпросмотр хода',
-            subtitle: 'Показывать фишку при наведении',
+            title: l10n.movePreview,
+            subtitle: l10n.movePreviewDescription,
             onChanged: (value) => update(settings.copyWith(hints: value)),
           ),
           _SettingSwitch(
             icon: LucideIcons.scanLine,
             value: settings.xrayDefault,
-            title: 'Рентген по умолчанию',
-            subtitle: 'Прозрачные фишки в новой партии',
+            title: l10n.xrayDefault,
+            subtitle: l10n.xrayDefaultDescription,
             onChanged: (value) => update(settings.copyWith(xrayDefault: value)),
           ),
         ];
@@ -96,6 +107,62 @@ class SettingsView extends StatelessWidget {
           },
         );
       },
+    );
+  }
+}
+
+class _LanguagePicker extends StatelessWidget {
+  const new({required this.scope});
+
+  final AppLocaleScope scope;
+
+  @override
+  Widget build(BuildContext context) {
+    final AppLocalizations l10n = context.l10n;
+    return Row(
+      children: [
+        Expanded(
+          child: Text(
+            l10n.language,
+            style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700),
+          ),
+        ),
+        DropdownButton<Locale?>(
+          value: scope.locale,
+          underline: const SizedBox.shrink(),
+          onChanged: scope.setLocale,
+          items: [
+            DropdownMenuItem(child: Text(l10n.systemLanguage)),
+            DropdownMenuItem(
+              value: const Locale('ru'),
+              child: Text(l10n.languageRussian),
+            ),
+            DropdownMenuItem(
+              value: const Locale('en'),
+              child: Text(l10n.languageEnglish),
+            ),
+            DropdownMenuItem(
+              value: const Locale('es'),
+              child: Text(l10n.languageSpanish),
+            ),
+            DropdownMenuItem(
+              value: const Locale('fr'),
+              child: Text(l10n.languageFrench),
+            ),
+            DropdownMenuItem(
+              value: const Locale.fromSubtags(
+                languageCode: 'pt',
+                countryCode: 'BR',
+              ),
+              child: Text(l10n.languagePortugueseBrazil),
+            ),
+            DropdownMenuItem(
+              value: const Locale('de'),
+              child: Text(l10n.languageGerman),
+            ),
+          ],
+        ),
+      ],
     );
   }
 }

@@ -1,8 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:four3/l10n/generated/app_localizations.dart';
+import 'package:four3/src/common/rest_client/rest_client.dart';
 import 'package:four3/src/common/theme/app_theme.dart';
+import 'package:four3/src/common/utils/build_context_extension.dart';
 import 'package:four3/src/common/widget/app_controls.dart';
 import 'package:four3/src/feature/account/bloc/account_bloc.dart';
+import 'package:four3/src/feature/account/data/account_repository.dart';
 import 'package:four3/src/feature/account/model/account_profile.dart';
 import 'package:four3/src/feature/account/widget/account_root_scope.dart';
 import 'package:four3/src/feature/match_history/bloc/match_history_bloc.dart';
@@ -72,9 +76,11 @@ class _AccountViewState extends State<AccountView> {
         final AccountProfile? profile = bloc.profile;
         final bool loading = state is AccountState$Loading;
         final String failure = state is AccountState$Failure
-            ? state.message
+            ? _accountFailure(context, state)
             : _localError;
-        final String notice = state is AccountState$Ready ? state.notice : '';
+        final String notice = state is AccountState$Ready
+            ? _accountNotice(context, state)
+            : '';
         if (state case AccountState$PasswordReset(:final token)) {
           return _resetView(bloc, token, loading, failure);
         }
@@ -97,7 +103,7 @@ class _AccountViewState extends State<AccountView> {
     child: Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        _ProfileIntro(name: profile?.guestName ?? 'Гость'),
+        _ProfileIntro(name: profile?.guestName ?? context.l10n.guest),
         if (notice.isNotEmpty) _Notice(notice),
         const SizedBox(height: 14),
         if (_mode != _AccountMode.forgot) ...[
@@ -111,15 +117,15 @@ class _AccountViewState extends State<AccountView> {
           ),
           const SizedBox(height: 16),
           _Field(
-            label: 'Имя пользователя',
+            label: context.l10n.username,
             controller: _username,
             autocorrect: false,
           ),
           if (_mode == _AccountMode.register) ...[
             const SizedBox(height: 5),
-            const Text(
-              'Английские буквы, цифры и _ · 3–24 символа',
-              style: TextStyle(fontSize: 9, color: AppColors.muted),
+            Text(
+              context.l10n.usernameHint,
+              style: const TextStyle(fontSize: 9, color: AppColors.muted),
             ),
             const SizedBox(height: 10),
             _Field(
@@ -130,11 +136,19 @@ class _AccountViewState extends State<AccountView> {
             ),
           ],
           const SizedBox(height: 10),
-          _Field(label: 'Пароль', controller: _password, obscureText: true),
+          _Field(
+            label: context.l10n.password,
+            controller: _password,
+            obscureText: true,
+          ),
         ] else ...[
-          const Text(
-            'Пришлём ссылку для создания нового пароля.',
-            style: TextStyle(color: AppColors.muted, fontSize: 11, height: 1.5),
+          Text(
+            context.l10n.forgotPasswordHint,
+            style: const TextStyle(
+              color: AppColors.muted,
+              fontSize: 11,
+              height: 1.5,
+            ),
           ),
           const SizedBox(height: 16),
           _Field(
@@ -151,12 +165,12 @@ class _AccountViewState extends State<AccountView> {
           child: Text(
             loading
                 ? _mode == _AccountMode.forgot
-                      ? 'Отправляем…'
-                      : 'Подождите…'
+                      ? context.l10n.sending
+                      : context.l10n.pleaseWait
                 : switch (_mode) {
-                    _AccountMode.register => 'Зарегистрироваться',
-                    _AccountMode.login => 'Войти',
-                    _AccountMode.forgot => 'Получить ссылку',
+                    _AccountMode.register => context.l10n.register,
+                    _AccountMode.login => context.l10n.signIn,
+                    _AccountMode.forgot => context.l10n.getLink,
                   },
           ),
         ),
@@ -164,7 +178,7 @@ class _AccountViewState extends State<AccountView> {
         if (_mode == _AccountMode.login) ...[
           OutlinedButton(
             onPressed: () => setState(() => _mode = _AccountMode.forgot),
-            child: const Text('Забыли пароль?'),
+            child: Text(context.l10n.forgotPassword),
           ),
           if (_email.text.trim().isNotEmpty || _username.text.trim().isNotEmpty)
             TextButton(
@@ -177,12 +191,12 @@ class _AccountViewState extends State<AccountView> {
                             : _email.text,
                       ),
                     ),
-              child: const Text('Отправить подтверждение ещё раз'),
+              child: Text(context.l10n.resendVerification),
             ),
         ] else if (_mode == _AccountMode.forgot)
           OutlinedButton(
             onPressed: () => setState(() => _mode = _AccountMode.login),
-            child: const Text('Вернуться ко входу'),
+            child: Text(context.l10n.returnToSignIn),
           ),
       ],
     ),
@@ -221,14 +235,14 @@ class _AccountViewState extends State<AccountView> {
                 TextButton.icon(
                   onPressed: widget.onHistory,
                   icon: const Icon(LucideIcons.history, size: 16),
-                  label: const Text('История'),
+                  label: Text(context.l10n.history),
                 ),
               TextButton.icon(
                 onPressed: loading
                     ? null
                     : () => bloc.add(const AccountEvent$Logout()),
                 icon: const Icon(LucideIcons.logOut, size: 16),
-                label: const Text('Выйти'),
+                label: Text(context.l10n.signOut),
               ),
             ],
           ),
@@ -243,20 +257,20 @@ class _AccountViewState extends State<AccountView> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                const Row(
+                Row(
                   children: [
-                    Icon(
+                    const Icon(
                       LucideIcons.lockKeyhole,
                       size: 20,
                       color: AppColors.accent,
                     ),
-                    SizedBox(width: 11),
+                    const SizedBox(width: 11),
                     Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          'СМЕНА ПАРОЛЯ',
-                          style: TextStyle(
+                          context.l10n.changePasswordUpper,
+                          style: const TextStyle(
                             color: AppColors.muted,
                             fontSize: 8,
                             fontWeight: FontWeight.w800,
@@ -264,8 +278,8 @@ class _AccountViewState extends State<AccountView> {
                           ),
                         ),
                         Text(
-                          'Обновите данные входа',
-                          style: TextStyle(
+                          context.l10n.updateCredentials,
+                          style: const TextStyle(
                             fontSize: 12,
                             fontWeight: FontWeight.w700,
                           ),
@@ -276,25 +290,25 @@ class _AccountViewState extends State<AccountView> {
                 ),
                 const SizedBox(height: 17),
                 _Field(
-                  label: 'Текущий пароль',
+                  label: context.l10n.currentPassword,
                   controller: _currentPassword,
                   obscureText: true,
                 ),
                 const SizedBox(height: 11),
                 _Field(
-                  label: 'Новый пароль',
+                  label: context.l10n.newPassword,
                   controller: _newPassword,
                   obscureText: true,
                   maxLength: 128,
                 ),
                 const SizedBox(height: 5),
-                const Text(
-                  'От 8 до 128 символов',
-                  style: TextStyle(color: AppColors.muted, fontSize: 8),
+                Text(
+                  context.l10n.passwordLengthHint,
+                  style: const TextStyle(color: AppColors.muted, fontSize: 8),
                 ),
                 const SizedBox(height: 11),
                 _Field(
-                  label: 'Повторите новый пароль',
+                  label: context.l10n.repeatNewPassword,
                   controller: _newPasswordRepeat,
                   obscureText: true,
                   maxLength: 128,
@@ -305,7 +319,9 @@ class _AccountViewState extends State<AccountView> {
                 FilledButton.icon(
                   onPressed: loading ? null : () => _changePassword(bloc),
                   icon: const Icon(LucideIcons.keyRound, size: 17),
-                  label: Text(loading ? 'Сохраняем…' : 'Изменить пароль'),
+                  label: Text(
+                    loading ? context.l10n.saving : context.l10n.changePassword,
+                  ),
                 ),
               ],
             ),
@@ -324,15 +340,23 @@ class _AccountViewState extends State<AccountView> {
     child: Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        const Text(
-          'Задайте новый пароль для аккаунта.',
-          style: TextStyle(color: AppColors.muted, fontSize: 11, height: 1.5),
+        Text(
+          context.l10n.setNewPasswordHint,
+          style: const TextStyle(
+            color: AppColors.muted,
+            fontSize: 11,
+            height: 1.5,
+          ),
         ),
         const SizedBox(height: 16),
-        _Field(label: 'Новый пароль', controller: _password, obscureText: true),
+        _Field(
+          label: context.l10n.newPassword,
+          controller: _password,
+          obscureText: true,
+        ),
         const SizedBox(height: 10),
         _Field(
-          label: 'Повторите пароль',
+          label: context.l10n.repeatPassword,
           controller: _passwordRepeat,
           obscureText: true,
         ),
@@ -340,7 +364,9 @@ class _AccountViewState extends State<AccountView> {
         const SizedBox(height: 16),
         FilledButton(
           onPressed: loading ? null : () => _completeReset(bloc, token),
-          child: Text(loading ? 'Сохраняем…' : 'Изменить пароль'),
+          child: Text(
+            loading ? context.l10n.saving : context.l10n.changePassword,
+          ),
         ),
       ],
     ),
@@ -351,14 +377,9 @@ class _AccountViewState extends State<AccountView> {
     switch (_mode) {
       case _AccountMode.register:
         if (!RegExp(r'^[A-Za-z0-9_]{3,24}$').hasMatch(_username.text.trim())) {
-          setState(
-            () => _localError =
-                'Используйте 3–24 английские буквы, цифры или символ _.',
-          );
+          setState(() => _localError = context.l10n.usernameValidation);
         } else if (_password.text.length < 8) {
-          setState(
-            () => _localError = 'Пароль должен содержать от 8 символов.',
-          );
+          setState(() => _localError = context.l10n.passwordMinValidation);
         } else {
           bloc.add(
             AccountEvent$Register(_username.text, _email.text, _password.text),
@@ -375,8 +396,8 @@ class _AccountViewState extends State<AccountView> {
     if (_password.text.length < 8 || _password.text != _passwordRepeat.text) {
       setState(
         () => _localError = _password.text.length < 8
-            ? 'Пароль должен содержать от 8 символов.'
-            : 'Пароли не совпадают.',
+            ? context.l10n.passwordMinValidation
+            : context.l10n.passwordMismatch,
       );
       return;
     }
@@ -391,10 +412,10 @@ class _AccountViewState extends State<AccountView> {
       setState(
         () => _localError =
             _newPassword.text.length < 8 || _newPassword.text.length > 128
-            ? 'Новый пароль должен содержать от 8 до 128 символов.'
+            ? context.l10n.newPasswordValidation
             : _newPassword.text != _newPasswordRepeat.text
-            ? 'Новые пароли не совпадают.'
-            : 'Новый пароль должен отличаться от текущего.',
+            ? context.l10n.newPasswordsMismatch
+            : context.l10n.passwordMustDiffer,
       );
       return;
     }
@@ -439,9 +460,9 @@ class _ProfileIntro extends StatelessWidget {
           Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text(
-                'ТЕКУЩИЙ ПРОФИЛЬ',
-                style: TextStyle(
+              Text(
+                context.l10n.currentProfileUpper,
+                style: const TextStyle(
                   fontSize: 8,
                   letterSpacing: 1.2,
                   fontWeight: FontWeight.w800,
@@ -471,9 +492,9 @@ class _AuthTabs extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Row(
     children: [
-      for (final (_AccountMode value, String label) in const [
-        (_AccountMode.register, 'Регистрация'),
-        (_AccountMode.login, 'Вход'),
+      for (final (_AccountMode value, String label) in [
+        (_AccountMode.register, context.l10n.registration),
+        (_AccountMode.login, context.l10n.login),
       ]) ...[
         if (value != _AccountMode.register) const SizedBox(width: 8),
         Expanded(
@@ -507,12 +528,16 @@ class _SignedTabs extends StatelessWidget {
   final ValueChanged<bool> onChanged;
   @override
   Widget build(BuildContext context) => AppSegmentedControl<bool>(
-    options: const [
-      AppSegment(value: false, icon: LucideIcons.activity, label: 'Обзор'),
+    options: [
+      AppSegment(
+        value: false,
+        icon: LucideIcons.activity,
+        label: context.l10n.overview,
+      ),
       AppSegment(
         value: true,
         icon: LucideIcons.shieldCheck,
-        label: 'Безопасность',
+        label: context.l10n.security,
       ),
     ],
     selected: security,
@@ -561,9 +586,9 @@ class _SignedProfile extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text(
-                    'ПРОФИЛЬ ИГРОКА',
-                    style: TextStyle(
+                  Text(
+                    context.l10n.playerProfileUpper,
+                    style: const TextStyle(
                       fontSize: 8,
                       letterSpacing: 1.2,
                       color: AppColors.muted,
@@ -585,7 +610,7 @@ class _SignedProfile extends StatelessWidget {
                       const SizedBox(width: 5),
                       Flexible(
                         child: Text(
-                          profile.email ?? 'Локальный аккаунт',
+                          profile.email ?? context.l10n.localAccount,
                           overflow: TextOverflow.ellipsis,
                           style: const TextStyle(
                             color: AppColors.muted,
@@ -656,7 +681,10 @@ class _OverviewData extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final (String, int, int, String) league = _league(data.rating.points);
+    final (String, int, int, String) league = _league(
+      context,
+      data.rating.points,
+    );
     final double progress =
         ((data.rating.points - league.$2) / (league.$3 - league.$2))
             .clamp(0, 1)
@@ -685,9 +713,9 @@ class _OverviewData extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text(
-                      'РЕЙТИНГ',
-                      style: TextStyle(
+                    Text(
+                      context.l10n.ratingUpper,
+                      style: const TextStyle(
                         color: Color(0xFFDBE3FF),
                         fontSize: 8,
                         fontWeight: FontWeight.w800,
@@ -750,7 +778,10 @@ class _OverviewData extends StatelessWidget {
           ),
           const SizedBox(height: 7),
           Text(
-            '${(league.$3 - data.rating.points).clamp(0, 9999)} очков до уровня «${league.$4}»',
+            context.l10n.pointsToLeague(
+              (league.$3 - data.rating.points).clamp(0, 9999),
+              league.$4,
+            ),
             style: const TextStyle(color: Color(0xFFDBE3FF), fontSize: 8),
           ),
         ],
@@ -773,9 +804,9 @@ class _OverviewData extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text(
-                      'КАРЬЕРА',
-                      style: TextStyle(
+                    Text(
+                      context.l10n.careerUpper,
+                      style: const TextStyle(
                         color: AppColors.muted,
                         fontSize: 8,
                         fontWeight: FontWeight.w800,
@@ -783,7 +814,7 @@ class _OverviewData extends StatelessWidget {
                       ),
                     ),
                     Text(
-                      '${data.rating.games} рейтинговых партий',
+                      context.l10n.ratedMatches(data.rating.games),
                       style: const TextStyle(
                         fontSize: 11,
                         fontWeight: FontWeight.w700,
@@ -798,10 +829,10 @@ class _OverviewData extends StatelessWidget {
           SizedBox(height: compact ? 8 : 13),
           Row(
             children: [
-              _MiniStat('${data.statistics.total}', 'Партий'),
-              _MiniStat('${data.statistics.wins}', 'Побед'),
-              _MiniStat('$winRate%', 'Винрейт'),
-              _MiniStat('${data.statistics.losses}', 'Поражений'),
+              _MiniStat('${data.statistics.total}', context.l10n.matchesStat),
+              _MiniStat('${data.statistics.wins}', context.l10n.winsStat),
+              _MiniStat('$winRate%', context.l10n.winRate),
+              _MiniStat('${data.statistics.losses}', context.l10n.lossesStat),
             ],
           ),
         ],
@@ -836,13 +867,13 @@ class _OverviewData extends StatelessWidget {
               children: [
                 Row(
                   children: [
-                    const Expanded(
+                    Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            'ПОСЛЕДНИЕ ПАРТИИ',
-                            style: TextStyle(
+                            context.l10n.recentMatchesUpper,
+                            style: const TextStyle(
                               color: AppColors.muted,
                               fontSize: 8,
                               fontWeight: FontWeight.w800,
@@ -850,8 +881,8 @@ class _OverviewData extends StatelessWidget {
                             ),
                           ),
                           Text(
-                            'Недавняя форма',
-                            style: TextStyle(
+                            context.l10n.recentForm,
+                            style: const TextStyle(
                               fontSize: 12,
                               fontWeight: FontWeight.w700,
                             ),
@@ -864,26 +895,29 @@ class _OverviewData extends StatelessWidget {
                         onPressed: onHistory,
                         iconAlignment: IconAlignment.end,
                         icon: const Icon(LucideIcons.chevronRight, size: 15),
-                        label: const Text(
-                          'Вся история',
-                          style: TextStyle(fontSize: 10),
+                        label: Text(
+                          context.l10n.fullHistory,
+                          style: const TextStyle(fontSize: 10),
                         ),
                       ),
                   ],
                 ),
                 const SizedBox(height: 9),
                 if (data.matches.isEmpty)
-                  const DecoratedBox(
-                    decoration: BoxDecoration(
+                  DecoratedBox(
+                    decoration: const BoxDecoration(
                       color: Color(0xFFF3F5F0),
                       borderRadius: BorderRadius.all(Radius.circular(9)),
                     ),
                     child: Padding(
-                      padding: EdgeInsets.all(12),
+                      padding: const EdgeInsets.all(12),
                       child: Text(
-                        'Завершите первую партию — здесь появится ваша игровая форма.',
+                        context.l10n.firstMatchHint,
                         textAlign: TextAlign.center,
-                        style: TextStyle(color: AppColors.muted, fontSize: 10),
+                        style: const TextStyle(
+                          color: AppColors.muted,
+                          fontSize: 10,
+                        ),
                       ),
                     ),
                   )
@@ -962,10 +996,10 @@ class _RecentMatch extends StatelessWidget {
             ),
             child: Text(
               draw
-                  ? 'Н'
+                  ? context.l10n.drawShort
                   : won
-                  ? 'В'
-                  : 'П',
+                  ? context.l10n.winShort
+                  : context.l10n.lossShort,
               style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w700),
             ),
           ),
@@ -973,10 +1007,10 @@ class _RecentMatch extends StatelessWidget {
           Expanded(
             child: Text(
               draw
-                  ? 'Ничья'
+                  ? context.l10n.draw
                   : won
-                  ? 'Победа'
-                  : 'Поражение',
+                  ? context.l10n.win
+                  : context.l10n.loss,
               style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 10),
             ),
           ),
@@ -997,12 +1031,43 @@ class _RecentMatch extends StatelessWidget {
   }
 }
 
-(String, int, int, String) _league(int points) {
-  if (points < 900) return ('Бронза', 600, 900, 'Серебро');
-  if (points < 1100) return ('Серебро', 900, 1100, 'Золото');
-  if (points < 1300) return ('Золото', 1100, 1300, 'Платина');
-  if (points < 1500) return ('Платина', 1300, 1500, 'Мастер');
-  return ('Мастер', 1500, 1800, 'Высшая лига');
+(String, int, int, String) _league(BuildContext context, int points) {
+  final AppLocalizations l10n = context.l10n;
+  if (points < 900) {
+    return (l10n.leagueBronze, 600, 900, l10n.leagueSilver);
+  }
+  if (points < 1100) {
+    return (l10n.leagueSilver, 900, 1100, l10n.leagueGold);
+  }
+  if (points < 1300) {
+    return (l10n.leagueGold, 1100, 1300, l10n.leaguePlatinum);
+  }
+  if (points < 1500) {
+    return (l10n.leaguePlatinum, 1300, 1500, l10n.leagueMaster);
+  }
+  return (l10n.leagueMaster, 1500, 1800, l10n.leagueTop);
+}
+
+String _accountNotice(BuildContext context, AccountState$Ready state) {
+  if (state.notice.isNotEmpty) return state.notice;
+  return switch (state.clientNotice) {
+    AccountNotice.emailVerified => context.l10n.emailVerified,
+    AccountNotice.passwordChanged => context.l10n.passwordChanged,
+    AccountNotice.accountCreatedVerify => context.l10n.accountCreatedVerify,
+    AccountNotice.emailSent => context.l10n.emailSent,
+    AccountNotice.passwordResetSent => context.l10n.passwordResetSent,
+    null => '',
+  };
+}
+
+String _accountFailure(BuildContext context, AccountState$Failure state) {
+  if (state.message.isNotEmpty) return state.message;
+  return switch (state.failure) {
+    RestClientFailure.network => context.l10n.networkError,
+    RestClientFailure.invalidResponse => context.l10n.invalidServerResponse,
+    RestClientFailure.wrongType => context.l10n.serverWrongType,
+    RestClientFailure.server || null => context.l10n.genericServerError,
+  };
 }
 
 class _Field extends StatelessWidget {

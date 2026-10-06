@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:four3/l10n/generated/app_localizations.dart';
 import 'package:four3/src/common/theme/app_theme.dart';
+import 'package:four3/src/common/utils/build_context_extension.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:video_player/video_player.dart';
 
@@ -11,43 +13,13 @@ final class _Lesson {
   final String description;
 }
 
-const _lessons = [
-  _Lesson(
-    'stacking',
-    'Как ходить',
-    'Фишки встают друг на друга',
-    'Нажмите на лунку — фишка займёт нижнее свободное место. Ходы чередуются. В одном столбце помещается до пяти фишек.',
-  ),
-  _Lesson(
-    'horizontal',
-    'Горизонталь',
-    'Четыре на одном уровне',
-    'Четыре фишки одного цвета стоят подряд в соседних столбцах. Такая линия может идти вдоль любой стороны доски и на любой высоте.',
-  ),
-  _Lesson(
-    'vertical',
-    'Вертикаль',
-    'Четыре в одном столбце',
-    'Соберите четыре фишки своего цвета друг над другом. Фишка соперника внутри столбца разрывает линию.',
-  ),
-  _Lesson(
-    'diagonal-flat',
-    'Диагональ слоя',
-    'По диагонали одного слоя',
-    'Каждая следующая фишка смещена на одну лунку в двух направлениях. Высота остаётся одинаковой.',
-  ),
-  _Lesson(
-    'diagonal-third-layer',
-    'Диагональ на высоте',
-    'Победа на любом слое',
-    'Соберите четыре фишки по диагонали на одной высоте. Такая линия побеждает на любом слое, а цвет опор снизу не важен.',
-  ),
-  _Lesson(
-    'diagonal-space',
-    'Объёмная диагональ',
-    'Четыре через пространство',
-    'Каждая следующая фишка смещена на одну лунку в обоих направлениях и на один уровень вверх. Это тоже прямая линия и победа.',
-  ),
+const _lessonIds = [
+  'stacking',
+  'horizontal',
+  'vertical',
+  'diagonal-flat',
+  'diagonal-third-layer',
+  'diagonal-space',
 ];
 
 class TutorialView extends StatefulWidget {
@@ -86,9 +58,9 @@ class _TutorialViewState extends State<TutorialView> {
     final VideoPlayerController? previous = _video;
     _video = null;
     await previous?.dispose();
-    final _Lesson lesson = _lessons[_selected];
+    final String lessonId = _lessonIds[_selected];
     final controller = VideoPlayerController.asset(
-      'assets/tutorial/${lesson.id}.mp4',
+      'assets/tutorial/$lessonId.mp4',
     );
     try {
       await controller.initialize();
@@ -119,22 +91,27 @@ class _TutorialViewState extends State<TutorialView> {
 
   @override
   Widget build(BuildContext context) {
-    final _Lesson lesson = _lessons[_selected];
+    final List<_Lesson> lessons = _localizedLessons(context);
+    final _Lesson lesson = lessons[_selected];
     final bool landscape =
         MediaQuery.orientationOf(context) == Orientation.landscape &&
         MediaQuery.sizeOf(context).height <= 700;
-    const Widget goal = Text.rich(
+    final Widget goal = Text.rich(
       TextSpan(
         children: [
-          TextSpan(text: 'Соберите '),
+          TextSpan(text: context.l10n.tutorialGoalBefore),
           TextSpan(
-            text: '4 фишки своего цвета',
-            style: TextStyle(fontWeight: FontWeight.w800),
+            text: context.l10n.tutorialGoalStrong,
+            style: const TextStyle(fontWeight: FontWeight.w800),
           ),
-          TextSpan(text: ' по прямой, без пропусков.'),
+          TextSpan(text: context.l10n.tutorialGoalAfter),
         ],
       ),
-      style: TextStyle(color: Color(0xFF626860), fontSize: 12, height: 1.5),
+      style: const TextStyle(
+        color: Color(0xFF626860),
+        fontSize: 12,
+        height: 1.5,
+      ),
     );
     if (landscape) {
       return Column(
@@ -148,7 +125,7 @@ class _TutorialViewState extends State<TutorialView> {
                 SizedBox(
                   key: const ValueKey('tutorial-selector'),
                   width: 170,
-                  child: _lessonButtons(vertical: true),
+                  child: _lessonButtons(context, lessons, vertical: true),
                 ),
                 const SizedBox(width: 16),
                 Expanded(
@@ -164,7 +141,7 @@ class _TutorialViewState extends State<TutorialView> {
             ),
           ),
           const SizedBox(height: 6),
-          _footer(),
+          _footer(context),
         ],
       );
     }
@@ -175,21 +152,25 @@ class _TutorialViewState extends State<TutorialView> {
         SizedBox(
           key: const ValueKey('tutorial-selector'),
           height: 78,
-          child: _lessonButtons(vertical: false),
+          child: _lessonButtons(context, lessons, vertical: false),
         ),
         const SizedBox(height: 10),
         Expanded(child: _media(lesson)),
         const SizedBox(height: 10),
         _caption(context, lesson),
         const SizedBox(height: 8),
-        _footer(),
+        _footer(context),
       ],
     );
   }
 
-  Widget _lessonButtons({required bool vertical}) {
+  Widget _lessonButtons(
+    BuildContext context,
+    List<_Lesson> lessons, {
+    required bool vertical,
+  }) {
     final List<Widget> buttons = [
-      for (var index = 0; index < _lessons.length; index++)
+      for (var index = 0; index < lessons.length; index++)
         OutlinedButton(
           onPressed: () {
             setState(() => _selected = index);
@@ -212,8 +193,8 @@ class _TutorialViewState extends State<TutorialView> {
           ),
           child: Text(
             vertical
-                ? '${(index + 1).toString().padLeft(2, '0')}  ${_lessons[index].tab}'
-                : _lessons[index].tab,
+                ? '${(index + 1).toString().padLeft(2, '0')}  ${lessons[index].tab}'
+                : lessons[index].tab,
             maxLines: 1,
             style: const TextStyle(fontSize: 9),
           ),
@@ -278,8 +259,8 @@ class _TutorialViewState extends State<TutorialView> {
                         children: [
                           IconButton(
                             tooltip: _video!.value.isPlaying
-                                ? 'Остановить пример'
-                                : 'Воспроизвести пример',
+                                ? context.l10n.pauseExample
+                                : context.l10n.playExample,
                             onPressed: () async {
                               if (_video!.value.isPlaying) {
                                 await _video!.pause();
@@ -301,7 +282,7 @@ class _TutorialViewState extends State<TutorialView> {
                           ),
                           Expanded(
                             child: Semantics(
-                              label: 'Позиция ролика',
+                              label: context.l10n.videoPosition,
                               child: VideoProgressIndicator(
                                 _video!,
                                 allowScrubbing: true,
@@ -312,7 +293,7 @@ class _TutorialViewState extends State<TutorialView> {
                             ),
                           ),
                           IconButton(
-                            tooltip: 'Повторить пример',
+                            tooltip: context.l10n.replayExample,
                             onPressed: () async {
                               await _video!.seekTo(Duration.zero);
                               _ended = false;
@@ -341,9 +322,9 @@ class _TutorialViewState extends State<TutorialView> {
                   color: const Color(0xE8FAFBF7),
                   borderRadius: BorderRadius.circular(20),
                 ),
-                child: const Text(
-                  '4 в ряд — победа',
-                  style: TextStyle(
+                child: Text(
+                  context.l10n.fourInRowWin,
+                  style: const TextStyle(
                     color: AppColors.accent,
                     fontSize: 11,
                     fontWeight: FontWeight.w700,
@@ -352,14 +333,14 @@ class _TutorialViewState extends State<TutorialView> {
               ),
             ),
           if (_failed)
-            const Positioned(
+            Positioned(
               left: 8,
               right: 8,
               bottom: 4,
               child: Text(
-                'Видео недоступно. Показан итоговый пример.',
+                context.l10n.videoUnavailable,
                 textAlign: TextAlign.center,
-                style: TextStyle(fontSize: 11),
+                style: const TextStyle(fontSize: 11),
               ),
             ),
         ],
@@ -395,27 +376,27 @@ class _TutorialViewState extends State<TutorialView> {
     ],
   );
 
-  Widget _footer() => Row(
+  Widget _footer(BuildContext context) => Row(
     mainAxisAlignment: MainAxisAlignment.spaceBetween,
     children: [
       TextButton.icon(
         onPressed: () {
-          setState(() => _selected = (_selected + 1) % _lessons.length);
+          setState(() => _selected = (_selected + 1) % _lessonIds.length);
           if (widget.loadVideos) _load();
         },
         iconAlignment: IconAlignment.end,
         icon: const Icon(LucideIcons.arrowRight, size: 16),
         label: Text(
-          _selected == _lessons.length - 1
-              ? 'К первому примеру'
-              : 'Следующий пример',
+          _selected == _lessonIds.length - 1
+              ? context.l10n.firstExample
+              : context.l10n.nextExample,
           style: const TextStyle(fontSize: 11),
         ),
       ),
       const SizedBox(width: 8),
       FilledButton(
         onPressed: widget.onDone ?? () => Navigator.maybePop(context),
-        child: Text(widget.starting ? 'Начать' : 'Понятно'),
+        child: Text(widget.starting ? context.l10n.start : context.l10n.gotIt),
       ),
     ],
   );
@@ -425,4 +406,46 @@ class _TutorialViewState extends State<TutorialView> {
     _video?.dispose();
     super.dispose();
   }
+}
+
+List<_Lesson> _localizedLessons(BuildContext context) {
+  final AppLocalizations l10n = context.l10n;
+  return [
+    _Lesson(
+      _lessonIds[0],
+      l10n.tutorialMoveTab,
+      l10n.tutorialMoveTitle,
+      l10n.tutorialMoveBody,
+    ),
+    _Lesson(
+      _lessonIds[1],
+      l10n.tutorialHorizontalTab,
+      l10n.tutorialHorizontalTitle,
+      l10n.tutorialHorizontalBody,
+    ),
+    _Lesson(
+      _lessonIds[2],
+      l10n.tutorialVerticalTab,
+      l10n.tutorialVerticalTitle,
+      l10n.tutorialVerticalBody,
+    ),
+    _Lesson(
+      _lessonIds[3],
+      l10n.tutorialLayerDiagonalTab,
+      l10n.tutorialLayerDiagonalTitle,
+      l10n.tutorialLayerDiagonalBody,
+    ),
+    _Lesson(
+      _lessonIds[4],
+      l10n.tutorialRaisedDiagonalTab,
+      l10n.tutorialRaisedDiagonalTitle,
+      l10n.tutorialRaisedDiagonalBody,
+    ),
+    _Lesson(
+      _lessonIds[5],
+      l10n.tutorialSpaceDiagonalTab,
+      l10n.tutorialSpaceDiagonalTitle,
+      l10n.tutorialSpaceDiagonalBody,
+    ),
+  ];
 }

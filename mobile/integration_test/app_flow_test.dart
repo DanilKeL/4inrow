@@ -48,20 +48,20 @@ void main() {
         .map((widget) => widget.data)
         .toList(growable: false);
     expect(
-      find.text('Четыре в ряд'),
+      find.text('Four in a row'),
       findsOneWidget,
       reason: 'Rendered texts: $visibleTexts; phase: ${bloc.data?.phase}',
     );
     await binding.takeScreenshot('menu-portrait');
 
-    await tester.tap(find.text('Вдвоём'));
+    await tester.tap(find.text('Two players'));
     await tester.pump(const Duration(milliseconds: 300));
-    expect(find.text('Новая игра'), findsOneWidget);
-    await tester.tap(find.text('Начать игру'));
+    expect(find.text('New game'), findsOneWidget);
+    await tester.tap(find.text('Start game'));
     await tester.pump(const Duration(seconds: 1));
 
-    if (find.text('Как играть').evaluate().isNotEmpty) {
-      await tester.tap(find.text('Начать'));
+    if (find.text('How to play').evaluate().isNotEmpty) {
+      await tester.tap(find.text('Start'));
       await tester.pump(const Duration(seconds: 1));
     }
 
@@ -88,17 +88,17 @@ void main() {
     await binding.takeScreenshot('local-game-center-move');
     expect(tester.takeException(), isNull);
 
-    await tester.tap(find.byTooltip('Пауза'));
+    await tester.tap(find.byTooltip('Pause'));
     await tester.pump(const Duration(milliseconds: 300));
-    expect(find.text('Время остановлено.'), findsOneWidget);
-    await tester.tap(find.text('Главное меню'));
+    expect(find.text('Time is stopped.'), findsOneWidget);
+    await tester.tap(find.text('Main menu'));
     await tester.pump(const Duration(milliseconds: 500));
-    if (find.text('Завершить текущую партию?').evaluate().isNotEmpty) {
-      await tester.tap(find.text('Выйти в меню'));
+    if (find.text('End the current game?').evaluate().isNotEmpty) {
+      await tester.tap(find.text('Exit to menu'));
       await tester.pump(const Duration(milliseconds: 500));
     }
     expect(bloc.data?.phase, GamePhase.menu);
-    expect(find.text('Четыре в ряд'), findsOneWidget);
+    expect(find.text('Four in a row'), findsOneWidget);
 
     bloc.add(
       GameEvent$ReplaySaved(
@@ -116,7 +116,7 @@ void main() {
           MoveCandidate(1, 1),
           MoveCandidate(3, 3),
         ]),
-        names: const ['Игрок 1', 'Игрок 2'],
+        names: const ['Player 1', 'Player 2'],
       ),
     );
     await tester.pump(const Duration(milliseconds: 500));
@@ -136,7 +136,7 @@ void main() {
           MoveCandidate(2, 4),
           MoveCandidate(3, 0),
         ]),
-        names: const ['Игрок 1', 'Игрок 2'],
+        names: const ['Player 1', 'Player 2'],
       ),
     );
     await tester.pump(const Duration(milliseconds: 500));
@@ -147,18 +147,18 @@ void main() {
     await tester.pump(const Duration(milliseconds: 500));
     await tester.tap(find.byIcon(LucideIcons.userRound).first);
     await tester.pump(const Duration(milliseconds: 300));
-    expect(find.text('Личный кабинет'), findsOneWidget);
-    expect(find.text('ТЕКУЩИЙ ПРОФИЛЬ'), findsOneWidget);
-    expect(find.text('Регистрация'), findsOneWidget);
+    expect(find.text('Account'), findsOneWidget);
+    expect(find.text('CURRENT PROFILE'), findsOneWidget);
+    expect(find.text('Registration'), findsOneWidget);
     await binding.takeScreenshot('account-guest-portrait');
     expect(tester.takeException(), isNull);
-    await tester.tap(find.byTooltip('Закрыть'));
+    await tester.tap(find.byTooltip('Close'));
     await tester.pump(const Duration(milliseconds: 300));
 
     await tester.tap(find.byIcon(LucideIcons.settings2));
     await tester.pump(const Duration(milliseconds: 300));
-    expect(find.text('Настройки'), findsOneWidget);
-    expect(find.text('Предпросмотр хода'), findsOneWidget);
+    expect(find.text('Settings'), findsOneWidget);
+    expect(find.text('Move preview'), findsOneWidget);
     await binding.takeScreenshot('settings-portrait');
     expect(tester.takeException(), isNull);
   });

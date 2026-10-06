@@ -1,0 +1,495 @@
+{
+  "@@locale": "pt_BR",
+  "appTitle": "FOUR³",
+  "close": "Fechar",
+  "retry": "Tente novamente",
+  "retryShort": "Tentar novamente",
+  "back": "Voltar",
+  "next": "Próximo",
+  "save": "Salvar",
+  "delete": "Excluir",
+  "cancel": "Cancelar",
+  "continueAction": "Continuar",
+  "settings": "Configurações",
+  "mainMenu": "Menu principal",
+  "toMainMenu": "Ir ao menu principal",
+  "levels": "Níveis",
+  "history": "História",
+  "online": "On-line",
+  "versusAi": "Contra a IA",
+  "twoPlayers": "Dois jogadores",
+  "guest": "Convidado",
+  "player": "Jogador",
+  "playerOne": "Jogador 1",
+  "playerTwo": "Jogador 2",
+  "you": "Você",
+  "bot": "Robô",
+  "opponent": "adversário",
+  "win": "Vitória",
+  "loss": "Derrota",
+  "draw": "Empate",
+  "loadingGame": "Carregando jogo",
+  "loadingBoard": "Tabuleiro e peças…",
+  "loadBoardFailed": "Não foi possível carregar a placa",
+  "checkConnection": "Verifique sua conexão e tente novamente.",
+  "newGame": "Novo jogo",
+  "howToPlay": "Como jogar",
+  "account": "Conta",
+  "matchHistory": "Histórico de partidas",
+  "turnOffSound": "Desligue o som",
+  "turnOnSound": "Ativar som",
+  "gameName": "Quatro seguidas",
+  "gameTagline": "Um jogo clássico em uma nova terceira dimensão",
+  "rankedGame": "Jogo classificado",
+  "playerRating": "Tabela de classificação dos jogadores",
+  "difficulty": "Dificuldade",
+  "easy": "Fácil",
+  "medium": "Médio",
+  "hard": "Duro",
+  "sameDevice": "No mesmo dispositivo",
+  "threeDifficulties": "Três níveis de dificuldade",
+  "lobbyCodeMode": "Com um código de lobby",
+  "playingAs": "Você está jogando como",
+  "secondPlayer": "Segundo jogador:",
+  "startGame": "Iniciar jogo",
+  "language": "Linguagem",
+  "systemLanguage": "Sistema",
+  "languageRussian": "Русский",
+  "languageEnglish": "English",
+  "languageSpanish": "Español",
+  "languageFrench": "Français",
+  "languagePortugueseBrazil": "Português (Brasil)",
+  "languageGerman": "Deutsch",
+  "soundVolume": "Volume do som",
+  "soundDisabledInHeader": "O som está desligado no cabeçalho",
+  "animations": "Animações",
+  "animationsDescription": "Pedaços caindo e câmera suave",
+  "movePreview": "Visualização da movimentação",
+  "movePreviewDescription": "Mostre uma peça antes de colocá-la",
+  "xrayDefault": "Raio X por padrão",
+  "xrayDefaultDescription": "Peças transparentes em um novo jogo",
+  "settingsSaveFailed": "Não foi possível salvar as configurações.",
+  "botMoving": "O bot está se movendo…",
+  "aiThinking": "IA está pensando…",
+  "moveCompleted": "Movimento concluído",
+  "pause": "Pausa",
+  "replayMove": "Repetir · mover {move}",
+  "@replayMove": {
+    "placeholders": {
+      "move": {
+        "type": "int"
+      }
+    }
+  },
+  "gameFinished": "Jogo terminado",
+  "noConnection": "Sem conexão",
+  "waitingForOpponent": "Esperando pelo adversário",
+  "waitingForOpponentEllipsis": "Esperando pelo adversário…",
+  "waitingForConnection": "Aguardando conexão",
+  "yourTurn": "Sua vez",
+  "opponentTurn": "A vez do oponente",
+  "playerTurn": "A vez de {name}",
+  "@playerTurn": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "levelNumber": "Nível {level}",
+  "@levelNumber": {
+    "placeholders": {
+      "level": {
+        "type": "int"
+      }
+    }
+  },
+  "secondsShort": "é",
+  "connectionClosed": "Conexão fechada",
+  "reconnecting": "Reconectando…",
+  "shareLobbyCode": "Compartilhe o código com um amigo – esperando pelo jogador dois",
+  "opponentDisconnected": "Oponente desconectado. Esperando eles voltarem...",
+  "playingGraphite": "Você é grafite · ●",
+  "playingLight": "Você é luz · ○",
+  "ratingValue": "Classificação: {value}",
+  "@ratingValue": {
+    "placeholders": {
+      "value": {
+        "type": "int"
+      }
+    }
+  },
+  "rankedGameUpper": "JOGO CLASSIFICADO",
+  "lobbyUpper": "SALÃO",
+  "copyLobbyCode": "Copiar código do lobby",
+  "codeCopied": "Código copiado",
+  "leaveLobby": "Sair do lobby",
+  "exitLobby": "Sair do lobby",
+  "undo": "Desfazer",
+  "xray": "raio X",
+  "view": "Visualizar",
+  "moves": "{count, plural, =0{0 jogadas} =1{1 jogada} other{{count} jogadas}}",
+  "@moves": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "pauseRequest": "Pausar solicitação",
+  "twoMinutePause": "Pausa · 2 minutos",
+  "pauseReadyHint": "O jogo recomeça assim que ambos os jogadores estiverem prontos. Caso contrário, o tempo esgota-se.",
+  "youAreReady": "Você está pronto",
+  "ready": "Preparar",
+  "waitingOpponentReady": "Esperando que o oponente esteja pronto.",
+  "opponentReady": "O oponente está pronto.",
+  "waitingOpponentApproval": "Aguardando a aprovação do oponente.",
+  "playerOffersPause": "{name} oferece uma pausa de dois minutos.",
+  "@playerOffersPause": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "pauseAnswerTime": "Responda dentro de {seconds} s. O jogo continua até ser aceito.",
+  "@pauseAnswerTime": {
+    "placeholders": {
+      "seconds": {
+        "type": "int"
+      }
+    }
+  },
+  "acceptPause": "Aceitar pausa",
+  "cancelRequest": "Cancelar solicitação",
+  "decline": "Declínio",
+  "rankedMatchFinished": "JOGO CLASSIFICADO TERMINADO",
+  "youBeatOpponent": "Você venceu {opponent}",
+  "@youBeatOpponent": {
+    "placeholders": {
+      "opponent": {
+        "type": "String"
+      }
+    }
+  },
+  "youBeatFallbackOpponent": "Você venceu o adversário",
+  "opponentWon": "{opponent} venceu esta partida",
+  "@opponentWon": {
+    "placeholders": {
+      "opponent": {
+        "type": "String"
+      }
+    }
+  },
+  "fallbackOpponentWon": "O adversário venceu esta partida",
+  "evenMatch": "Empate com {opponent}",
+  "@evenMatch": {
+    "placeholders": {
+      "opponent": {
+        "type": "String"
+      }
+    }
+  },
+  "evenMatchWithFallbackOpponent": "Empate com o adversário",
+  "eloChange": "MUDANÇA ELO",
+  "waitingOpponentDecision": "Aguardando a decisão do adversário",
+  "playAgainWith": "Jogue novamente com {opponent}",
+  "@playAgainWith": {
+    "placeholders": {
+      "opponent": {
+        "type": "String"
+      }
+    }
+  },
+  "playAgainWithFallbackOpponent": "Jogue novamente com o adversário",
+  "opponentOffline": "O oponente está offline",
+  "rematchUnrated": "A revanche não afeta a classificação",
+  "viewBoard": "Ver quadro",
+  "camera": "Câmera",
+  "closeViewMenu": "Fechar menu de visualização",
+  "viewPerspective": "Perspectiva",
+  "viewTop": "Principal",
+  "viewFront": "Frente",
+  "showLayers": "Mostrar camadas",
+  "allLayers": "Todos",
+  "layersHint": "Mostre e oculte cada camada separadamente.\nUm novo movimento restaura todas as camadas.",
+  "leaveLobbyQuestion": "Sair do saguão?",
+  "finishGameQuestion": "Terminar o jogo atual?",
+  "rankedLeaveWarning": "Sair conta como uma derrota e diminui sua classificação. Caso a conexão caia, você tem até 60 segundos para retornar; o temporizador de giro continua funcionando.",
+  "lobbyLeaveWarning": "O lobby fecha para ambos os jogadores. Você pode retornar após uma atualização normal da página.",
+  "movesWillBeLost": "Os movimentos atuais serão perdidos.",
+  "leaveToMenu": "Sair para o menu",
+  "restartQuestion": "Reiniciar o jogo?",
+  "restart": "Reiniciar",
+  "stayInGame": "Fique no jogo",
+  "onlineContinuesInMenu": "O jogo online continua enquanto o menu está aberto.",
+  "pauseUsed": "Pausa usada",
+  "offerPause": "Oferecer pausa · 2 min",
+  "timeStopped": "O tempo está parado.",
+  "backToLevels": "De volta aos níveis",
+  "levelCompleted": "Nível concluído",
+  "winnerName": "Vencedor: {name}",
+  "@winnerName": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "replayStart": "Início da repetição",
+  "previousMove": "Movimento anterior",
+  "nextMove": "Próximo passo",
+  "replayEnd": "Fim da repetição",
+  "replayProgress": "Mova {current} de {total}",
+  "@replayProgress": {
+    "placeholders": {
+      "current": {
+        "type": "int"
+      },
+      "total": {
+        "type": "int"
+      }
+    }
+  },
+  "finishReplay": "Concluir repetição",
+  "newRecord": "Novo recorde",
+  "nextLevel": "Próximo nível",
+  "retryLevel": "Nível de nova tentativa",
+  "anotherGame": "Outro jogo",
+  "replayGame": "Jogo de repetição",
+  "columnFull": "Esta coluna está cheia. Escolha outro.",
+  "aiMoveFailed": "Não foi possível calcular o movimento. Toque em Continuar para tentar novamente.",
+  "sceneLoadFailed": "Não foi possível carregar a placa 3D.\nReinicie o aplicativo.",
+  "tutorialMoveTab": "Como se mover",
+  "tutorialMoveTitle": "As peças são empilhadas umas sobre as outras",
+  "tutorialMoveBody": "Toque em um buraco e a peça preencherá a posição livre mais baixa. Os jogadores alternam turnos. Uma coluna comporta até cinco peças.",
+  "tutorialHorizontalTab": "Horizontal",
+  "tutorialHorizontalTitle": "Quatro em um nível",
+  "tutorialHorizontalBody": "Quatro peças da mesma cor se alinham em colunas adjacentes. A linha pode seguir qualquer lado do tabuleiro em qualquer altura.",
+  "tutorialVerticalTab": "Vertical",
+  "tutorialVerticalTitle": "Quatro em uma coluna",
+  "tutorialVerticalBody": "Empilhe quatro peças da sua cor. Uma peça do adversário dentro da coluna rompe a linha.",
+  "tutorialLayerDiagonalTab": "Camada diagonal",
+  "tutorialLayerDiagonalTitle": "Através de uma camada",
+  "tutorialLayerDiagonalBody": "Cada peça seguinte muda um buraco em duas direções enquanto permanece na mesma altura.",
+  "tutorialRaisedDiagonalTab": "Diagonal elevada",
+  "tutorialRaisedDiagonalTitle": "Ganhe em qualquer camada",
+  "tutorialRaisedDiagonalBody": "Coloque quatro peças diagonalmente na mesma altura. A linha vence em qualquer camada; a cor dos suportes abaixo não importa.",
+  "tutorialSpaceDiagonalTab": "Diagonal 3D",
+  "tutorialSpaceDiagonalTitle": "Quatro através do espaço",
+  "tutorialSpaceDiagonalBody": "Cada peça seguinte muda um buraco em ambas as direções e um nível acima. Esta também é uma linha reta de vitória.",
+  "tutorialGoalBefore": "Conectar",
+  "tutorialGoalStrong": "4 peças da sua cor",
+  "tutorialGoalAfter": "em linha reta sem lacunas.",
+  "pauseExample": "Exemplo de pausa",
+  "playExample": "Exemplo de jogo",
+  "videoPosition": "Posição do vídeo",
+  "replayExample": "Exemplo de repetição",
+  "fourInRowWin": "4 consecutivos – vitória",
+  "videoUnavailable": "O vídeo não está disponível. O exemplo final é mostrado.",
+  "firstExample": "Primeiro exemplo",
+  "nextExample": "Próximo exemplo",
+  "start": "Começar",
+  "gotIt": "Entendi",
+  "levelsIntro": "Ganhe de uma posição preparada com o menor número de movimentos possível.",
+  "completedProgress": "{completed} / {total} concluído",
+  "@completedProgress": {
+    "placeholders": {
+      "completed": {
+        "type": "int"
+      },
+      "total": {
+        "type": "int"
+      }
+    }
+  },
+  "recordEmpty": "Registro: -",
+  "recordValue": "Registro: {moves}",
+  "@recordValue": {
+    "placeholders": {
+      "moves": {
+        "type": "String"
+      }
+    }
+  },
+  "levelSyncOffline": "Sem conexão com o servidor. O progresso será salvo quando a conexão retornar.",
+  "levelSignInHint": "Faça login para salvar o progresso no servidor.",
+  "levelProgressSaved": "Progresso salvo em sua conta.",
+  "chapterFirstSteps": "Primeiros passos",
+  "chapterTactics": "Táticas",
+  "chapterCombinations": "Combinações",
+  "chapterCounterattack": "Contra-ataque",
+  "chapterAdvanced": "Posições avançadas",
+  "leaderboardTop": "Top 100 · Elo",
+  "refreshLeaderboard": "Atualizar placar",
+  "leaderboardEmpty": "Ainda não há jogadores classificados.",
+  "leaderboardFailed": "Não foi possível carregar o placar.",
+  "leaderboardLoading": "Carregando placar…",
+  "place": "Lugar",
+  "rankedGames": "Jogos",
+  "findRankedOpponent": "Jogo classificado – encontre oponente",
+  "connecting": "Conectando…",
+  "createLobby": "Criar lobby",
+  "lobbyCode": "Código do lobby",
+  "joinLobby": "Junte-se ao lobby",
+  "restoringSearch": "Restaurando pesquisa…",
+  "searchingOpponent": "Procurando oponente…",
+  "searchReconnectHint": "Conexão perdida. A pesquisa é retomada automaticamente após a reconexão.",
+  "ratedSearchHint": "Pesquisa classificada entre contas. Confirme em 15 segundos.",
+  "guestSearchHint": "Pesquisa de visitantes sem classificação. Confirme em 15 segundos.",
+  "cancelSearch": "Cancelar pesquisa",
+  "opponentFound": "Oponente encontrado: {opponent}",
+  "@opponentFound": {
+    "placeholders": {
+      "opponent": {
+        "type": "String"
+      }
+    }
+  },
+  "guestUnratedGame": "Jogo convidado sem classificação",
+  "opponentRating": "Avaliação do oponente: {rating}",
+  "@opponentRating": {
+    "placeholders": {
+      "rating": {
+        "type": "int"
+      }
+    }
+  },
+  "ratedLabel": "Avaliado",
+  "unratedMeetingLimit": "Sem pontos: limite de encontro",
+  "confirmMatch": "Confirme dentro de {seconds} s. A partida começa quando ambos aceitam.",
+  "@confirmMatch": {
+    "placeholders": {
+      "seconds": {
+        "type": "int"
+      }
+    }
+  },
+  "confirmRatedMatch": "Confirme dentro de {seconds} s. A partida começa quando ambos aceitam. Você tem 90 segundos por movimento; partir é uma derrota.",
+  "@confirmRatedMatch": {
+    "placeholders": {
+      "seconds": {
+        "type": "int"
+      }
+    }
+  },
+  "waitingMatchConfirmation": "Aguardando a confirmação do oponente…",
+  "acceptMatch": "Aceitar correspondência",
+  "refuse": "Recusar",
+  "matchSearchFailed": "Não foi possível encontrar um jogo.",
+  "searchAgain": "Pesquise novamente",
+  "enterFiveLetterCode": "Insira um código de lobby de cinco letras.",
+  "searchCancelled": "Pesquisa cancelada.",
+  "moveNotSent": "Sem conexão com o servidor. Movimento não enviado.",
+  "invalidServerResponse": "O servidor retornou uma resposta inválida.",
+  "connectionLost": "A conexão com o servidor foi perdida. Conecte-se novamente.",
+  "historyLoading": "Carregando estatísticas…",
+  "lastFiftyMatches": "Últimas 50 partidas; estatísticas de todos os modos.",
+  "matchesStat": "Partidas",
+  "winsStat": "Vitórias",
+  "lossesStat": "Perdas",
+  "drawsStat": "Empates",
+  "historyEmpty": "Termine um jogo e ele aparecerá aqui automaticamente.",
+  "matchTitle": "Corresponder",
+  "matchTitleLabel": "Título da partida",
+  "matchSummary": "{date} · {mode} · {moves}",
+  "@matchSummary": {
+    "placeholders": {
+      "date": {
+        "type": "String"
+      },
+      "mode": {
+        "type": "String"
+      },
+      "moves": {
+        "type": "String"
+      }
+    }
+  },
+  "earlyFinish": "terminar cedo",
+  "watch": "Assistir",
+  "titleAction": "Título",
+  "removeHistoryHint": "Remover da história; as estatísticas são preservadas",
+  "historyGuestHint": "Faça login para salvar estatísticas e histórico de partidas no servidor. As partidas de convidados não são contadas.",
+  "signInOrRegister": "Faça login ou cadastre-se",
+  "ratingPrefix": "Avaliação:",
+  "username": "Nome de usuário",
+  "usernameHint": "Letras, números e _ em inglês · 3–24 caracteres",
+  "password": "Senha",
+  "forgotPasswordHint": "Enviaremos um link para criação de uma nova senha.",
+  "sending": "Enviando…",
+  "pleaseWait": "Por favor, aguarde…",
+  "register": "Cadastre-se",
+  "signIn": "Entrar",
+  "getLink": "Obter link",
+  "forgotPassword": "Esqueceu sua senha?",
+  "resendVerification": "Enviar verificação novamente",
+  "returnToSignIn": "Voltar para fazer login",
+  "signOut": "sair",
+  "changePasswordUpper": "ALTERAR A SENHA",
+  "updateCredentials": "Atualizar detalhes de login",
+  "currentPassword": "Senha atual",
+  "newPassword": "Nova Senha",
+  "passwordLengthHint": "8–128 caracteres",
+  "repeatNewPassword": "Repita a nova senha",
+  "saving": "Salvando…",
+  "changePassword": "Alterar a senha",
+  "setNewPasswordHint": "Defina uma nova senha para sua conta.",
+  "repeatPassword": "Repetir senha",
+  "usernameValidation": "Use de 3 a 24 letras, números ou _ em inglês.",
+  "passwordMinValidation": "A senha deve conter pelo menos 8 caracteres.",
+  "passwordMismatch": "As senhas não coincidem.",
+  "newPasswordValidation": "A nova senha deve conter de 8 a 128 caracteres.",
+  "newPasswordsMismatch": "As novas senhas não coincidem.",
+  "passwordMustDiffer": "A nova senha deve ser diferente da atual.",
+  "currentProfileUpper": "PERFIL ATUAL",
+  "registration": "Cadastro",
+  "login": "Entrar",
+  "overview": "Visão geral",
+  "security": "Segurança",
+  "playerProfileUpper": "PERFIL DO JOGADOR",
+  "localAccount": "Conta local",
+  "ratingUpper": "AVALIAÇÃO",
+  "pointsToLeague": "{points} aponta para {league}",
+  "@pointsToLeague": {
+    "placeholders": {
+      "points": {
+        "type": "int"
+      },
+      "league": {
+        "type": "String"
+      }
+    }
+  },
+  "ratedMatches": "{count, plural, =0{Nenhuma partida ranqueada} =1{1 partida ranqueada} other{{count} partidas ranqueadas}}",
+  "@ratedMatches": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "careerUpper": "CARREIRA",
+  "winRate": "Taxa de vitórias",
+  "recentMatchesUpper": "JOGOS RECENTES",
+  "recentForm": "Formulário recente",
+  "fullHistory": "História completa",
+  "firstMatchHint": "Termine sua primeira partida para ver sua forma recente aqui.",
+  "drawShort": "D",
+  "winShort": "C",
+  "lossShort": "eu",
+  "leagueBronze": "Bronze",
+  "leagueSilver": "Prata",
+  "leagueGold": "Ouro",
+  "leaguePlatinum": "Platina",
+  "leagueMaster": "Mestre",
+  "leagueTop": "Liga principal",
+  "emailVerified": "E-mail verificado.",
+  "passwordChanged": "Senha alterada.",
+  "networkError": "Sem conexão com o servidor.",
+  "accountCreatedVerify": "Conta criada. Verifique sua caixa de entrada e pasta de spam e, em seguida, verifique seu e-mail.",
+  "emailSent": "E-mail enviado.",
+  "passwordResetSent": "Se a conta existir, o e-mail foi enviado.",
+  "genericServerError": "Erro no servidor.",
+  "serverWrongType": "O servidor retornou o tipo de resposta errado."
+}

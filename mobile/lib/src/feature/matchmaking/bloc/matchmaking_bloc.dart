@@ -8,6 +8,17 @@ import 'package:four3/src/feature/game/model/game_models.dart';
 import 'package:four3/src/feature/matchmaking/model/online_models.dart';
 import 'package:four3/src/feature/matchmaking/service/online_transport.dart';
 
+enum MatchmakingNotice { searchCancelled }
+
+enum MatchmakingFailure {
+  invalidCode,
+  moveNotSent,
+  invalidServerResponse,
+  connectionLost,
+  generic,
+  lobbyClosed,
+}
+
 sealed class MatchmakingEvent extends Equatable {
   const new();
   @override
@@ -113,10 +124,11 @@ final class MatchmakingState$Initial extends MatchmakingState {
 }
 
 final class MatchmakingState$Idle extends MatchmakingState {
-  const new({this.message = ''});
+  const new({this.message = '', this.notice});
   final String message;
+  final MatchmakingNotice? notice;
   @override
-  List<Object> get props => [message];
+  List<Object?> get props => [message, notice];
 }
 
 final class MatchmakingState$Connecting extends MatchmakingState {
@@ -171,10 +183,11 @@ final class MatchmakingState$Match extends MatchmakingState {
 }
 
 final class MatchmakingState$Failure extends MatchmakingState {
-  const new(this.message);
+  const new(this.message, {this.failure});
   final String message;
+  final MatchmakingFailure? failure;
   @override
-  List<Object> get props => [message];
+  List<Object?> get props => [message, failure];
 }
 
 final class MatchmakingBloc extends Bloc<MatchmakingEvent, MatchmakingState> {
@@ -206,7 +219,10 @@ final class MatchmakingBloc extends Bloc<MatchmakingEvent, MatchmakingState> {
         final String normalized = code.trim().toUpperCase();
         if (!RegExp(r'^[A-Z]{5}$').hasMatch(normalized)) {
           emit(
-            const MatchmakingState$Failure('Введите пятибуквенный код лобби.'),
+            const MatchmakingState$Failure(
+              '',
+              failure: MatchmakingFailure.invalidCode,
+            ),
           );
           return;
         }
@@ -250,7 +266,11 @@ final class MatchmakingBloc extends Bloc<MatchmakingEvent, MatchmakingState> {
       case MatchmakingEvent$Cancel():
         _transport.send(const {'type': 'quick_cancel'});
         await _transport.disconnect(clearPersistence: true);
-        emit(const MatchmakingState$Idle(message: 'Поиск отменён.'));
+        emit(
+          const MatchmakingState$Idle(
+            notice: MatchmakingNotice.searchCancelled,
+          ),
+        );
       case MatchmakingEvent$Move(:final x, :final y):
         final OnlineMatchSnapshot? snapshot = _snapshot;
         final Player? player = _player;
@@ -270,7 +290,8 @@ final class MatchmakingBloc extends Bloc<MatchmakingEvent, MatchmakingState> {
         })) {
           emit(
             const MatchmakingState$Failure(
-              'Нет связи с сервером. Ход не отправлен.',
+              '',
+              failure: MatchmakingFailure.moveNotSent,
             ),
           );
         }
@@ -338,8 +359,19 @@ final class MatchmakingBloc extends Bloc<MatchmakingEvent, MatchmakingState> {
         } else if (_connection == OnlineConnectionStatus.reconnecting) {
           emit(const MatchmakingState$Connecting(reconnecting: true));
         }
-      case OnlineTransportEvent$Failure(:final message):
-        emit(MatchmakingState$Failure(message));
+      case OnlineTransportEvent$Failure(:final message, :final failure):
+        emit(
+          MatchmakingState$Failure(
+            message,
+            failure: switch (failure) {
+              OnlineTransportFailure.invalidResponse =>
+                MatchmakingFailure.invalidServerResponse,
+              OnlineTransportFailure.connectionLost =>
+                MatchmakingFailure.connectionLost,
+              null => null,
+            },
+          ),
+        );
       case OnlineTransportEvent$Message(:final json):
         switch (json['type']) {
           case 'session':
@@ -372,7 +404,7 @@ final class MatchmakingBloc extends Bloc<MatchmakingEvent, MatchmakingState> {
             emit(
               MatchmakingState$Found(
                 matchId: json['matchId']?.toString() ?? '',
-                opponent: json['opponent']?.toString() ?? 'Соперник',
+                opponent: json['opponent']?.toString() ?? 'Opponent',
                 deadline: json['deadline'] is int ? json['deadline'] as int : 0,
                 rating: json['opponentRating'] is int
                     ? json['opponentRating'] as int
@@ -382,14 +414,15 @@ final class MatchmakingBloc extends Bloc<MatchmakingEvent, MatchmakingState> {
             );
           case 'queue_removed':
             emit(
-              MatchmakingState$Idle(
-                message: json['message']?.toString() ?? 'Поиск завершён.',
-              ),
+              MatchmakingState$Idle(message: json['message']?.toString() ?? ''),
             );
           case 'error':
             emit(
               MatchmakingState$Failure(
-                json['message']?.toString() ?? 'Ошибка онлайн-игры.',
+                json['message']?.toString() ?? '',
+                failure: json['message'] == null
+                    ? MatchmakingFailure.generic
+                    : null,
               ),
             );
           case 'closed':
@@ -397,7 +430,10 @@ final class MatchmakingBloc extends Bloc<MatchmakingEvent, MatchmakingState> {
             _player = null;
             emit(
               MatchmakingState$Failure(
-                json['message']?.toString() ?? 'Лобби закрыто.',
+                json['message']?.toString() ?? '',
+                failure: json['message'] == null
+                    ? MatchmakingFailure.lobbyClosed
+                    : null,
               ),
             );
         }

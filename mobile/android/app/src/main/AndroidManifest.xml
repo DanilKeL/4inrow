@@ -3,7 +3,8 @@
     <application
         android:label="four3"
         android:name="${applicationName}"
-        android:icon="@mipmap/ic_launcher">
+        android:icon="@mipmap/ic_launcher"
+        android:localeConfig="@xml/locales_config">
         <meta-data
             android:name="io.flutter.embedding.android.EnableFlutterGPU"
             android:value="true" />

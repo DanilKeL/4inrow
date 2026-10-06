@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:four3/l10n/generated/app_localizations.dart';
 import 'package:four3/src/common/theme/app_theme.dart';
+import 'package:four3/src/common/utils/build_context_extension.dart';
 import 'package:four3/src/common/widget/app_controls.dart';
 import 'package:four3/src/common/widget/app_dialog.dart';
 import 'package:four3/src/feature/account/model/account_profile.dart';
@@ -31,7 +33,8 @@ class _GameSetupViewState extends State<GameSetupView> {
   @override
   Widget build(BuildContext context) {
     final AccountProfile? profile = AccountRootScope.of(context).profile;
-    final String player = profile?.displayName ?? 'Игрок 1';
+    final AppLocalizations l10n = context.l10n;
+    final String player = profile?.displayName ?? l10n.playerOne;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -40,8 +43,8 @@ class _GameSetupViewState extends State<GameSetupView> {
             Expanded(
               child: _ModeChoice(
                 icon: LucideIcons.usersRound,
-                title: 'Вдвоём',
-                subtitle: 'На одном устройстве',
+                title: l10n.twoPlayers,
+                subtitle: l10n.sameDevice,
                 selected: _mode == GameMode.local,
                 onTap: () => setState(() => _mode = GameMode.local),
               ),
@@ -50,8 +53,8 @@ class _GameSetupViewState extends State<GameSetupView> {
             Expanded(
               child: _ModeChoice(
                 icon: LucideIcons.cpu,
-                title: 'Против AI',
-                subtitle: 'Три сложности',
+                title: l10n.versusAi,
+                subtitle: l10n.threeDifficulties,
                 selected: _mode == GameMode.ai,
                 onTap: () => setState(() => _mode = GameMode.ai),
               ),
@@ -60,8 +63,8 @@ class _GameSetupViewState extends State<GameSetupView> {
             Expanded(
               child: _ModeChoice(
                 icon: LucideIcons.globe2,
-                title: 'Онлайн',
-                subtitle: 'По коду лобби',
+                title: l10n.online,
+                subtitle: l10n.lobbyCodeMode,
                 selected: _mode == GameMode.online,
                 onTap: () => setState(() => _mode = GameMode.online),
               ),
@@ -75,7 +78,7 @@ class _GameSetupViewState extends State<GameSetupView> {
           children: [
             Text.rich(
               TextSpan(
-                text: 'Вы играете как ',
+                text: l10n.playingAs,
                 children: [
                   TextSpan(
                     text: player,
@@ -89,32 +92,32 @@ class _GameSetupViewState extends State<GameSetupView> {
               style: const TextStyle(color: AppColors.muted, fontSize: 11),
             ),
             if (_mode == GameMode.local)
-              const Text.rich(
+              Text.rich(
                 TextSpan(
-                  text: 'Второй игрок: ',
+                  text: l10n.secondPlayer,
                   children: [
                     TextSpan(
-                      text: 'Игрок 2',
-                      style: TextStyle(
+                      text: l10n.playerTwo,
+                      style: const TextStyle(
                         color: AppColors.ink,
                         fontWeight: FontWeight.w700,
                       ),
                     ),
                   ],
                 ),
-                style: TextStyle(color: AppColors.muted, fontSize: 11),
+                style: const TextStyle(color: AppColors.muted, fontSize: 11),
               ),
           ],
         ),
         if (_mode == GameMode.ai) ...[
           const SizedBox(height: 14),
-          const Text('Сложность', style: TextStyle(fontSize: 11)),
+          Text(l10n.difficulty, style: const TextStyle(fontSize: 11)),
           const SizedBox(height: 7),
           AppSegmentedControl<Difficulty>(
-            options: const [
-              AppSegment(value: Difficulty.easy, label: 'Легко'),
-              AppSegment(value: Difficulty.medium, label: 'Средне'),
-              AppSegment(value: Difficulty.hard, label: 'Сложно'),
+            options: [
+              AppSegment(value: Difficulty.easy, label: l10n.easy),
+              AppSegment(value: Difficulty.medium, label: l10n.medium),
+              AppSegment(value: Difficulty.hard, label: l10n.hard),
             ],
             selected: _difficulty,
             onChanged: (value) => setState(() => _difficulty = value),
@@ -132,7 +135,7 @@ class _GameSetupViewState extends State<GameSetupView> {
               onPressed: () => _start(context, player),
               iconAlignment: IconAlignment.end,
               icon: const Icon(LucideIcons.arrowRight, size: 18),
-              label: const Text('Начать игру'),
+              label: Text(l10n.startGame),
             ),
           ),
         ],
@@ -148,7 +151,7 @@ class _GameSetupViewState extends State<GameSetupView> {
       GameEvent$Start(
         mode: _mode,
         difficulty: _difficulty,
-        names: <String>[player, 'Игрок 2'],
+        names: <String>[player, context.l10n.playerTwo],
       ),
     );
     Navigator.pop(context);
@@ -158,7 +161,7 @@ class _GameSetupViewState extends State<GameSetupView> {
       game.add(const GameEvent$Pause());
       showAppDialog<void>(
         context: appContext,
-        title: 'Как играть',
+        title: context.l10n.howToPlay,
         wide: true,
         child: TutorialView(
           starting: true,
@@ -184,7 +187,7 @@ class _GameSetupViewState extends State<GameSetupView> {
       if (!appContext.mounted) return;
       showAppDialog<void>(
         context: appContext,
-        title: 'Рейтинговая игра',
+        title: context.l10n.rankedGame,
         child: const OnlineSetupView(quickOnly: true),
       );
     });

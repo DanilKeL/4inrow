@@ -109,21 +109,29 @@ final class AccountState$Ready extends AccountState {
   const new(
     this.profile, {
     this.notice = '',
+    this.clientNotice,
     this.registrationCompleted = false,
   });
   final AccountProfile profile;
   final String notice;
+  final AccountNotice? clientNotice;
   final bool registrationCompleted;
   @override
-  List<Object> get props => [profile, notice, registrationCompleted];
+  List<Object?> get props => [
+    profile,
+    notice,
+    clientNotice,
+    registrationCompleted,
+  ];
 }
 
 final class AccountState$Failure extends AccountState {
-  const new(this.profile, this.message);
+  const new(this.profile, this.message, {this.failure});
   final AccountProfile? profile;
   final String message;
+  final RestClientFailure? failure;
   @override
-  List<Object?> get props => [profile, message];
+  List<Object?> get props => [profile, message, failure];
 }
 
 final class AccountState$PasswordReset extends AccountState {
@@ -174,18 +182,25 @@ final class AccountBloc extends Bloc<AccountEvent, AccountState> {
               result.verificationRequired
                   ? profile ?? await _repository.load()
                   : await _repository.load(),
-              notice: result.notice,
+              notice: result.notice.remote,
+              clientNotice: result.notice.client,
               registrationCompleted: true,
             ),
           );
         } on RestClientException catch (error) {
-          emit(AccountState$Failure(profile, error.message));
+          emit(
+            AccountState$Failure(
+              profile,
+              error.message,
+              failure: error.failure,
+            ),
+          );
         }
       case AccountEvent$VerifyEmail(:final token):
         await _action(
           emit,
           () => _repository.verifyEmail(token),
-          notice: 'Email подтверждён.',
+          clientNotice: AccountNotice.emailVerified,
         );
       case AccountEvent$OpenPasswordReset(:final token):
         if (token.isNotEmpty) emit(AccountState$PasswordReset(profile, token));
@@ -203,7 +218,7 @@ final class AccountBloc extends Bloc<AccountEvent, AccountState> {
         await _action(
           emit,
           () => _repository.completePasswordReset(token, password),
-          notice: 'Пароль изменён.',
+          clientNotice: AccountNotice.passwordChanged,
         );
       case AccountEvent$ChangePassword(
         :final currentPassword,
@@ -212,7 +227,7 @@ final class AccountBloc extends Bloc<AccountEvent, AccountState> {
         await _action(
           emit,
           () => _repository.changePassword(currentPassword, newPassword),
-          notice: 'Пароль изменён.',
+          clientNotice: AccountNotice.passwordChanged,
         );
       case AccountEvent$Logout():
         await _action(emit, _repository.logout);
@@ -226,31 +241,50 @@ final class AccountBloc extends Bloc<AccountEvent, AccountState> {
     Emitter<AccountState> emit,
     Future<AccountProfile> Function() operation, {
     String notice = '',
+    AccountNotice? clientNotice,
   }) async {
     emit(AccountState$Loading(profile));
     try {
-      emit(AccountState$Ready(await operation(), notice: notice));
+      emit(
+        AccountState$Ready(
+          await operation(),
+          notice: notice,
+          clientNotice: clientNotice,
+        ),
+      );
     } on RestClientException catch (error) {
-      emit(AccountState$Failure(profile, error.message));
+      emit(
+        AccountState$Failure(profile, error.message, failure: error.failure),
+      );
     } on Exception {
-      emit(AccountState$Failure(profile, 'Нет связи с сервером.'));
+      emit(
+        AccountState$Failure(profile, '', failure: RestClientFailure.network),
+      );
     }
   }
 
   Future<void> _noticeAction(
     Emitter<AccountState> emit,
-    Future<String> Function() operation,
+    Future<AccountActionNotice> Function() operation,
   ) async {
     emit(AccountState$Loading(profile));
     try {
-      final String notice = await operation();
+      final AccountActionNotice notice = await operation();
       emit(
-        AccountState$Ready(profile ?? await _repository.load(), notice: notice),
+        AccountState$Ready(
+          profile ?? await _repository.load(),
+          notice: notice.remote,
+          clientNotice: notice.client,
+        ),
       );
     } on RestClientException catch (error) {
-      emit(AccountState$Failure(profile, error.message));
+      emit(
+        AccountState$Failure(profile, error.message, failure: error.failure),
+      );
     } on Exception {
-      emit(AccountState$Failure(profile, 'Нет связи с сервером.'));
+      emit(
+        AccountState$Failure(profile, '', failure: RestClientFailure.network),
+      );
     }
   }
 }

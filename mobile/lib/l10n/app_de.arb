@@ -1,0 +1,495 @@
+{
+  "@@locale": "de",
+  "appTitle": "FOUR³",
+  "close": "Schließen",
+  "retry": "Erneut versuchen",
+  "retryShort": "Erneut versuchen",
+  "back": "Zurück",
+  "next": "Weiter",
+  "save": "Speichern",
+  "delete": "Löschen",
+  "cancel": "Abbrechen",
+  "continueAction": "Weiter",
+  "settings": "Einstellungen",
+  "mainMenu": "Hauptmenü",
+  "toMainMenu": "Zum Hauptmenü",
+  "levels": "Level",
+  "history": "Verlauf",
+  "online": "Online",
+  "versusAi": "Gegen die KI",
+  "twoPlayers": "Zwei Spieler",
+  "guest": "Gast",
+  "player": "Spieler",
+  "playerOne": "Spieler 1",
+  "playerTwo": "Spieler 2",
+  "you": "Du",
+  "bot": "Bot",
+  "opponent": "Gegner",
+  "win": "Sieg",
+  "loss": "Niederlage",
+  "draw": "Unentschieden",
+  "loadingGame": "Partie wird geladen",
+  "loadingBoard": "Spielbrett und Spielsteine…",
+  "loadBoardFailed": "Das Spielbrett konnte nicht geladen werden",
+  "checkConnection": "Überprüfe deine Verbindung und versuche es erneut.",
+  "newGame": "Neue Partie",
+  "howToPlay": "Spielanleitung",
+  "account": "Konto",
+  "matchHistory": "Partieverlauf",
+  "turnOffSound": "Ton ausschalten",
+  "turnOnSound": "Ton einschalten",
+  "gameName": "Vier in einer Reihe",
+  "gameTagline": "Ein Klassiker – jetzt in 3D",
+  "rankedGame": "Ranglistenpartie",
+  "playerRating": "Spieler-Rangliste",
+  "difficulty": "Schwierigkeit",
+  "easy": "Leicht",
+  "medium": "Mittel",
+  "hard": "Schwer",
+  "sameDevice": "Auf demselben Gerät",
+  "threeDifficulties": "Drei Schwierigkeitsgrade",
+  "lobbyCodeMode": "Mit Lobby-Code",
+  "playingAs": "Du: ",
+  "secondPlayer": "Zweiter Spieler: ",
+  "startGame": "Partie starten",
+  "language": "Sprache",
+  "systemLanguage": "System",
+  "languageRussian": "Русский",
+  "languageEnglish": "English",
+  "languageSpanish": "Español",
+  "languageFrench": "Français",
+  "languagePortugueseBrazil": "Português (Brasil)",
+  "languageGerman": "Deutsch",
+  "soundVolume": "Lautstärke",
+  "soundDisabledInHeader": "Der Ton wird über die Schaltfläche in der oberen Leiste ausgeschaltet",
+  "animations": "Animationen",
+  "animationsDescription": "Fallende Spielsteine und sanfte Kamerabewegungen",
+  "movePreview": "Zugvorschau",
+  "movePreviewDescription": "Spielstein vor dem Setzen anzeigen",
+  "xrayDefault": "Röntgenansicht als Standard",
+  "xrayDefaultDescription": "Transparente Spielsteine in einer neuen Partie",
+  "settingsSaveFailed": "Die Einstellungen konnten nicht gespeichert werden.",
+  "botMoving": "Bot zieht…",
+  "aiThinking": "KI denkt…",
+  "moveCompleted": "Zug ausgeführt",
+  "pause": "Pause",
+  "replayMove": "Wiederholung · Zug {move}",
+  "@replayMove": {
+    "placeholders": {
+      "move": {
+        "type": "int"
+      }
+    }
+  },
+  "gameFinished": "Partie beendet",
+  "noConnection": "Keine Verbindung",
+  "waitingForOpponent": "Warten auf den Gegner",
+  "waitingForOpponentEllipsis": "Warten auf den Gegner…",
+  "waitingForConnection": "Warten auf eine Verbindung",
+  "yourTurn": "Du bist dran",
+  "opponentTurn": "Der Gegner ist an der Reihe",
+  "playerTurn": "{name} ist an der Reihe",
+  "@playerTurn": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "levelNumber": "Level {level}",
+  "@levelNumber": {
+    "placeholders": {
+      "level": {
+        "type": "int"
+      }
+    }
+  },
+  "secondsShort": " s",
+  "connectionClosed": "Verbindung getrennt",
+  "reconnecting": "Verbindung wird wiederhergestellt…",
+  "shareLobbyCode": "Teile den Code mit einem Freund – warte auf Spieler 2",
+  "opponentDisconnected": "Verbindung zum Gegner getrennt. Warte auf seine Rückkehr…",
+  "playingGraphite": "Du spielst mit den graphitfarbenen Spielsteinen · ●",
+  "playingLight": "Du spielst mit den hellen Spielsteinen · ○",
+  "ratingValue": "Wertung: {value}",
+  "@ratingValue": {
+    "placeholders": {
+      "value": {
+        "type": "int"
+      }
+    }
+  },
+  "rankedGameUpper": "RANGLISTENPARTIE",
+  "lobbyUpper": "LOBBY",
+  "copyLobbyCode": "Lobby-Code kopieren",
+  "codeCopied": "Code kopiert",
+  "leaveLobby": "Lobby verlassen",
+  "exitLobby": "Lobby verlassen",
+  "undo": "Rückgängig machen",
+  "xray": "Röntgenansicht",
+  "view": "Ansicht",
+  "moves": "{count, plural, =0{0 Züge} =1{1 Zug} other{{count} Züge}}",
+  "@moves": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "pauseRequest": "Pausenanfrage",
+  "twoMinutePause": "Pause · 2 Minuten",
+  "pauseReadyHint": "Das Spiel wird fortgesetzt, sobald beide Spieler bereit sind. Andernfalls wird es nach Ablauf des Timers fortgesetzt.",
+  "youAreReady": "Du bist bereit",
+  "ready": "Bereit",
+  "waitingOpponentReady": "Warten darauf, dass der Gegner bereit ist.",
+  "opponentReady": "Gegner ist bereit.",
+  "waitingOpponentApproval": "Warten auf die Zustimmung des Gegners.",
+  "playerOffersPause": "{name} bietet eine zweiminütige Pause an.",
+  "@playerOffersPause": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "pauseAnswerTime": "Antworte innerhalb von {seconds} s. Die Partie läuft weiter, bis die Pause angenommen wird.",
+  "@pauseAnswerTime": {
+    "placeholders": {
+      "seconds": {
+        "type": "int"
+      }
+    }
+  },
+  "acceptPause": "Pause annehmen",
+  "cancelRequest": "Anfrage abbrechen",
+  "decline": "Ablehnen",
+  "rankedMatchFinished": "RANGLISTENPARTIE BEENDET",
+  "youBeatOpponent": "Du hast {opponent} geschlagen",
+  "@youBeatOpponent": {
+    "placeholders": {
+      "opponent": {
+        "type": "String"
+      }
+    }
+  },
+  "youBeatFallbackOpponent": "Du hast deinen Gegner geschlagen",
+  "opponentWon": "{opponent} hat diese Partie gewonnen",
+  "@opponentWon": {
+    "placeholders": {
+      "opponent": {
+        "type": "String"
+      }
+    }
+  },
+  "fallbackOpponentWon": "Dein Gegner hat diese Partie gewonnen",
+  "evenMatch": "Unentschieden gegen {opponent}",
+  "@evenMatch": {
+    "placeholders": {
+      "opponent": {
+        "type": "String"
+      }
+    }
+  },
+  "evenMatchWithFallbackOpponent": "Unentschieden gegen deinen Gegner",
+  "eloChange": "ELO-ÄNDERUNG",
+  "waitingOpponentDecision": "Warten auf die Entscheidung des Gegners",
+  "playAgainWith": "Noch einmal gegen {opponent} spielen",
+  "@playAgainWith": {
+    "placeholders": {
+      "opponent": {
+        "type": "String"
+      }
+    }
+  },
+  "playAgainWithFallbackOpponent": "Noch einmal gegen deinen Gegner spielen",
+  "opponentOffline": "Gegner ist offline",
+  "rematchUnrated": "Das Rückspiel hat keinen Einfluss auf deine Wertung",
+  "viewBoard": "Spielbrett ansehen",
+  "camera": "Kamera",
+  "closeViewMenu": "Ansichtsmenü schließen",
+  "viewPerspective": "3D",
+  "viewTop": "Von oben",
+  "viewFront": "Von vorn",
+  "showLayers": "Ebenen anzeigen",
+  "allLayers": "Alle",
+  "layersHint": "Blende jede Ebene einzeln ein oder aus.\nEin neuer Zug stellt alle Ebenen wieder her.",
+  "leaveLobbyQuestion": "Die Lobby verlassen?",
+  "finishGameQuestion": "Aktuelle Partie beenden?",
+  "rankedLeaveWarning": "Das Verlassen zählt als Niederlage und senkt deine Wertung. Bei einem Verbindungsabbruch hast du bis zu 60 Sekunden Zeit, zurückzukehren; der Zugtimer läuft weiter.",
+  "lobbyLeaveWarning": "Die Lobby wird für beide Spieler geschlossen. Nach dem normalen Neuladen der Seite kannst du zurückkehren.",
+  "movesWillBeLost": "Die aktuellen Züge gehen verloren.",
+  "leaveToMenu": "Zurück zum Menü",
+  "restartQuestion": "Partie neu starten?",
+  "restart": "Neu starten",
+  "stayInGame": "In der Partie bleiben",
+  "onlineContinuesInMenu": "Die Online-Partie läuft weiter, solange das Menü geöffnet ist.",
+  "pauseUsed": "Pause bereits verwendet",
+  "offerPause": "Pause anbieten · 2 Min.",
+  "timeStopped": "Der Timer ist angehalten.",
+  "backToLevels": "Zurück zur Levelauswahl",
+  "levelCompleted": "Level abgeschlossen",
+  "winnerName": "Sieger: {name}",
+  "@winnerName": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "replayStart": "Beginn der Wiederholung",
+  "previousMove": "Vorheriger Zug",
+  "nextMove": "Nächster Zug",
+  "replayEnd": "Ende der Wiederholung",
+  "replayProgress": "Zug {current} von {total}",
+  "@replayProgress": {
+    "placeholders": {
+      "current": {
+        "type": "int"
+      },
+      "total": {
+        "type": "int"
+      }
+    }
+  },
+  "finishReplay": "Wiederholung beenden",
+  "newRecord": "Neuer Rekord",
+  "nextLevel": "Nächstes Level",
+  "retryLevel": "Level wiederholen",
+  "anotherGame": "Weitere Partie",
+  "replayGame": "Partie wiederholen",
+  "columnFull": "Diese Spalte ist voll. Wähle eine andere.",
+  "aiMoveFailed": "Der Zug konnte nicht berechnet werden. Tippe auf Weiter, um es erneut zu versuchen.",
+  "sceneLoadFailed": "Das 3D-Spielbrett konnte nicht geladen werden.\nStarte die App neu.",
+  "tutorialMoveTab": "So wird gespielt",
+  "tutorialMoveTitle": "Spielsteine stapeln sich",
+  "tutorialMoveBody": "Tippe auf eine Öffnung. Der Spielstein fällt auf die niedrigste freie Position. Die Spieler ziehen abwechselnd. Eine Spalte fasst bis zu fünf Spielsteine.",
+  "tutorialHorizontalTab": "Horizontal",
+  "tutorialHorizontalTitle": "Vier auf einer Ebene",
+  "tutorialHorizontalBody": "Vier Spielsteine einer Farbe liegen in benachbarten Spalten. Die Linie kann auf jeder Höhe parallel zu einer beliebigen Seite des Spielbretts verlaufen.",
+  "tutorialVerticalTab": "Vertikal",
+  "tutorialVerticalTitle": "Vier in einer Spalte",
+  "tutorialVerticalBody": "Stapele vier Spielsteine deiner Farbe. Ein gegnerischer Spielstein in der Spalte unterbricht die Linie.",
+  "tutorialLayerDiagonalTab": "Ebenendiagonale",
+  "tutorialLayerDiagonalTitle": "Diagonal auf einer Ebene",
+  "tutorialLayerDiagonalBody": "Jeder weitere Spielstein wird in zwei Richtungen um eine Öffnung versetzt und bleibt dabei auf derselben Höhe.",
+  "tutorialRaisedDiagonalTab": "Erhöhte Diagonale",
+  "tutorialRaisedDiagonalTitle": "Auf jeder Ebene gewinnen",
+  "tutorialRaisedDiagonalBody": "Platziere vier Spielsteine diagonal auf derselben Höhe. Diese Linie gewinnt auf jeder Ebene; die Farbe der darunterliegenden Spielsteine spielt keine Rolle.",
+  "tutorialSpaceDiagonalTab": "3D-Diagonale",
+  "tutorialSpaceDiagonalTitle": "Vier auf einer Raumdiagonale",
+  "tutorialSpaceDiagonalBody": "Jeder weitere Spielstein wird in beide Richtungen um eine Öffnung versetzt und liegt eine Ebene höher. Auch das ist eine gerade Gewinnlinie.",
+  "tutorialGoalBefore": "Verbinde ",
+  "tutorialGoalStrong": "4 Spielsteine deiner Farbe",
+  "tutorialGoalAfter": " in einer geraden Linie ohne Lücken.",
+  "pauseExample": "Beispiel pausieren",
+  "playExample": "Beispiel abspielen",
+  "videoPosition": "Videoposition",
+  "replayExample": "Beispiel wiederholen",
+  "fourInRowWin": "4 in Folge – Sieg",
+  "videoUnavailable": "Video ist nicht verfügbar. Das letzte Beispiel wird gezeigt.",
+  "firstExample": "Zum ersten Beispiel",
+  "nextExample": "Nächstes Beispiel",
+  "start": "Start",
+  "gotIt": "Verstanden",
+  "levelsIntro": "Gewinne aus einer vorbereiteten Stellung mit möglichst wenigen Zügen.",
+  "completedProgress": "{completed} / {total} abgeschlossen",
+  "@completedProgress": {
+    "placeholders": {
+      "completed": {
+        "type": "int"
+      },
+      "total": {
+        "type": "int"
+      }
+    }
+  },
+  "recordEmpty": "Rekord: —",
+  "recordValue": "Rekord: {moves}",
+  "@recordValue": {
+    "placeholders": {
+      "moves": {
+        "type": "String"
+      }
+    }
+  },
+  "levelSyncOffline": "Keine Serververbindung. Der Fortschritt wird gespeichert, wenn die Verbindung wiederhergestellt wird.",
+  "levelSignInHint": "Melde dich an, um den Fortschritt auf dem Server zu speichern.",
+  "levelProgressSaved": "Der Fortschritt wurde in deinem Konto gespeichert.",
+  "chapterFirstSteps": "Erste Schritte",
+  "chapterTactics": "Taktiken",
+  "chapterCombinations": "Kombinationen",
+  "chapterCounterattack": "Gegenangriff",
+  "chapterAdvanced": "Fortgeschrittene Positionen",
+  "leaderboardTop": "Top 100 · Elo",
+  "refreshLeaderboard": "Rangliste aktualisieren",
+  "leaderboardEmpty": "Es gibt noch keine gewerteten Spieler.",
+  "leaderboardFailed": "Die Rangliste konnte nicht geladen werden.",
+  "leaderboardLoading": "Rangliste wird geladen…",
+  "place": "Rang",
+  "rankedGames": "Partien",
+  "findRankedOpponent": "Ranglistenpartie – Gegner suchen",
+  "connecting": "Verbindung wird hergestellt…",
+  "createLobby": "Lobby erstellen",
+  "lobbyCode": "Lobby-Code",
+  "joinLobby": "Lobby beitreten",
+  "restoringSearch": "Suche wird fortgesetzt…",
+  "searchingOpponent": "Gegner wird gesucht…",
+  "searchReconnectHint": "Verbindung verloren. Die Suche wird nach Wiederherstellung der Verbindung automatisch fortgesetzt.",
+  "ratedSearchHint": "Ranglistensuche unter registrierten Spielern. Innerhalb von 15 Sekunden bestätigen.",
+  "guestSearchHint": "Ungewertete Gegnersuche für Gäste. Innerhalb von 15 Sekunden bestätigen.",
+  "cancelSearch": "Suche abbrechen",
+  "opponentFound": "Gegner gefunden: {opponent}",
+  "@opponentFound": {
+    "placeholders": {
+      "opponent": {
+        "type": "String"
+      }
+    }
+  },
+  "guestUnratedGame": "Ungewertetes Gastspiel",
+  "opponentRating": "Gegnerwertung: {rating}",
+  "@opponentRating": {
+    "placeholders": {
+      "rating": {
+        "type": "int"
+      }
+    }
+  },
+  "ratedLabel": "Bewertet",
+  "unratedMeetingLimit": "Keine Punkte · Rückspiel-Limit",
+  "confirmMatch": "Bestätige innerhalb von {seconds} s. Die Partie beginnt, sobald beide Spieler bestätigt haben.",
+  "@confirmMatch": {
+    "placeholders": {
+      "seconds": {
+        "type": "int"
+      }
+    }
+  },
+  "confirmRatedMatch": "Bestätige innerhalb von {seconds} s. Die Partie beginnt, sobald beide Spieler bestätigt haben. Du hast 90 Sekunden pro Zug; Verlassen zählt als Niederlage.",
+  "@confirmRatedMatch": {
+    "placeholders": {
+      "seconds": {
+        "type": "int"
+      }
+    }
+  },
+  "waitingMatchConfirmation": "Auf die Bestätigung des Gegners warten…",
+  "acceptMatch": "Partie annehmen",
+  "refuse": "Ablehnen",
+  "matchSearchFailed": "Keine Partie gefunden.",
+  "searchAgain": "Erneut suchen",
+  "enterFiveLetterCode": "Gib einen fünf Buchstaben langen Lobby-Code ein.",
+  "searchCancelled": "Suche abgebrochen.",
+  "moveNotSent": "Keine Serververbindung. Zug nicht gesendet.",
+  "invalidServerResponse": "Der Server hat eine ungültige Antwort zurückgegeben.",
+  "connectionLost": "Die Verbindung zum Server wurde unterbrochen. Stelle die Verbindung erneut her.",
+  "historyLoading": "Statistiken werden geladen…",
+  "lastFiftyMatches": "Letzte 50 Partien; Statistiken aus allen Modi.",
+  "matchesStat": "Partien",
+  "winsStat": "Siege",
+  "lossesStat": "Niederlagen",
+  "drawsStat": "Unentschieden",
+  "historyEmpty": "Beende eine Partie, damit sie automatisch hier erscheint.",
+  "matchTitle": "Partie",
+  "matchTitleLabel": "Partietitel",
+  "matchSummary": "{date} · {mode} · {moves}",
+  "@matchSummary": {
+    "placeholders": {
+      "date": {
+        "type": "String"
+      },
+      "mode": {
+        "type": "String"
+      },
+      "moves": {
+        "type": "String"
+      }
+    }
+  },
+  "earlyFinish": "vorzeitig beendet",
+  "watch": "Ansehen",
+  "titleAction": "Titel",
+  "removeHistoryHint": "Aus dem Verlauf entfernen; Statistiken bleiben erhalten",
+  "historyGuestHint": "Melde dich an, um Statistiken und den Partieverlauf auf dem Server zu speichern. Gastpartien werden nicht gewertet.",
+  "signInOrRegister": "Anmelden oder registrieren",
+  "ratingPrefix": "Wertung: ",
+  "username": "Benutzername",
+  "usernameHint": "Englische Buchstaben, Zahlen und _ · 3–24 Zeichen",
+  "password": "Passwort",
+  "forgotPasswordHint": "Wir senden dir einen Link, mit dem du ein neues Passwort erstellen kannst.",
+  "sending": "Senden…",
+  "pleaseWait": "Bitte warten…",
+  "register": "Registrieren",
+  "signIn": "Anmelden",
+  "getLink": "Link abrufen",
+  "forgotPassword": "Passwort vergessen?",
+  "resendVerification": "Bestätigungs-E-Mail erneut senden",
+  "returnToSignIn": "Zurück zur Anmeldung",
+  "signOut": "Abmelden",
+  "changePasswordUpper": "PASSWORT ÄNDERN",
+  "updateCredentials": "Anmeldedaten aktualisieren",
+  "currentPassword": "Aktuelles Passwort",
+  "newPassword": "Neues Passwort",
+  "passwordLengthHint": "8–128 Zeichen",
+  "repeatNewPassword": "Neues Passwort wiederholen",
+  "saving": "Wird gespeichert…",
+  "changePassword": "Passwort ändern",
+  "setNewPasswordHint": "Lege ein neues Passwort für dein Konto fest.",
+  "repeatPassword": "Passwort wiederholen",
+  "usernameValidation": "Verwende 3–24 englische Buchstaben, Zahlen oder _.",
+  "passwordMinValidation": "Das Passwort muss mindestens 8 Zeichen enthalten.",
+  "passwordMismatch": "Passwörter stimmen nicht überein.",
+  "newPasswordValidation": "Das neue Passwort muss 8–128 Zeichen enthalten.",
+  "newPasswordsMismatch": "Neue Passwörter stimmen nicht überein.",
+  "passwordMustDiffer": "Das neue Passwort muss sich vom aktuellen unterscheiden.",
+  "currentProfileUpper": "AKTUELLES PROFIL",
+  "registration": "Registrierung",
+  "login": "Anmelden",
+  "overview": "Überblick",
+  "security": "Sicherheit",
+  "playerProfileUpper": "SPIELERPROFIL",
+  "localAccount": "Lokales Konto",
+  "ratingUpper": "WERTUNG",
+  "pointsToLeague": "Noch {points} Punkte bis {league}",
+  "@pointsToLeague": {
+    "placeholders": {
+      "points": {
+        "type": "int"
+      },
+      "league": {
+        "type": "String"
+      }
+    }
+  },
+  "ratedMatches": "{count, plural, =0{Keine Ranglistenpartien} =1{1 Ranglistenpartie} other{{count} Ranglistenpartien}}",
+  "@ratedMatches": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "careerUpper": "KARRIERE",
+  "winRate": "Siegquote",
+  "recentMatchesUpper": "LETZTE PARTIEN",
+  "recentForm": "Aktuelle Form",
+  "fullHistory": "Gesamter Verlauf",
+  "firstMatchHint": "Beende deine erste Partie, um hier deine aktuelle Form zu sehen.",
+  "drawShort": "U",
+  "winShort": "S",
+  "lossShort": "N",
+  "leagueBronze": "Bronze",
+  "leagueSilver": "Silber",
+  "leagueGold": "Gold",
+  "leaguePlatinum": "Platin",
+  "leagueMaster": "Meister",
+  "leagueTop": "Top-Liga",
+  "emailVerified": "E-Mail bestätigt.",
+  "passwordChanged": "Passwort geändert.",
+  "networkError": "Keine Serververbindung.",
+  "accountCreatedVerify": "Konto erstellt. Überprüfe deinen Posteingang und Spam-Ordner und bestätige anschließend deine E-Mail-Adresse.",
+  "emailSent": "E-Mail gesendet.",
+  "passwordResetSent": "Wenn das Konto vorhanden ist, wurde die E-Mail gesendet.",
+  "genericServerError": "Serverfehler.",
+  "serverWrongType": "Der Server hat den falschen Antworttyp zurückgegeben."
+}

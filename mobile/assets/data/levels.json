@@ -1,7 +1,7 @@
 [
   {
     "id": 1,
-    "chapter": "Первые решения",
+    "chapter": "firstSteps",
     "preset": [
       {
         "x": 1,
@@ -167,7 +167,7 @@
   },
   {
     "id": 2,
-    "chapter": "Первые решения",
+    "chapter": "firstSteps",
     "preset": [
       {
         "x": 4,
@@ -349,7 +349,7 @@
   },
   {
     "id": 3,
-    "chapter": "Первые решения",
+    "chapter": "firstSteps",
     "preset": [
       {
         "x": 1,
@@ -491,7 +491,7 @@
   },
   {
     "id": 4,
-    "chapter": "Первые решения",
+    "chapter": "firstSteps",
     "preset": [
       {
         "x": 3,
@@ -537,7 +537,7 @@
   },
   {
     "id": 5,
-    "chapter": "Первые решения",
+    "chapter": "firstSteps",
     "preset": [
       {
         "x": 2,
@@ -599,7 +599,7 @@
   },
   {
     "id": 6,
-    "chapter": "Первые решения",
+    "chapter": "firstSteps",
     "preset": [
       {
         "x": 2,
@@ -661,7 +661,7 @@
   },
   {
     "id": 7,
-    "chapter": "Первые решения",
+    "chapter": "firstSteps",
     "preset": [
       {
         "x": 4,
@@ -747,7 +747,7 @@
   },
   {
     "id": 8,
-    "chapter": "Первые решения",
+    "chapter": "firstSteps",
     "preset": [
       {
         "x": 4,
@@ -793,7 +793,7 @@
   },
   {
     "id": 9,
-    "chapter": "Тактика",
+    "chapter": "tactics",
     "preset": [
       {
         "x": 4,
@@ -855,7 +855,7 @@
   },
   {
     "id": 10,
-    "chapter": "Тактика",
+    "chapter": "tactics",
     "preset": [
       {
         "x": 4,
@@ -941,7 +941,7 @@
   },
   {
     "id": 11,
-    "chapter": "Тактика",
+    "chapter": "tactics",
     "preset": [
       {
         "x": 4,
@@ -995,7 +995,7 @@
   },
   {
     "id": 12,
-    "chapter": "Тактика",
+    "chapter": "tactics",
     "preset": [
       {
         "x": 0,
@@ -1089,7 +1089,7 @@
   },
   {
     "id": 13,
-    "chapter": "Тактика",
+    "chapter": "tactics",
     "preset": [
       {
         "x": 1,
@@ -1151,7 +1151,7 @@
   },
   {
     "id": 14,
-    "chapter": "Тактика",
+    "chapter": "tactics",
     "preset": [
       {
         "x": 2,
@@ -1237,7 +1237,7 @@
   },
   {
     "id": 15,
-    "chapter": "Тактика",
+    "chapter": "tactics",
     "preset": [
       {
         "x": 1,
@@ -1323,7 +1323,7 @@
   },
   {
     "id": 16,
-    "chapter": "Тактика",
+    "chapter": "tactics",
     "preset": [
       {
         "x": 4,
@@ -1385,7 +1385,7 @@
   },
   {
     "id": 17,
-    "chapter": "Комбинации",
+    "chapter": "combinations",
     "preset": [
       {
         "x": 3,
@@ -1431,7 +1431,7 @@
   },
   {
     "id": 18,
-    "chapter": "Комбинации",
+    "chapter": "combinations",
     "preset": [
       {
         "x": 4,
@@ -1493,7 +1493,7 @@
   },
   {
     "id": 19,
-    "chapter": "Комбинации",
+    "chapter": "combinations",
     "preset": [
       {
         "x": 4,
@@ -1555,7 +1555,7 @@
   },
   {
     "id": 20,
-    "chapter": "Комбинации",
+    "chapter": "combinations",
     "preset": [
       {
         "x": 0,
@@ -1665,7 +1665,7 @@
   },
   {
     "id": 21,
-    "chapter": "Комбинации",
+    "chapter": "combinations",
     "preset": [
       {
         "x": 4,
@@ -1735,7 +1735,7 @@
   },
   {
     "id": 22,
-    "chapter": "Комбинации",
+    "chapter": "combinations",
     "preset": [
       {
         "x": 0,
@@ -1829,7 +1829,7 @@
   },
   {
     "id": 23,
-    "chapter": "Комбинации",
+    "chapter": "combinations",
     "preset": [
       {
         "x": 4,
@@ -1963,7 +1963,7 @@
   },
   {
     "id": 24,
-    "chapter": "Комбинации",
+    "chapter": "combinations",
     "preset": [
       {
         "x": 3,
@@ -2009,7 +2009,7 @@
   },
   {
     "id": 25,
-    "chapter": "Контратака",
+    "chapter": "counterattack",
     "preset": [
       {
         "x": 4,
@@ -2063,7 +2063,7 @@
   },
   {
     "id": 26,
-    "chapter": "Контратака",
+    "chapter": "counterattack",
     "preset": [
       {
         "x": 2,
@@ -2109,7 +2109,7 @@
   },
   {
     "id": 27,
-    "chapter": "Контратака",
+    "chapter": "counterattack",
     "preset": [
       {
         "x": 0,
@@ -2243,7 +2243,7 @@
   },
   {
     "id": 28,
-    "chapter": "Контратака",
+    "chapter": "counterattack",
     "preset": [
       {
         "x": 4,
@@ -2385,7 +2385,7 @@
   },
   {
     "id": 29,
-    "chapter": "Контратака",
+    "chapter": "counterattack",
     "preset": [
       {
         "x": 0,
@@ -2487,7 +2487,7 @@
   },
   {
     "id": 30,
-    "chapter": "Контратака",
+    "chapter": "counterattack",
     "preset": [
       {
         "x": 4,
@@ -2557,7 +2557,7 @@
   },
   {
     "id": 31,
-    "chapter": "Контратака",
+    "chapter": "counterattack",
     "preset": [
       {
         "x": 3,
@@ -2683,7 +2683,7 @@
   },
   {
     "id": 32,
-    "chapter": "Контратака",
+    "chapter": "counterattack",
     "preset": [
       {
         "x": 3,
@@ -2753,7 +2753,7 @@
   },
   {
     "id": 33,
-    "chapter": "Сложные позиции",
+    "chapter": "advanced",
     "preset": [
       {
         "x": 2,
@@ -2831,7 +2831,7 @@
   },
   {
     "id": 34,
-    "chapter": "Сложные позиции",
+    "chapter": "advanced",
     "preset": [
       {
         "x": 3,
@@ -2901,7 +2901,7 @@
   },
   {
     "id": 35,
-    "chapter": "Сложные позиции",
+    "chapter": "advanced",
     "preset": [
       {
         "x": 4,
@@ -2987,7 +2987,7 @@
   },
   {
     "id": 36,
-    "chapter": "Сложные позиции",
+    "chapter": "advanced",
     "preset": [
       {
         "x": 1,
@@ -3073,7 +3073,7 @@
   },
   {
     "id": 37,
-    "chapter": "Сложные позиции",
+    "chapter": "advanced",
     "preset": [
       {
         "x": 1,
@@ -3191,7 +3191,7 @@
   },
   {
     "id": 38,
-    "chapter": "Сложные позиции",
+    "chapter": "advanced",
     "preset": [
       {
         "x": 4,
@@ -3309,7 +3309,7 @@
   },
   {
     "id": 39,
-    "chapter": "Сложные позиции",
+    "chapter": "advanced",
     "preset": [
       {
         "x": 1,
@@ -3363,7 +3363,7 @@
   },
   {
     "id": 40,
-    "chapter": "Сложные позиции",
+    "chapter": "advanced",
     "preset": [
       {
         "x": 2,

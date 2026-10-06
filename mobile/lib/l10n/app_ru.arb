@@ -1,0 +1,495 @@
+{
+  "@@locale": "ru",
+  "appTitle": "FOUR³",
+  "close": "Закрыть",
+  "retry": "Попробовать снова",
+  "retryShort": "Повторить",
+  "back": "Назад",
+  "next": "Дальше",
+  "save": "Сохранить",
+  "delete": "Удалить",
+  "cancel": "Отмена",
+  "continueAction": "Продолжить",
+  "settings": "Настройки",
+  "mainMenu": "Главное меню",
+  "toMainMenu": "В главное меню",
+  "levels": "Уровни",
+  "history": "История",
+  "online": "Онлайн",
+  "versusAi": "Против ИИ",
+  "twoPlayers": "Вдвоём",
+  "guest": "Гость",
+  "player": "Игрок",
+  "playerOne": "Игрок 1",
+  "playerTwo": "Игрок 2",
+  "you": "Вы",
+  "bot": "Бот",
+  "opponent": "соперник",
+  "win": "Победа",
+  "loss": "Поражение",
+  "draw": "Ничья",
+  "loadingGame": "Загрузка игры",
+  "loadingBoard": "Доска и фишки…",
+  "loadBoardFailed": "Не удалось загрузить поле",
+  "checkConnection": "Проверьте соединение и попробуйте ещё раз.",
+  "newGame": "Новая игра",
+  "howToPlay": "Как играть",
+  "account": "Личный кабинет",
+  "matchHistory": "История партий",
+  "turnOffSound": "Выключить звук",
+  "turnOnSound": "Включить звук",
+  "gameName": "Четыре в ряд",
+  "gameTagline": "Классическая игра — теперь в 3D",
+  "rankedGame": "Рейтинговая игра",
+  "playerRating": "Рейтинг игроков",
+  "difficulty": "Сложность",
+  "easy": "Легко",
+  "medium": "Средне",
+  "hard": "Сложно",
+  "sameDevice": "На одном устройстве",
+  "threeDifficulties": "Три сложности",
+  "lobbyCodeMode": "По коду лобби",
+  "playingAs": "Вы: ",
+  "secondPlayer": "Второй игрок: ",
+  "startGame": "Начать игру",
+  "language": "Язык",
+  "systemLanguage": "Система",
+  "languageRussian": "Русский",
+  "languageEnglish": "English",
+  "languageSpanish": "Español",
+  "languageFrench": "Français",
+  "languagePortugueseBrazil": "Português (Brasil)",
+  "languageGerman": "Deutsch",
+  "soundVolume": "Громкость звуков",
+  "soundDisabledInHeader": "Звук выключен кнопкой в шапке",
+  "animations": "Анимации",
+  "animationsDescription": "Падение фишек и плавная камера",
+  "movePreview": "Предпросмотр хода",
+  "movePreviewDescription": "Показывать фишку при наведении",
+  "xrayDefault": "Рентген по умолчанию",
+  "xrayDefaultDescription": "Прозрачные фишки в новой партии",
+  "settingsSaveFailed": "Не удалось сохранить настройки.",
+  "botMoving": "Ход бота…",
+  "aiThinking": "ИИ обдумывает ход…",
+  "moveCompleted": "Ход выполнен",
+  "pause": "Пауза",
+  "replayMove": "Повтор · ход {move}",
+  "@replayMove": {
+    "placeholders": {
+      "move": {
+        "type": "int"
+      }
+    }
+  },
+  "gameFinished": "Партия завершена",
+  "noConnection": "Нет соединения",
+  "waitingForOpponent": "Ждём соперника",
+  "waitingForOpponentEllipsis": "Ждём соперника…",
+  "waitingForConnection": "Ждём подключения",
+  "yourTurn": "Ваш ход",
+  "opponentTurn": "Ход соперника",
+  "playerTurn": "Ходит {name}",
+  "@playerTurn": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "levelNumber": "Уровень {level}",
+  "@levelNumber": {
+    "placeholders": {
+      "level": {
+        "type": "int"
+      }
+    }
+  },
+  "secondsShort": " сек",
+  "connectionClosed": "Соединение закрыто",
+  "reconnecting": "Восстанавливаем соединение…",
+  "shareLobbyCode": "Передайте код другу — ждём второго игрока",
+  "opponentDisconnected": "Соперник отключился. Ждём возвращения…",
+  "playingGraphite": "Вы играете графитовыми · ●",
+  "playingLight": "Вы играете светлыми · ○",
+  "ratingValue": "Рейтинг: {value}",
+  "@ratingValue": {
+    "placeholders": {
+      "value": {
+        "type": "int"
+      }
+    }
+  },
+  "rankedGameUpper": "РЕЙТИНГОВАЯ ИГРА",
+  "lobbyUpper": "ЛОББИ",
+  "copyLobbyCode": "Скопировать код лобби",
+  "codeCopied": "Код скопирован",
+  "leaveLobby": "Покинуть лобби",
+  "exitLobby": "Выйти из лобби",
+  "undo": "Отменить",
+  "xray": "Рентген",
+  "view": "Вид",
+  "moves": "{count, plural, =0{0 ходов} one{{count} ход} few{{count} хода} many{{count} ходов} other{{count} хода}}",
+  "@moves": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "pauseRequest": "Запрос паузы",
+  "twoMinutePause": "Пауза · 2 минуты",
+  "pauseReadyHint": "Оба готовы — продолжаем сразу. Иначе ждём окончания таймера.",
+  "youAreReady": "Вы готовы",
+  "ready": "Готов",
+  "waitingOpponentReady": "Ждём готовности соперника.",
+  "opponentReady": "Соперник готов.",
+  "waitingOpponentApproval": "Ждём согласия соперника.",
+  "playerOffersPause": "{name} предлагает паузу на 2 минуты.",
+  "@playerOffersPause": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "pauseAnswerTime": "На ответ: {seconds} сек. До принятия паузы партия продолжается.",
+  "@pauseAnswerTime": {
+    "placeholders": {
+      "seconds": {
+        "type": "int"
+      }
+    }
+  },
+  "acceptPause": "Принять паузу",
+  "cancelRequest": "Отменить запрос",
+  "decline": "Отклонить",
+  "rankedMatchFinished": "РЕЙТИНГОВАЯ ПАРТИЯ ЗАВЕРШЕНА",
+  "youBeatOpponent": "Вы обыграли {opponent}",
+  "@youBeatOpponent": {
+    "placeholders": {
+      "opponent": {
+        "type": "String"
+      }
+    }
+  },
+  "youBeatFallbackOpponent": "Вы обыграли соперника",
+  "opponentWon": "{opponent} выиграл эту партию",
+  "@opponentWon": {
+    "placeholders": {
+      "opponent": {
+        "type": "String"
+      }
+    }
+  },
+  "fallbackOpponentWon": "Соперник выиграл эту партию",
+  "evenMatch": "Равная партия с {opponent}",
+  "@evenMatch": {
+    "placeholders": {
+      "opponent": {
+        "type": "String"
+      }
+    }
+  },
+  "evenMatchWithFallbackOpponent": "Равная партия с соперником",
+  "eloChange": "ИЗМЕНЕНИЕ ELO",
+  "waitingOpponentDecision": "Ждём решения соперника",
+  "playAgainWith": "Сыграть ещё раз с {opponent}",
+  "@playAgainWith": {
+    "placeholders": {
+      "opponent": {
+        "type": "String"
+      }
+    }
+  },
+  "playAgainWithFallbackOpponent": "Сыграть ещё раз с соперником",
+  "opponentOffline": "Соперник не в сети",
+  "rematchUnrated": "Реванш не влияет на рейтинг",
+  "viewBoard": "Посмотреть поле",
+  "camera": "Камера",
+  "closeViewMenu": "Закрыть меню вида",
+  "viewPerspective": "3D",
+  "viewTop": "Сверху",
+  "viewFront": "Спереди",
+  "showLayers": "Показать слои",
+  "allLayers": "Все",
+  "layersHint": "Включайте и скрывайте каждый слой отдельно.\nНовый ход вернёт все слои.",
+  "leaveLobbyQuestion": "Выйти из лобби?",
+  "finishGameQuestion": "Завершить текущую партию?",
+  "rankedLeaveWarning": "Выход засчитается как поражение и уменьшит рейтинг. При потере соединения у вас до 60 секунд на возврат; таймер хода продолжает идти.",
+  "lobbyLeaveWarning": "Лобби закроется для обоих игроков. При обычном обновлении страницы вы сможете вернуться в игру.",
+  "movesWillBeLost": "Текущие ходы будут потеряны.",
+  "leaveToMenu": "Выйти в меню",
+  "restartQuestion": "Начать партию заново?",
+  "restart": "Начать заново",
+  "stayInGame": "Остаться в игре",
+  "onlineContinuesInMenu": "Онлайн-партия продолжается, пока открыто меню.",
+  "pauseUsed": "Пауза использована",
+  "offerPause": "Предложить паузу · 2 мин",
+  "timeStopped": "Время остановлено.",
+  "backToLevels": "К уровням",
+  "levelCompleted": "Уровень пройден",
+  "winnerName": "Победа: {name}",
+  "@winnerName": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "replayStart": "В начало повтора",
+  "previousMove": "Предыдущий ход",
+  "nextMove": "Следующий ход",
+  "replayEnd": "В конец повтора",
+  "replayProgress": "Ход {current} из {total}",
+  "@replayProgress": {
+    "placeholders": {
+      "current": {
+        "type": "int"
+      },
+      "total": {
+        "type": "int"
+      }
+    }
+  },
+  "finishReplay": "Завершить просмотр",
+  "newRecord": "Новый рекорд",
+  "nextLevel": "Следующий уровень",
+  "retryLevel": "Повторить уровень",
+  "anotherGame": "Ещё партия",
+  "replayGame": "Повтор партии",
+  "columnFull": "Столбец заполнен. Выберите другой.",
+  "aiMoveFailed": "Не удалось рассчитать ход. Нажмите «Продолжить», чтобы повторить.",
+  "sceneLoadFailed": "Не удалось загрузить 3D-поле.\nПерезапустите приложение.",
+  "tutorialMoveTab": "Как ходить",
+  "tutorialMoveTitle": "Фишки встают друг на друга",
+  "tutorialMoveBody": "Нажмите на лунку — фишка займёт нижнее свободное место. Ходы чередуются. В одном столбце помещается до пяти фишек.",
+  "tutorialHorizontalTab": "Горизонталь",
+  "tutorialHorizontalTitle": "Четыре на одном уровне",
+  "tutorialHorizontalBody": "Четыре фишки одного цвета стоят подряд в соседних столбцах. Такая линия может идти вдоль любой стороны доски и на любой высоте.",
+  "tutorialVerticalTab": "Вертикаль",
+  "tutorialVerticalTitle": "Четыре в одном столбце",
+  "tutorialVerticalBody": "Соберите четыре фишки своего цвета друг над другом. Фишка соперника внутри столбца разрывает линию.",
+  "tutorialLayerDiagonalTab": "Диагональ слоя",
+  "tutorialLayerDiagonalTitle": "По диагонали одного слоя",
+  "tutorialLayerDiagonalBody": "Каждая следующая фишка смещена на одну лунку в двух направлениях. Высота остаётся одинаковой.",
+  "tutorialRaisedDiagonalTab": "Диагональ на высоте",
+  "tutorialRaisedDiagonalTitle": "Победа на любом слое",
+  "tutorialRaisedDiagonalBody": "Соберите четыре фишки по диагонали на одной высоте. Такая линия побеждает на любом слое, а цвет фишек под ними не важен.",
+  "tutorialSpaceDiagonalTab": "Объёмная диагональ",
+  "tutorialSpaceDiagonalTitle": "Четыре по пространственной диагонали",
+  "tutorialSpaceDiagonalBody": "Каждая следующая фишка смещена на одну лунку в обоих направлениях и на один уровень вверх. Такая прямая линия тоже приносит победу.",
+  "tutorialGoalBefore": "Соберите ",
+  "tutorialGoalStrong": "4 фишки своего цвета",
+  "tutorialGoalAfter": " по прямой, без пропусков.",
+  "pauseExample": "Остановить пример",
+  "playExample": "Воспроизвести пример",
+  "videoPosition": "Позиция ролика",
+  "replayExample": "Повторить пример",
+  "fourInRowWin": "4 в ряд — победа",
+  "videoUnavailable": "Видео недоступно. Показан итоговый пример.",
+  "firstExample": "К первому примеру",
+  "nextExample": "Следующий пример",
+  "start": "Начать",
+  "gotIt": "Понятно",
+  "levelsIntro": "Победите из готовой позиции за меньшее число ходов.",
+  "completedProgress": "{completed} / {total} пройдено",
+  "@completedProgress": {
+    "placeholders": {
+      "completed": {
+        "type": "int"
+      },
+      "total": {
+        "type": "int"
+      }
+    }
+  },
+  "recordEmpty": "Рекорд: —",
+  "recordValue": "Рекорд: {moves}",
+  "@recordValue": {
+    "placeholders": {
+      "moves": {
+        "type": "String"
+      }
+    }
+  },
+  "levelSyncOffline": "Нет связи с сервером. Прогресс будет сохранён при подключении.",
+  "levelSignInHint": "Войдите в аккаунт, чтобы сохранять прогресс на сервере.",
+  "levelProgressSaved": "Прогресс сохранён в аккаунте.",
+  "chapterFirstSteps": "Первые решения",
+  "chapterTactics": "Тактика",
+  "chapterCombinations": "Комбинации",
+  "chapterCounterattack": "Контратака",
+  "chapterAdvanced": "Сложные позиции",
+  "leaderboardTop": "Топ 100 · Elo",
+  "refreshLeaderboard": "Обновить рейтинг",
+  "leaderboardEmpty": "В рейтинге пока нет игроков.",
+  "leaderboardFailed": "Не удалось загрузить рейтинг.",
+  "leaderboardLoading": "Загрузка рейтинга…",
+  "place": "Место",
+  "rankedGames": "Игры",
+  "findRankedOpponent": "Рейтинговая игра — найти соперника",
+  "connecting": "Подключаемся…",
+  "createLobby": "Создать лобби",
+  "lobbyCode": "Код лобби",
+  "joinLobby": "Войти в лобби",
+  "restoringSearch": "Восстанавливаем поиск…",
+  "searchingOpponent": "Ищем соперника…",
+  "searchReconnectHint": "Соединение прервалось. Поиск продолжится автоматически после подключения.",
+  "ratedSearchHint": "Рейтинговый поиск среди зарегистрированных игроков. На подтверждение — 15 секунд.",
+  "guestSearchHint": "Поиск среди гостей, без рейтинга. На подтверждение — 15 секунд.",
+  "cancelSearch": "Отменить поиск",
+  "opponentFound": "Соперник найден: {opponent}",
+  "@opponentFound": {
+    "placeholders": {
+      "opponent": {
+        "type": "String"
+      }
+    }
+  },
+  "guestUnratedGame": "Гостевая игра без рейтинга",
+  "opponentRating": "Рейтинг соперника: {rating}",
+  "@opponentRating": {
+    "placeholders": {
+      "rating": {
+        "type": "int"
+      }
+    }
+  },
+  "ratedLabel": "На рейтинг",
+  "unratedMeetingLimit": "Без очков · лимит повторных встреч",
+  "confirmMatch": "Подтвердите игру за {seconds} сек. Матч начнётся, когда оба игрока подтвердят участие.",
+  "@confirmMatch": {
+    "placeholders": {
+      "seconds": {
+        "type": "int"
+      }
+    }
+  },
+  "confirmRatedMatch": "Подтвердите игру за {seconds} сек. Матч начнётся, когда оба игрока подтвердят участие. На ход — 90 сек. Выход — поражение.",
+  "@confirmRatedMatch": {
+    "placeholders": {
+      "seconds": {
+        "type": "int"
+      }
+    }
+  },
+  "waitingMatchConfirmation": "Ждём подтверждения соперника…",
+  "acceptMatch": "Принять матч",
+  "refuse": "Отказаться",
+  "matchSearchFailed": "Не удалось найти игру.",
+  "searchAgain": "Искать снова",
+  "enterFiveLetterCode": "Введите пятибуквенный код лобби.",
+  "searchCancelled": "Поиск отменён.",
+  "moveNotSent": "Нет связи с сервером. Ход не отправлен.",
+  "invalidServerResponse": "Сервер прислал некорректный ответ.",
+  "connectionLost": "Связь с сервером потеряна. Подключитесь снова.",
+  "historyLoading": "Загружаем статистику…",
+  "lastFiftyMatches": "Последние 50 партий; статистика всех режимов.",
+  "matchesStat": "Партий",
+  "winsStat": "Побед",
+  "lossesStat": "Поражений",
+  "drawsStat": "Ничьих",
+  "historyEmpty": "Сыграйте партию до конца — она появится здесь автоматически.",
+  "matchTitle": "Партия",
+  "matchTitleLabel": "Название партии",
+  "matchSummary": "{date} · {mode} · {moves}",
+  "@matchSummary": {
+    "placeholders": {
+      "date": {
+        "type": "String"
+      },
+      "mode": {
+        "type": "String"
+      },
+      "moves": {
+        "type": "String"
+      }
+    }
+  },
+  "earlyFinish": "досрочно",
+  "watch": "Смотреть",
+  "titleAction": "Название",
+  "removeHistoryHint": "Убрать из истории; статистика сохранится",
+  "historyGuestHint": "Войдите в аккаунт, чтобы сохранять статистику и историю партий на сервере. Гостевые партии не учитываются.",
+  "signInOrRegister": "Войти или зарегистрироваться",
+  "ratingPrefix": "Рейтинг: ",
+  "username": "Имя пользователя",
+  "usernameHint": "Английские буквы, цифры и _ · 3–24 символа",
+  "password": "Пароль",
+  "forgotPasswordHint": "Пришлём ссылку для создания нового пароля.",
+  "sending": "Отправляем…",
+  "pleaseWait": "Подождите…",
+  "register": "Зарегистрироваться",
+  "signIn": "Войти",
+  "getLink": "Получить ссылку",
+  "forgotPassword": "Забыли пароль?",
+  "resendVerification": "Отправить подтверждение ещё раз",
+  "returnToSignIn": "Вернуться ко входу",
+  "signOut": "Выйти",
+  "changePasswordUpper": "СМЕНА ПАРОЛЯ",
+  "updateCredentials": "Обновите данные входа",
+  "currentPassword": "Текущий пароль",
+  "newPassword": "Новый пароль",
+  "passwordLengthHint": "От 8 до 128 символов",
+  "repeatNewPassword": "Повторите новый пароль",
+  "saving": "Сохраняем…",
+  "changePassword": "Изменить пароль",
+  "setNewPasswordHint": "Задайте новый пароль для аккаунта.",
+  "repeatPassword": "Повторите пароль",
+  "usernameValidation": "Используйте 3–24 английские буквы, цифры или символ _.",
+  "passwordMinValidation": "Пароль должен содержать от 8 символов.",
+  "passwordMismatch": "Пароли не совпадают.",
+  "newPasswordValidation": "Новый пароль должен содержать от 8 до 128 символов.",
+  "newPasswordsMismatch": "Новые пароли не совпадают.",
+  "passwordMustDiffer": "Новый пароль должен отличаться от текущего.",
+  "currentProfileUpper": "ТЕКУЩИЙ ПРОФИЛЬ",
+  "registration": "Регистрация",
+  "login": "Вход",
+  "overview": "Обзор",
+  "security": "Безопасность",
+  "playerProfileUpper": "ПРОФИЛЬ ИГРОКА",
+  "localAccount": "Локальный аккаунт",
+  "ratingUpper": "РЕЙТИНГ",
+  "pointsToLeague": "{points} очков до уровня «{league}»",
+  "@pointsToLeague": {
+    "placeholders": {
+      "points": {
+        "type": "int"
+      },
+      "league": {
+        "type": "String"
+      }
+    }
+  },
+  "ratedMatches": "{count, plural, =0{0 рейтинговых партий} one{{count} рейтинговая партия} few{{count} рейтинговые партии} many{{count} рейтинговых партий} other{{count} рейтинговых партий}}",
+  "@ratedMatches": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "careerUpper": "КАРЬЕРА",
+  "winRate": "Процент побед",
+  "recentMatchesUpper": "ПОСЛЕДНИЕ ПАРТИИ",
+  "recentForm": "Недавняя форма",
+  "fullHistory": "Вся история",
+  "firstMatchHint": "Завершите первую партию — здесь появятся ваши недавние результаты.",
+  "drawShort": "Н",
+  "winShort": "В",
+  "lossShort": "П",
+  "leagueBronze": "Бронза",
+  "leagueSilver": "Серебро",
+  "leagueGold": "Золото",
+  "leaguePlatinum": "Платина",
+  "leagueMaster": "Мастер",
+  "leagueTop": "Высшая лига",
+  "emailVerified": "Email подтверждён.",
+  "passwordChanged": "Пароль изменён.",
+  "networkError": "Нет связи с сервером.",
+  "accountCreatedVerify": "Аккаунт создан. Проверьте «Входящие» и папку «Спам», затем подтвердите email.",
+  "emailSent": "Письмо отправлено.",
+  "passwordResetSent": "Если аккаунт существует, письмо отправлено.",
+  "genericServerError": "Ошибка сервера.",
+  "serverWrongType": "Сервер прислал ответ неверного типа."
+}

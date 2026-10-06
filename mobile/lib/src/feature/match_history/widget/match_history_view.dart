@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:four3/src/common/theme/app_theme.dart';
+import 'package:four3/src/common/utils/build_context_extension.dart';
 import 'package:four3/src/common/widget/app_controls.dart';
 import 'package:four3/src/feature/game/bloc/game_bloc.dart';
 import 'package:four3/src/feature/game/model/game_models.dart';
@@ -8,6 +9,7 @@ import 'package:four3/src/feature/game/widget/game_root_scope.dart';
 import 'package:four3/src/feature/match_history/bloc/match_history_bloc.dart';
 import 'package:four3/src/feature/match_history/model/match_history_models.dart';
 import 'package:four3/src/feature/match_history/widget/match_history_root_scope.dart';
+import 'package:intl/intl.dart';
 
 class MatchHistoryView extends StatefulWidget {
   const new({this.onSignIn, super.key});
@@ -34,11 +36,10 @@ class _MatchHistoryViewState extends State<MatchHistoryView> {
     return BlocBuilder<MatchHistoryBloc, MatchHistoryState>(
       bloc: bloc,
       builder: (context, state) => switch (state) {
-        MatchHistoryState$Loading() ||
-        MatchHistoryState$Initial() => const Center(
+        MatchHistoryState$Loading() || MatchHistoryState$Initial() => Center(
           child: Text(
-            'Загружаем статистику…',
-            style: TextStyle(color: AppColors.muted, fontSize: 11),
+            context.l10n.historyLoading,
+            style: const TextStyle(color: AppColors.muted, fontSize: 11),
           ),
         ),
         MatchHistoryState$Guest() => _Guest(onSignIn: widget.onSignIn),
@@ -67,15 +68,13 @@ class _MatchHistoryViewState extends State<MatchHistoryView> {
       children: [
         Text.rich(
           TextSpan(
-            text: 'Рейтинг: ',
+            text: context.l10n.ratingPrefix,
             children: [
               TextSpan(
                 text: '${data.rating.points}',
                 style: const TextStyle(fontWeight: FontWeight.w800),
               ),
-              const TextSpan(
-                text: '. Последние 50 партий; статистика всех режимов.',
-              ),
+              TextSpan(text: '. ${context.l10n.lastFiftyMatches}'),
             ],
           ),
           style: const TextStyle(color: AppColors.muted, fontSize: 11),
@@ -83,20 +82,23 @@ class _MatchHistoryViewState extends State<MatchHistoryView> {
         const SizedBox(height: 10),
         Row(
           children: [
-            _Stat('Партий', data.statistics.total),
-            _Stat('Побед', data.statistics.wins),
-            _Stat('Поражений', data.statistics.losses),
-            _Stat('Ничьих', data.statistics.draws),
+            _Stat(context.l10n.matchesStat, data.statistics.total),
+            _Stat(context.l10n.winsStat, data.statistics.wins),
+            _Stat(context.l10n.lossesStat, data.statistics.losses),
+            _Stat(context.l10n.drawsStat, data.statistics.draws),
           ],
         ),
         const SizedBox(height: 10),
         Expanded(
           child: shown.isEmpty
-              ? const Center(
+              ? Center(
                   child: Text(
-                    'Сыграйте партию до конца — она появится здесь автоматически.',
+                    context.l10n.historyEmpty,
                     textAlign: TextAlign.center,
-                    style: TextStyle(color: AppColors.muted, fontSize: 11),
+                    style: const TextStyle(
+                      color: AppColors.muted,
+                      fontSize: 11,
+                    ),
                   ),
                 )
               : ListView.separated(
@@ -126,7 +128,9 @@ class _MatchHistoryViewState extends State<MatchHistoryView> {
                         );
                         setState(() => _editing = null);
                       } else {
-                        _title.text = shown[index].title;
+                        _title.text = shown[index].title.isEmpty
+                            ? context.l10n.matchTitle
+                            : shown[index].title;
                         setState(() => _editing = shown[index].id);
                       }
                     },
@@ -144,7 +148,7 @@ class _MatchHistoryViewState extends State<MatchHistoryView> {
                     ? null
                     : () => setState(() => _page = page - 1),
                 style: _smallButtonStyle,
-                child: const Text('Назад'),
+                child: Text(context.l10n.back),
               ),
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 12),
@@ -155,7 +159,7 @@ class _MatchHistoryViewState extends State<MatchHistoryView> {
                     ? null
                     : () => setState(() => _page = page + 1),
                 style: _smallButtonStyle,
-                child: const Text('Дальше'),
+                child: Text(context.l10n.next),
               ),
             ],
           ),
@@ -221,11 +225,17 @@ class ExpandedMatchCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final Player? winner = match.game.winner;
     final String mode = switch (match.mode) {
-      'ai' => 'Против AI',
-      'online' => 'Онлайн',
-      _ => 'Вдвоём',
+      'ai' => context.l10n.versusAi,
+      'online' => context.l10n.online,
+      _ => context.l10n.twoPlayers,
     };
     final DateTime date = DateTime.fromMillisecondsSinceEpoch(match.date);
+    final String formattedDate = DateFormat.yMd(
+      Localizations.localeOf(context).toLanguageTag(),
+    ).format(date);
+    final String result = winner == null
+        ? context.l10n.draw
+        : context.l10n.winnerName(match.names[winner.index]);
     return Container(
       padding: const EdgeInsets.all(8),
       decoration: BoxDecoration(
@@ -240,19 +250,23 @@ class ExpandedMatchCard extends StatelessWidget {
               controller: title,
               autofocus: true,
               maxLength: 80,
-              semanticLabel: 'Название партии',
+              semanticLabel: context.l10n.matchTitleLabel,
               fontSize: 14,
               onSubmitted: (_) => onEdit(),
             )
           else
             Text(
-              match.title,
+              match.title.isEmpty ? context.l10n.matchTitle : match.title,
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
               style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w800),
             ),
           Text(
-            '${date.day.toString().padLeft(2, '0')}.${date.month.toString().padLeft(2, '0')}.${date.year} · $mode · ${match.game.history.length} ходов',
+            context.l10n.matchSummary(
+              formattedDate,
+              mode,
+              context.l10n.moves(match.game.history.length),
+            ),
             style: const TextStyle(
               color: AppColors.muted,
               fontSize: 10,
@@ -260,7 +274,7 @@ class ExpandedMatchCard extends StatelessWidget {
             ),
           ),
           Text(
-            '${winner == null ? 'Ничья' : 'Победа: ${match.names[winner.index]}'}${match.ratingChange == null ? '' : ' · ${match.ratingChange! >= 0 ? '+' : ''}${match.ratingChange} Elo'}${match.endReason == null ? '' : ' · досрочно'}',
+            '$result${match.ratingChange == null ? '' : ' · ${match.ratingChange! >= 0 ? '+' : ''}${match.ratingChange} Elo'}${match.endReason == null ? '' : ' · ${context.l10n.earlyFinish}'}',
             style: const TextStyle(
               color: AppColors.muted,
               fontSize: 10,
@@ -277,22 +291,24 @@ class ExpandedMatchCard extends StatelessWidget {
                     AppColors.accent,
                   ),
                 ),
-                child: const Text('Смотреть'),
+                child: Text(context.l10n.watch),
               ),
               const SizedBox(width: 6),
               OutlinedButton(
                 onPressed: onEdit,
                 style: _smallButtonStyle,
-                child: Text(editing ? 'Сохранить' : 'Название'),
+                child: Text(
+                  editing ? context.l10n.save : context.l10n.titleAction,
+                ),
               ),
               const SizedBox(width: 6),
               Expanded(
                 child: Tooltip(
-                  message: 'Убрать из истории; статистика сохранится',
+                  message: context.l10n.removeHistoryHint,
                   child: OutlinedButton(
                     onPressed: onRemove,
                     style: _smallButtonStyle,
-                    child: const Text('Удалить'),
+                    child: Text(context.l10n.delete),
                   ),
                 ),
               ),
@@ -312,14 +328,18 @@ class _Guest extends StatelessWidget {
     mainAxisSize: MainAxisSize.min,
     crossAxisAlignment: CrossAxisAlignment.stretch,
     children: [
-      const Text(
-        'Войдите в аккаунт, чтобы сохранять статистику и историю партий на сервере. Гостевые партии не учитываются.',
-        style: TextStyle(color: AppColors.muted, fontSize: 11, height: 1.5),
+      Text(
+        context.l10n.historyGuestHint,
+        style: const TextStyle(
+          color: AppColors.muted,
+          fontSize: 11,
+          height: 1.5,
+        ),
       ),
       const SizedBox(height: 12),
       FilledButton(
         onPressed: onSignIn,
-        child: const Text('Войти или зарегистрироваться'),
+        child: Text(context.l10n.signInOrRegister),
       ),
     ],
   );
@@ -343,7 +363,7 @@ class _Failure extends StatelessWidget {
       mainAxisSize: MainAxisSize.min,
       children: [
         Text(message),
-        OutlinedButton(onPressed: retry, child: const Text('Повторить')),
+        OutlinedButton(onPressed: retry, child: Text(context.l10n.retryShort)),
       ],
     ),
   );

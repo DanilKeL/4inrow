@@ -3,10 +3,18 @@ import 'dart:convert';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:http/http.dart' as http;
 
+enum RestClientFailure { network, invalidResponse, wrongType, server }
+
 final class RestClientException implements Exception {
-  const new(this.message, {this.statusCode, this.data});
+  const new(
+    this.message, {
+    this.failure = RestClientFailure.server,
+    this.statusCode,
+    this.data,
+  });
 
   final String message;
+  final RestClientFailure failure;
   final int? statusCode;
   final Map<String, dynamic>? data;
 
@@ -117,7 +125,7 @@ final class RestClient$Http implements RestClient {
           .then(http.Response.fromStream)
           .timeout(const Duration(seconds: 8));
     } on Object {
-      throw const RestClientException('Нет связи с сервером.');
+      throw const RestClientException('', failure: RestClientFailure.network);
     }
     await _captureCookie(response.headers['set-cookie']);
     final Object? body;
@@ -127,19 +135,21 @@ final class RestClient$Http implements RestClient {
           : jsonDecode(response.body);
     } on FormatException {
       throw RestClientException(
-        'Сервер прислал некорректный ответ.',
+        '',
+        failure: RestClientFailure.invalidResponse,
         statusCode: response.statusCode,
       );
     }
     if (body is! Map<String, dynamic>) {
       throw RestClientException(
-        'Сервер прислал ответ неверного типа.',
+        '',
+        failure: RestClientFailure.wrongType,
         statusCode: response.statusCode,
       );
     }
     if (response.statusCode < 200 || response.statusCode >= 300) {
       throw RestClientException(
-        body['error']?.toString() ?? 'Ошибка сервера.',
+        body['error']?.toString() ?? '',
         statusCode: response.statusCode,
         data: body,
       );

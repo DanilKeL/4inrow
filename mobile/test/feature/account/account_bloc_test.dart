@@ -10,7 +10,7 @@ void main() {
 
   setUp(() async {
     SharedPreferences.setMockInitialValues(const {
-      'four-cubed-guest-name': 'Гость_123456',
+      'four-cubed-guest-name': 'Guest_123456',
     });
     datasource = _AccountDatasource();
     bloc = AccountBloc(
@@ -40,7 +40,7 @@ void main() {
       (state) => state is AccountState$Ready,
     )) as AccountState$Ready;
     expect(ready.profile.username, 'Alice');
-    expect(ready.notice, 'Пароль изменён.');
+    expect(ready.clientNotice, AccountNotice.passwordChanged);
     expect(datasource.completedToken, 'reset-token');
   });
 
@@ -67,7 +67,7 @@ void main() {
   test('marks email registration complete and keeps its notice', () async {
     datasource.registrationResponse = {
       'verificationRequired': true,
-      'message': 'Письмо с подтверждением отправлено. Проверьте «Входящие» и папку «Спам».',
+      'message': 'Verification sent. Check your inbox and spam folder.',
     };
     bloc.add(const AccountEvent$Load());
     await bloc.stream.firstWhere((state) => state is AccountState$Ready);
@@ -81,7 +81,7 @@ void main() {
 
     expect(ready.profile.username, isNull);
     expect(ready.registrationCompleted, isTrue);
-    expect(ready.notice, contains('папку «Спам»'));
+    expect(ready.notice, contains('spam folder'));
   });
 }
 
@@ -94,11 +94,11 @@ final class _AccountDatasource implements AccountDatasource {
   Future<Map<String, dynamic>> profile() async => signedIn
       ? {
           'username': 'Alice',
-          'guestName': 'Гость_123456',
+          'guestName': 'Guest_123456',
           'email': 'alice@example.com',
           'emailVerified': true,
         }
-      : {'guestName': 'Гость_123456'};
+      : {'guestName': 'Guest_123456'};
 
   @override
   Future<Map<String, dynamic>> completePasswordReset({
@@ -133,7 +133,7 @@ final class _AccountDatasource implements AccountDatasource {
   }) async => {'ok': true};
 
   @override
-  Future<Map<String, dynamic>> logout() async => {'guestName': 'Гость_123456'};
+  Future<Map<String, dynamic>> logout() async => {'guestName': 'Guest_123456'};
 
   @override
   Future<Map<String, dynamic>> register({

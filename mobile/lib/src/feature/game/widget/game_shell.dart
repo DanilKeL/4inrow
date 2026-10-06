@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:four3/src/common/theme/app_theme.dart';
+import 'package:four3/src/common/utils/build_context_extension.dart';
 import 'package:four3/src/common/widget/app_dialog.dart';
 import 'package:four3/src/feature/account/bloc/account_bloc.dart';
 import 'package:four3/src/feature/account/widget/account_root_scope.dart';
@@ -30,15 +31,14 @@ import 'package:four3/src/feature/settings/widget/settings_view.dart';
 import 'package:four3/src/feature/tutorial/widget/tutorial_view.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
-String _moveLabel(int count) {
-  final String ending = count % 100 >= 11 && count % 100 <= 14
-      ? 'ходов'
-      : count % 10 == 1
-      ? 'ход'
-      : count % 10 >= 2 && count % 10 <= 4
-      ? 'хода'
-      : 'ходов';
-  return '$count $ending';
+String _gameMessage(BuildContext context, GameViewData data) {
+  if (data.remoteMessage.isNotEmpty) return data.remoteMessage;
+  return switch (data.notice) {
+    GameNotice.columnFull => context.l10n.columnFull,
+    GameNotice.aiMoveFailed => context.l10n.aiMoveFailed,
+    GameNotice.reconnecting => context.l10n.reconnecting,
+    null => '',
+  };
 }
 
 class GameShell extends StatelessWidget {
@@ -130,8 +130,13 @@ class _GameShellBody extends StatelessWidget {
                                     fit: StackFit.expand,
                                     children: [
                                       _SceneCard(menu: false, child: sceneView),
-                                      if (data.message.isNotEmpty)
-                                        _GameMessage(message: data.message),
+                                      if (_gameMessage(
+                                        context,
+                                        data,
+                                      ).isNotEmpty)
+                                        _GameMessage(
+                                          message: _gameMessage(context, data),
+                                        ),
                                     ],
                                   )
                                 : _PortraitGameBoard(
@@ -235,17 +240,18 @@ class _GameShellBody extends StatelessWidget {
 
   void _openSetup(BuildContext context, GameMode mode) => showAppDialog<void>(
     context: context,
-    title: 'Новая игра',
+    title: context.l10n.newGame,
     child: GameSetupView(initialMode: mode),
   );
 
   void _openRated(BuildContext context) {
     final String name =
-        AccountRootScope.of(context).profile?.displayName ?? 'Игрок';
+        AccountRootScope.of(context).profile?.displayName ??
+        context.l10n.player;
     MatchmakingRootScope.of(context).add(MatchmakingEvent$Find(name));
     showAppDialog<void>(
       context: context,
-      title: 'Рейтинговая игра',
+      title: context.l10n.rankedGame,
       child: const OnlineSetupView(quickOnly: true),
     );
   }
@@ -300,18 +306,18 @@ class _Header extends StatelessWidget {
                 bloc: accountBloc,
                 builder: (context, _) => _HeaderAction(
                   icon: LucideIcons.userRound,
-                  label: accountBloc.profile?.displayName ?? 'Гость',
+                  label: accountBloc.profile?.displayName ?? context.l10n.guest,
                   showLabel: expanded,
                   onTap: () => _openAccount(context),
                 ),
               ),
               _HeaderAction(
                 icon: LucideIcons.circleHelp,
-                label: 'Как играть',
+                label: context.l10n.howToPlay,
                 showLabel: expanded,
                 onTap: () => showAppDialog<void>(
                   context: context,
-                  title: 'Как играть',
+                  title: context.l10n.howToPlay,
                   wide: true,
                   child: TutorialView(
                     onDone: () {
@@ -336,8 +342,8 @@ class _Header extends StatelessWidget {
                     ? LucideIcons.volume2
                     : LucideIcons.volumeX,
                 label: settingsBloc.settings.sound
-                    ? 'Выключить звук'
-                    : 'Включить звук',
+                    ? context.l10n.turnOffSound
+                    : context.l10n.turnOnSound,
                 onTap: () => settingsBloc.add(
                   SettingsEvent$Update(
                     settingsBloc.settings.copyWith(
@@ -348,10 +354,10 @@ class _Header extends StatelessWidget {
               ),
               _HeaderAction(
                 icon: LucideIcons.settings2,
-                label: 'Настройки',
+                label: context.l10n.settings,
                 onTap: () => showAppDialog<void>(
                   context: context,
-                  title: 'Настройки',
+                  title: context.l10n.settings,
                   child: const SettingsView(),
                 ),
               ),
@@ -366,7 +372,7 @@ class _Header extends StatelessWidget {
     var openHistory = false;
     await showAppDialog<void>(
       context: context,
-      title: 'Личный кабинет',
+      title: context.l10n.account,
       wide: true,
       child: AccountView(
         onHistory: () {
@@ -378,7 +384,7 @@ class _Header extends StatelessWidget {
     if (openHistory && context.mounted) {
       await showAppDialog<void>(
         context: context,
-        title: 'История партий',
+        title: context.l10n.matchHistory,
         child: SizedBox(
           height: math.min(560, MediaQuery.sizeOf(context).height - 180),
           child: const MatchHistoryView(),
@@ -513,7 +519,7 @@ class _MenuHero extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          'Четыре в ряд',
+          context.l10n.gameName,
           style: TextStyle(
             fontSize: compact ? 20 : 21,
             height: 1.1,
@@ -523,9 +529,9 @@ class _MenuHero extends StatelessWidget {
         ),
         if (compact) const SizedBox(height: 8),
         if (compact)
-          const Text(
-            'Классическая игра в новом трёхмерном измерении',
-            style: TextStyle(
+          Text(
+            context.l10n.gameTagline,
+            style: const TextStyle(
               color: AppColors.muted,
               fontSize: 12,
               height: 1.35,
@@ -540,13 +546,13 @@ class _MenuHero extends StatelessWidget {
             style: FilledButton.styleFrom(
               padding: const EdgeInsets.symmetric(horizontal: 13),
             ),
-            child: const Row(
+            child: Row(
               children: [
-                Icon(LucideIcons.search, size: 18),
-                SizedBox(width: 11),
-                Text('Рейтинговая игра'),
-                Spacer(),
-                Icon(LucideIcons.arrowRight, size: 18),
+                const Icon(LucideIcons.search, size: 18),
+                const SizedBox(width: 11),
+                Text(context.l10n.rankedGame),
+                const Spacer(),
+                const Icon(LucideIcons.arrowRight, size: 18),
               ],
             ),
           ),
@@ -558,10 +564,10 @@ class _MenuHero extends StatelessWidget {
               child: _ModeButton(
                 compact: compact,
                 icon: LucideIcons.puzzle,
-                label: 'Уровни',
+                label: context.l10n.levels,
                 onTap: () => showAppDialog<void>(
                   context: context,
-                  title: 'Уровни',
+                  title: context.l10n.levels,
                   wide: true,
                   child: const LevelsView(),
                 ),
@@ -572,7 +578,7 @@ class _MenuHero extends StatelessWidget {
               child: _ModeButton(
                 compact: compact,
                 icon: LucideIcons.cpu,
-                label: 'Против AI',
+                label: context.l10n.versusAi,
                 onTap: () => onMode(GameMode.ai),
               ),
             ),
@@ -585,7 +591,7 @@ class _MenuHero extends StatelessWidget {
               child: _ModeButton(
                 compact: compact,
                 icon: LucideIcons.usersRound,
-                label: 'Вдвоём',
+                label: context.l10n.twoPlayers,
                 onTap: () => onMode(GameMode.local),
               ),
             ),
@@ -594,7 +600,7 @@ class _MenuHero extends StatelessWidget {
               child: _ModeButton(
                 compact: compact,
                 icon: LucideIcons.globe2,
-                label: 'Онлайн',
+                label: context.l10n.online,
                 onTap: () => onMode(GameMode.online),
               ),
             ),
@@ -606,7 +612,7 @@ class _MenuHero extends StatelessWidget {
           child: TextButton(
             onPressed: () => showAppDialog<void>(
               context: context,
-              title: 'Рейтинг игроков',
+              title: context.l10n.playerRating,
               wide: true,
               child: const LeaderboardView(),
             ),
@@ -615,13 +621,13 @@ class _MenuHero extends StatelessWidget {
               foregroundColor: const Color(0xFF697163),
               textStyle: const TextStyle(fontSize: 10),
             ),
-            child: const Row(
+            child: Row(
               children: [
-                Icon(LucideIcons.trophy, size: 16),
-                SizedBox(width: 9),
-                Text('Рейтинг игроков'),
-                Spacer(),
-                Icon(LucideIcons.arrowRight, size: 14),
+                const Icon(LucideIcons.trophy, size: 16),
+                const SizedBox(width: 9),
+                Text(context.l10n.playerRating),
+                const Spacer(),
+                const Icon(LucideIcons.arrowRight, size: 14),
               ],
             ),
           ),
@@ -682,28 +688,36 @@ class _TurnStatusState extends State<_TurnStatus> {
     });
   }
 
-  String get _text {
+  String _text(BuildContext context) {
     final GameViewData data = widget.data;
     if (data.phase == GamePhase.aiThinking) {
-      return data.mode == GameMode.level ? 'Ход бота…' : 'AI обдумывает ход…';
+      return data.mode == GameMode.level
+          ? context.l10n.botMoving
+          : context.l10n.aiThinking;
     }
-    if (data.phase == GamePhase.animating) return 'Ход выполнен';
-    if (data.phase == GamePhase.paused) return 'Пауза';
+    if (data.phase == GamePhase.animating) return context.l10n.moveCompleted;
+    if (data.phase == GamePhase.paused) return context.l10n.pause;
     if (data.phase == GamePhase.replay) {
-      return 'Повтор · ход ${data.replayIndex}';
+      return context.l10n.replayMove(data.replayIndex);
     }
-    if (data.snapshot.status != GameStatus.playing) return 'Партия завершена';
+    if (data.snapshot.status != GameStatus.playing) {
+      return context.l10n.gameFinished;
+    }
     if (data.mode == GameMode.online) {
       if (data.onlineConnection != OnlineConnectionStatus.connected) {
-        return 'Нет соединения';
+        return context.l10n.noConnection;
       }
-      if (data.onlineSnapshot?.startedAt == null) return 'Ждём соперника';
+      if (data.onlineSnapshot?.startedAt == null) {
+        return context.l10n.waitingForOpponent;
+      }
       return data.onlinePlayer == data.snapshot.currentPlayer
-          ? 'Ваш ход'
-          : 'Ход соперника';
+          ? context.l10n.yourTurn
+          : context.l10n.opponentTurn;
     }
-    if (data.mode == GameMode.level) return 'Ваш ход';
-    return 'Ходит ${data.names[data.snapshot.currentPlayer.index]}';
+    if (data.mode == GameMode.level) return context.l10n.yourTurn;
+    return context.l10n.playerTurn(
+      data.names[data.snapshot.currentPlayer.index],
+    );
   }
 
   int? get _remaining {
@@ -750,7 +764,7 @@ class _TurnStatusState extends State<_TurnStatus> {
           const SizedBox(width: 8),
           Flexible(
             child: Text(
-              '${data.levelId == null ? '' : 'Уровень ${data.levelId} · '}$_text',
+              '${data.levelId == null ? '' : '${context.l10n.levelNumber(data.levelId!)} · '}${_text(context)}',
               overflow: TextOverflow.ellipsis,
               style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w600),
             ),
@@ -769,10 +783,10 @@ class _TurnStatusState extends State<_TurnStatus> {
                   fontSize: 11,
                   fontWeight: FontWeight.w700,
                 ),
-                children: const [
+                children: [
                   TextSpan(
-                    text: ' сек',
-                    style: TextStyle(
+                    text: context.l10n.secondsShort,
+                    style: const TextStyle(
                       color: Color(0xFF858D7B),
                       fontSize: 9,
                       fontWeight: FontWeight.w600,
@@ -817,27 +831,29 @@ class _OnlineBannerState extends State<_OnlineBanner> {
     final OnlineRanking? ranking = snapshot.ranking;
     final int? delta = ranking?.changes?[index];
     final String status = data.onlineConnection == OnlineConnectionStatus.error
-        ? 'Соединение закрыто'
+        ? context.l10n.connectionClosed
         : data.onlineConnection != OnlineConnectionStatus.connected
-        ? 'Восстанавливаем соединение…'
+        ? context.l10n.reconnecting
         : opponent == null
         ? (quick
-              ? 'Ждём соперника…'
-              : 'Передайте код другу — ждём второго игрока')
+              ? context.l10n.waitingForOpponentEllipsis
+              : context.l10n.shareLobbyCode)
         : !opponent.connected
-        ? 'Соперник отключился. Ждём возвращения…'
-        : 'Вы играете ${index == 0 ? 'графитом · ●' : 'светлыми · ○'}';
+        ? context.l10n.opponentDisconnected
+        : index == 0
+        ? context.l10n.playingGraphite
+        : context.l10n.playingLight;
     final String rankedStatus = ranking?.rated == true
-        ? 'Рейтинг: ${ranking!.points[index] + (delta ?? 0)}'
+        ? '${context.l10n.ratingValue(ranking!.points[index] + (delta ?? 0))}'
               '${delta != null
                   ? ' (${delta >= 0 ? '+' : ''}$delta)'
                   : snapshot.pause?.endsAt != null
-                  ? ' · Пауза'
+                  ? ' · ${context.l10n.pause}'
                   : ''}'
               '${snapshot.endReason != null
                   ? ' · ${snapshot.endReason}'
                   : opponent?.connected == false
-                  ? ' · Ждём подключения'
+                  ? ' · ${context.l10n.waitingForConnection}'
                   : ''}'
         : (ranking?.reason ?? status);
     return Container(
@@ -856,7 +872,9 @@ class _OnlineBannerState extends State<_OnlineBanner> {
               const SizedBox(width: 5),
               Expanded(
                 child: Text(
-                  quick ? 'РЕЙТИНГОВАЯ ИГРА' : 'ЛОББИ',
+                  quick
+                      ? context.l10n.rankedGameUpper
+                      : context.l10n.lobbyUpper,
                   style: const TextStyle(
                     color: AppColors.muted,
                     fontSize: 8,
@@ -876,17 +894,19 @@ class _OnlineBannerState extends State<_OnlineBanner> {
                 ),
                 IconButton(
                   visualDensity: VisualDensity.compact,
-                  tooltip: 'Скопировать код лобби',
+                  tooltip: context.l10n.copyLobbyCode,
                   onPressed: () async {
                     await Clipboard.setData(ClipboardData(text: snapshot.code));
-                    if (mounted) setState(() => _copyStatus = 'Код скопирован');
+                    if (mounted) {
+                      setState(() => _copyStatus = context.l10n.codeCopied);
+                    }
                   },
                   icon: const Icon(LucideIcons.copy, size: 15),
                 ),
               ],
               IconButton(
                 visualDensity: VisualDensity.compact,
-                tooltip: 'Покинуть лобби',
+                tooltip: context.l10n.leaveLobby,
                 onPressed: () => _confirmOnlineLeave(context, data),
                 icon: const Icon(LucideIcons.logOut, size: 15),
               ),
@@ -955,7 +975,7 @@ class _PortraitGameBoard extends StatelessWidget {
                   Flexible(child: _TurnStatus(data: data)),
                   const Spacer(),
                   IconButton(
-                    tooltip: 'Пауза',
+                    tooltip: context.l10n.pause,
                     onPressed: () => _showPauseDialog(context, data),
                     icon: const Icon(LucideIcons.pause, size: 19),
                   ),
@@ -968,8 +988,8 @@ class _PortraitGameBoard extends StatelessWidget {
               fit: StackFit.expand,
               children: [
                 scene,
-                if (data.message.isNotEmpty)
-                  _GameMessage(message: data.message, bottom: 8),
+                if (_gameMessage(context, data).isNotEmpty)
+                  _GameMessage(message: _gameMessage(context, data), bottom: 8),
               ],
             ),
           ),
@@ -1001,8 +1021,12 @@ class _PlayerStrip extends StatelessWidget {
         ),
         Text(
           data.mode == GameMode.level
-              ? _moveLabel(data.levelMoves)
-              : '${data.phase == GamePhase.replay ? data.replayIndex : data.snapshot.history.length} ходов',
+              ? context.l10n.moves(data.levelMoves)
+              : context.l10n.moves(
+                  data.phase == GamePhase.replay
+                      ? data.replayIndex
+                      : data.snapshot.history.length,
+                ),
           style: const TextStyle(fontSize: 9),
         ),
         Expanded(
@@ -1032,7 +1056,7 @@ class _ToolBar extends StatelessWidget {
         if (data.mode != GameMode.level)
           _Tool(
             icon: LucideIcons.rotateCcw,
-            label: labels ? 'Отменить' : '',
+            label: labels ? context.l10n.undo : '',
             enabled:
                 data.mode != GameMode.online &&
                 data.phase == GamePhase.playing &&
@@ -1041,11 +1065,11 @@ class _ToolBar extends StatelessWidget {
           ),
         _Tool(
           icon: LucideIcons.eye,
-          label: labels ? 'Рентген' : '',
+          label: labels ? context.l10n.xray : '',
           selected: data.xray,
           onTap: () => bloc.add(const GameEvent$ToggleXray()),
         ),
-        _ViewTool(label: labels ? 'Вид' : ''),
+        _ViewTool(label: labels ? context.l10n.view : ''),
         _Tool(
           icon: LucideIcons.maximize,
           label: '',
@@ -1139,8 +1163,8 @@ class _OnlinePauseOverlayState extends State<_OnlinePauseOverlay> {
                       Expanded(
                         child: Text(
                           pause.endsAt == null
-                              ? 'Запрос паузы'
-                              : 'Пауза · 2 минуты',
+                              ? context.l10n.pauseRequest
+                              : context.l10n.twoMinutePause,
                           style: const TextStyle(
                             fontSize: 21,
                             fontWeight: FontWeight.w700,
@@ -1148,7 +1172,7 @@ class _OnlinePauseOverlayState extends State<_OnlinePauseOverlay> {
                         ),
                       ),
                       IconButton(
-                        tooltip: 'Закрыть',
+                        tooltip: context.l10n.close,
                         onPressed: () => setState(() => _dismissed = true),
                         icon: const Icon(Icons.close_rounded, size: 20),
                       ),
@@ -1164,10 +1188,13 @@ class _OnlinePauseOverlayState extends State<_OnlinePauseOverlay> {
                         fontWeight: FontWeight.w700,
                       ),
                     ),
-                    const Text(
-                      'Оба готовы — продолжаем сразу. Иначе ждём окончания таймера.',
+                    Text(
+                      context.l10n.pauseReadyHint,
                       textAlign: TextAlign.center,
-                      style: TextStyle(color: AppColors.muted, fontSize: 11),
+                      style: const TextStyle(
+                        color: AppColors.muted,
+                        fontSize: 11,
+                      ),
                     ),
                     const SizedBox(height: 12),
                     FilledButton(
@@ -1181,14 +1208,16 @@ class _OnlinePauseOverlayState extends State<_OnlinePauseOverlay> {
                               )
                           ? null
                           : () => bloc.add(const MatchmakingEvent$Ready()),
-                      child: Text(ready ? 'Вы готовы' : 'Готов'),
+                      child: Text(
+                        ready ? context.l10n.youAreReady : context.l10n.ready,
+                      ),
                     ),
                     const SizedBox(height: 8),
                     Text(
                       ready
-                          ? 'Ждём готовности соперника.'
+                          ? context.l10n.waitingOpponentReady
                           : pause.ready.any((value) => value != player)
-                          ? 'Соперник готов.'
+                          ? context.l10n.opponentReady
                           : '',
                       textAlign: TextAlign.center,
                       style: const TextStyle(
@@ -1198,18 +1227,20 @@ class _OnlinePauseOverlayState extends State<_OnlinePauseOverlay> {
                     ),
                     if (widget.data.onlineConnection !=
                         OnlineConnectionStatus.connected)
-                      const Text(
-                        'Восстанавливаем соединение…',
+                      Text(
+                        context.l10n.reconnecting,
                         textAlign: TextAlign.center,
                       ),
                   ] else ...[
                     Text(
                       own
-                          ? 'Ждём согласия соперника.'
-                          : '${widget.data.names[pause.requestedBy?.index ?? 0]} предлагает паузу на 2 минуты.',
+                          ? context.l10n.waitingOpponentApproval
+                          : context.l10n.playerOffersPause(
+                              widget.data.names[pause.requestedBy?.index ?? 0],
+                            ),
                     ),
                     Text(
-                      'На ответ: $remaining сек. До принятия партия продолжается.',
+                      context.l10n.pauseAnswerTime(remaining),
                       style: const TextStyle(
                         color: AppColors.muted,
                         fontSize: 11,
@@ -1228,7 +1259,7 @@ class _OnlinePauseOverlayState extends State<_OnlinePauseOverlay> {
                                   accept: true,
                                 ),
                               ),
-                        child: const Text('Принять паузу'),
+                        child: Text(context.l10n.acceptPause),
                       ),
                     OutlinedButton(
                       onPressed:
@@ -1238,7 +1269,9 @@ class _OnlinePauseOverlayState extends State<_OnlinePauseOverlay> {
                           : () => bloc.add(
                               const MatchmakingEvent$PauseAnswer(accept: false),
                             ),
-                      child: Text(own ? 'Отменить запрос' : 'Отклонить'),
+                      child: Text(
+                        own ? context.l10n.cancelRequest : context.l10n.decline,
+                      ),
                     ),
                   ],
                 ],
@@ -1278,8 +1311,7 @@ class _RankedResultOverlayState extends State<_RankedResultOverlay> {
     final int delta = ranking.changes![index];
     final bool won = snapshot.game.winner == data.onlinePlayer;
     final bool lost = snapshot.game.winner != null && !won;
-    final String opponent =
-        snapshot.players[index == 0 ? 1 : 0]?.name ?? 'соперником';
+    final String? opponent = snapshot.players[index == 0 ? 1 : 0]?.name;
     final bool waiting = snapshot.rematch.contains(data.onlinePlayer);
     final bool connected =
         data.onlineConnection == OnlineConnectionStatus.connected &&
@@ -1321,9 +1353,9 @@ class _RankedResultOverlayState extends State<_RankedResultOverlay> {
                         child: Column(
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            const Text(
-                              'РЕЙТИНГОВАЯ ПАРТИЯ ЗАВЕРШЕНА',
-                              style: TextStyle(
+                            Text(
+                              context.l10n.rankedMatchFinished,
+                              style: const TextStyle(
                                 color: AppColors.muted,
                                 fontSize: 9,
                                 fontWeight: FontWeight.w800,
@@ -1346,21 +1378,29 @@ class _RankedResultOverlayState extends State<_RankedResultOverlay> {
                             const SizedBox(height: 8),
                             Text(
                               won
-                                  ? 'Победа'
+                                  ? context.l10n.win
                                   : lost
-                                  ? 'Поражение'
-                                  : 'Ничья',
+                                  ? context.l10n.loss
+                                  : context.l10n.draw,
                               style: const TextStyle(
                                 fontSize: 28,
                                 fontWeight: FontWeight.w800,
                               ),
                             ),
                             Text(
-                              won
-                                  ? 'Вы обыграли $opponent'
+                              opponent == null
+                                  ? won
+                                        ? context.l10n.youBeatFallbackOpponent
+                                        : lost
+                                        ? context.l10n.fallbackOpponentWon
+                                        : context
+                                              .l10n
+                                              .evenMatchWithFallbackOpponent
+                                  : won
+                                  ? context.l10n.youBeatOpponent(opponent)
                                   : lost
-                                  ? '$opponent выиграл эту партию'
-                                  : 'Равная партия с $opponent',
+                                  ? context.l10n.opponentWon(opponent)
+                                  : context.l10n.evenMatch(opponent),
                               style: const TextStyle(
                                 color: AppColors.muted,
                                 fontSize: 12,
@@ -1385,9 +1425,9 @@ class _RankedResultOverlayState extends State<_RankedResultOverlay> {
                               ),
                               child: Column(
                                 children: [
-                                  const Text(
-                                    'ИЗМЕНЕНИЕ ELO',
-                                    style: TextStyle(fontSize: 9),
+                                  Text(
+                                    context.l10n.eloChange,
+                                    style: const TextStyle(fontSize: 9),
                                   ),
                                   Text(
                                     '${delta >= 0 ? '+' : ''}$delta',
@@ -1420,17 +1460,23 @@ class _RankedResultOverlayState extends State<_RankedResultOverlay> {
                                 ),
                                 label: Text(
                                   waiting
-                                      ? 'Ждём решения соперника'
+                                      ? context.l10n.waitingOpponentDecision
                                       : connected
-                                      ? 'Сыграть ещё с $opponent'
-                                      : 'Соперник не в сети',
+                                      ? opponent == null
+                                            ? context
+                                                  .l10n
+                                                  .playAgainWithFallbackOpponent
+                                            : context.l10n.playAgainWith(
+                                                opponent,
+                                              )
+                                      : context.l10n.opponentOffline,
                                 ),
                               ),
                             ),
                             const SizedBox(height: 2),
-                            const Text(
-                              'Реванш не влияет на рейтинг',
-                              style: TextStyle(
+                            Text(
+                              context.l10n.rematchUnrated,
+                              style: const TextStyle(
                                 fontSize: 9,
                                 color: AppColors.muted,
                               ),
@@ -1442,7 +1488,7 @@ class _RankedResultOverlayState extends State<_RankedResultOverlay> {
                                 onPressed: () =>
                                     setState(() => _dismissed = true),
                                 icon: const Icon(LucideIcons.eye),
-                                label: const Text('Посмотреть поле'),
+                                label: Text(context.l10n.viewBoard),
                               ),
                             ),
                             const SizedBox(height: 4),
@@ -1454,7 +1500,7 @@ class _RankedResultOverlayState extends State<_RankedResultOverlay> {
                                     .add(const GameEvent$Menu());
                               },
                               icon: const Icon(LucideIcons.home),
-                              label: const Text('Главное меню'),
+                              label: Text(context.l10n.mainMenu),
                             ),
                           ],
                         ),
@@ -1525,17 +1571,17 @@ void _showViewControls(BuildContext context) {
                       children: [
                         Row(
                           children: [
-                            const Expanded(
+                            Expanded(
                               child: Text(
-                                'Камера',
-                                style: TextStyle(
+                                context.l10n.camera,
+                                style: const TextStyle(
                                   fontSize: 11,
                                   fontWeight: FontWeight.w700,
                                 ),
                               ),
                             ),
                             IconButton(
-                              tooltip: 'Закрыть меню вида',
+                              tooltip: context.l10n.closeViewMenu,
                               visualDensity: VisualDensity.compact,
                               onPressed: () => Navigator.pop(context),
                               icon: const Icon(LucideIcons.x, size: 18),
@@ -1545,10 +1591,13 @@ void _showViewControls(BuildContext context) {
                         const SizedBox(height: 4),
                         Row(
                           children: [
-                            for (final (view, label) in const [
-                              (CameraView.perspective, '3D'),
-                              (CameraView.top, 'Сверху'),
-                              (CameraView.front, 'Спереди'),
+                            for (final (view, label) in [
+                              (
+                                CameraView.perspective,
+                                context.l10n.viewPerspective,
+                              ),
+                              (CameraView.top, context.l10n.viewTop),
+                              (CameraView.front, context.l10n.viewFront),
                             ]) ...[
                               if (view != CameraView.perspective)
                                 const SizedBox(width: 5),
@@ -1563,9 +1612,9 @@ void _showViewControls(BuildContext context) {
                           ],
                         ),
                         const SizedBox(height: 8),
-                        const Text(
-                          'Показать слои',
-                          style: TextStyle(
+                        Text(
+                          context.l10n.showLayers,
+                          style: const TextStyle(
                             fontSize: 11,
                             fontWeight: FontWeight.w700,
                           ),
@@ -1575,7 +1624,7 @@ void _showViewControls(BuildContext context) {
                           children: [
                             Expanded(
                               child: _LayerChoice(
-                                label: 'Все',
+                                label: context.l10n.allLayers,
                                 selected: data.layers.length == 5,
                                 onTap: () =>
                                     bloc.add(const GameEvent$ShowAllLayers()),
@@ -1595,9 +1644,9 @@ void _showViewControls(BuildContext context) {
                           ],
                         ),
                         const SizedBox(height: 8),
-                        const Text(
-                          'Включайте и скрывайте каждый слой отдельно.\nНовый ход вернёт все слои.',
-                          style: TextStyle(
+                        Text(
+                          context.l10n.layersHint,
+                          style: const TextStyle(
                             color: Color(0xFF959D89),
                             fontSize: 9,
                             height: 1.7,
@@ -1678,16 +1727,18 @@ Future<void> _requestGameMenu(
   }
   final bool? leave = await showAppDialog<bool>(
     context: context,
-    title: online ? 'Выйти из лобби?' : 'Завершить текущую партию?',
+    title: online
+        ? context.l10n.leaveLobbyQuestion
+        : context.l10n.finishGameQuestion,
     child: Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         Text(
           online && current.onlineSnapshot?.ranking?.rated == true
-              ? 'Выход засчитается как поражение и уменьшит рейтинг. При потере соединения у вас до 60 секунд на возврат; таймер хода продолжает идти.'
+              ? context.l10n.rankedLeaveWarning
               : online
-              ? 'Лобби закроется для обоих игроков. При обычном обновлении страницы вы сможете вернуться в игру.'
-              : 'Текущие ходы будут потеряны.',
+              ? context.l10n.lobbyLeaveWarning
+              : context.l10n.movesWillBeLost,
           style: const TextStyle(
             color: AppColors.muted,
             fontSize: 12,
@@ -1696,7 +1747,9 @@ Future<void> _requestGameMenu(
         ),
         const SizedBox(height: 20),
         _ConfirmationActions(
-          confirmLabel: online ? 'Выйти из лобби' : 'Выйти в меню',
+          confirmLabel: online
+              ? context.l10n.exitLobby
+              : context.l10n.leaveToMenu,
         ),
       ],
     ),
@@ -1724,16 +1777,16 @@ Future<void> _requestRestart(
   }
   final bool? restart = await showAppDialog<bool>(
     context: context,
-    title: 'Начать партию заново?',
-    child: const Column(
+    title: context.l10n.restartQuestion,
+    child: Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         Text(
-          'Текущие ходы будут потеряны.',
-          style: TextStyle(color: AppColors.muted, fontSize: 12),
+          context.l10n.movesWillBeLost,
+          style: const TextStyle(color: AppColors.muted, fontSize: 12),
         ),
-        SizedBox(height: 20),
-        _ConfirmationActions(confirmLabel: 'Начать заново'),
+        const SizedBox(height: 20),
+        _ConfirmationActions(confirmLabel: context.l10n.restart),
       ],
     ),
   );
@@ -1768,7 +1821,7 @@ class _ConfirmationActions extends StatelessWidget {
           padding: const EdgeInsets.symmetric(horizontal: 6),
           textStyle: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700),
         ),
-        child: const Text('Остаться в игре', textAlign: TextAlign.center),
+        child: Text(context.l10n.stayInGame, textAlign: TextAlign.center),
       ),
     ],
   );
@@ -1777,18 +1830,18 @@ class _ConfirmationActions extends StatelessWidget {
 void _confirmOnlineLeave(BuildContext context, GameViewData data) {
   showAppDialog<bool>(
     context: context,
-    title: 'Выйти из лобби?',
+    title: context.l10n.leaveLobbyQuestion,
     child: Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         Text(
           data.onlineSnapshot?.ranking?.rated == true &&
                   data.snapshot.status == GameStatus.playing
-              ? 'Выход засчитается как поражение и уменьшит рейтинг. При потере соединения у вас до 60 секунд на возврат; таймер хода продолжает идти.'
-              : 'Лобби закроется для обоих игроков. При обычном обновлении страницы вы сможете вернуться в игру.',
+              ? context.l10n.rankedLeaveWarning
+              : context.l10n.lobbyLeaveWarning,
         ),
         const SizedBox(height: 14),
-        const _ConfirmationActions(confirmLabel: 'Выйти из лобби'),
+        _ConfirmationActions(confirmLabel: context.l10n.exitLobby),
       ],
     ),
   ).then((leave) {
@@ -1810,11 +1863,11 @@ void _showPauseDialog(BuildContext context, GameViewData data) {
   if (data.mode == GameMode.online) {
     showAppDialog<void>(
       context: context,
-      title: 'Пауза',
+      title: context.l10n.pause,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          const Text('Онлайн-партия продолжается, пока открыто меню.'),
+          Text(context.l10n.onlineContinuesInMenu),
           const SizedBox(height: 14),
           FilledButton(
             onPressed: data.onlineSnapshot?.pause?.used == true
@@ -1828,8 +1881,8 @@ void _showPauseDialog(BuildContext context, GameViewData data) {
                   },
             child: Text(
               data.onlineSnapshot?.pause?.used == true
-                  ? 'Пауза использована'
-                  : 'Предложить паузу · 2 мин',
+                  ? context.l10n.pauseUsed
+                  : context.l10n.offerPause,
             ),
           ),
           const SizedBox(height: 6),
@@ -1837,24 +1890,24 @@ void _showPauseDialog(BuildContext context, GameViewData data) {
             onPressed: () => Navigator.pop(context),
             iconAlignment: IconAlignment.end,
             icon: const Icon(LucideIcons.arrowRight, size: 18),
-            label: const Text('Продолжить'),
+            label: Text(context.l10n.continueAction),
           ),
           const SizedBox(height: 8),
           OutlinedButton.icon(
             onPressed: () => afterClose(
               () => showAppDialog<void>(
                 context: context,
-                title: 'Настройки',
+                title: context.l10n.settings,
                 child: const SettingsView(),
               ),
             ),
             icon: const Icon(LucideIcons.settings2),
-            label: const Text('Настройки'),
+            label: Text(context.l10n.settings),
           ),
           TextButton.icon(
             onPressed: () => afterClose(() => _requestGameMenu(context, data)),
             icon: const Icon(LucideIcons.home),
-            label: const Text('Главное меню'),
+            label: Text(context.l10n.mainMenu),
           ),
         ],
       ),
@@ -1865,11 +1918,11 @@ void _showPauseDialog(BuildContext context, GameViewData data) {
   var resumeAfterDismiss = true;
   showAppDialog<void>(
     context: context,
-    title: 'Пауза',
+    title: context.l10n.pause,
     child: Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        const Text('Время остановлено.'),
+        Text(context.l10n.timeStopped),
         const SizedBox(height: 16),
         FilledButton.icon(
           onPressed: () {
@@ -1879,7 +1932,7 @@ void _showPauseDialog(BuildContext context, GameViewData data) {
           },
           iconAlignment: IconAlignment.end,
           icon: const Icon(LucideIcons.arrowRight, size: 18),
-          label: const Text('Продолжить'),
+          label: Text(context.l10n.continueAction),
         ),
         const SizedBox(height: 6),
         OutlinedButton.icon(
@@ -1888,7 +1941,7 @@ void _showPauseDialog(BuildContext context, GameViewData data) {
             afterClose(() => _requestRestart(context, data));
           },
           icon: const Icon(LucideIcons.rotateCcw),
-          label: const Text('Начать заново'),
+          label: Text(context.l10n.restart),
         ),
         const SizedBox(height: 8),
         OutlinedButton.icon(
@@ -1897,7 +1950,7 @@ void _showPauseDialog(BuildContext context, GameViewData data) {
             afterClose(() async {
               await showAppDialog<void>(
                 context: context,
-                title: 'Настройки',
+                title: context.l10n.settings,
                 child: const SettingsView(),
               );
               if (bloc.data?.phase == GamePhase.paused) {
@@ -1906,7 +1959,7 @@ void _showPauseDialog(BuildContext context, GameViewData data) {
             });
           },
           icon: const Icon(LucideIcons.settings2),
-          label: const Text('Настройки'),
+          label: Text(context.l10n.settings),
         ),
         if (data.mode == GameMode.level) ...[
           const SizedBox(height: 8),
@@ -1918,14 +1971,14 @@ void _showPauseDialog(BuildContext context, GameViewData data) {
               afterClose(
                 () => showAppDialog<void>(
                   context: context,
-                  title: 'Уровни',
+                  title: context.l10n.levels,
                   wide: true,
                   child: LevelsView(initialId: initialId),
                 ),
               );
             },
             icon: const Icon(LucideIcons.puzzle),
-            label: const Text('К уровням'),
+            label: Text(context.l10n.backToLevels),
           ),
         ],
         TextButton.icon(
@@ -1934,7 +1987,7 @@ void _showPauseDialog(BuildContext context, GameViewData data) {
             afterClose(() => _requestGameMenu(context, data));
           },
           icon: const Icon(LucideIcons.home),
-          label: const Text('Главное меню'),
+          label: Text(context.l10n.mainMenu),
         ),
       ],
     ),
@@ -1973,7 +2026,7 @@ class _GamePanel extends StatelessWidget {
       bloc.add(const GameEvent$Menu());
       showAppDialog<void>(
         context: context,
-        title: 'Уровни',
+        title: context.l10n.levels,
         wide: true,
         child: LevelsView(initialId: initialId),
       );
@@ -1981,13 +2034,13 @@ class _GamePanel extends StatelessWidget {
 
     final String title = data.mode == GameMode.level
         ? completedLevel
-              ? 'Уровень пройден'
+              ? context.l10n.levelCompleted
               : winner == null
-              ? 'Ничья'
-              : 'Поражение'
+              ? context.l10n.draw
+              : context.l10n.loss
         : winner == null
-        ? 'Ничья'
-        : 'Победа: ${data.names[winner.index]}';
+        ? context.l10n.draw
+        : context.l10n.winnerName(data.names[winner.index]);
     return Container(
       padding: const EdgeInsets.fromLTRB(0, 6, 0, 0),
       decoration: const BoxDecoration(
@@ -2001,14 +2054,14 @@ class _GamePanel extends StatelessWidget {
                   children: [
                     _ReplayButton(
                       icon: LucideIcons.chevronsLeft,
-                      tooltip: 'В начало повтора',
+                      tooltip: context.l10n.replayStart,
                       onPressed: data.replayIndex > 0
                           ? () => bloc.add(const GameEvent$SeekReplay(0))
                           : null,
                     ),
                     _ReplayButton(
                       icon: LucideIcons.chevronLeft,
-                      tooltip: 'Предыдущий ход',
+                      tooltip: context.l10n.previousMove,
                       onPressed: data.replayIndex > 0
                           ? () => bloc.add(
                               GameEvent$SeekReplay(data.replayIndex - 1),
@@ -2017,7 +2070,7 @@ class _GamePanel extends StatelessWidget {
                     ),
                     _ReplayButton(
                       icon: LucideIcons.chevronRight,
-                      tooltip: 'Следующий ход',
+                      tooltip: context.l10n.nextMove,
                       onPressed: data.replayIndex < data.snapshot.history.length
                           ? () => bloc.add(
                               GameEvent$SeekReplay(data.replayIndex + 1),
@@ -2026,7 +2079,7 @@ class _GamePanel extends StatelessWidget {
                     ),
                     _ReplayButton(
                       icon: LucideIcons.chevronsRight,
-                      tooltip: 'В конец повтора',
+                      tooltip: context.l10n.replayEnd,
                       onPressed: data.replayIndex < data.snapshot.history.length
                           ? () => bloc.add(
                               GameEvent$SeekReplay(
@@ -2042,7 +2095,10 @@ class _GamePanel extends StatelessWidget {
                   children: [
                     Expanded(
                       child: Text(
-                        'Ход ${data.replayIndex} из ${data.snapshot.history.length}',
+                        context.l10n.replayProgress(
+                          data.replayIndex,
+                          data.snapshot.history.length,
+                        ),
                         textAlign: TextAlign.center,
                         style: const TextStyle(
                           color: AppColors.muted,
@@ -2055,7 +2111,7 @@ class _GamePanel extends StatelessWidget {
                       child: OutlinedButton(
                         onPressed: () =>
                             bloc.add(const GameEvent$CloseReplay()),
-                        child: const Text('Завершить просмотр'),
+                        child: Text(context.l10n.finishReplay),
                       ),
                     ),
                   ],
@@ -2076,7 +2132,7 @@ class _GamePanel extends StatelessWidget {
                 ),
                 if (completedLevel && MediaQuery.sizeOf(context).width > 650)
                   Text(
-                    '${data.levelBestBefore == null || data.levelMoves < data.levelBestBefore! ? 'Новый рекорд' : 'Победа'} · ${_moveLabel(data.levelMoves)}',
+                    '${data.levelBestBefore == null || data.levelMoves < data.levelBestBefore! ? context.l10n.newRecord : context.l10n.win} · ${context.l10n.moves(data.levelMoves)}',
                     style: const TextStyle(
                       color: AppColors.muted,
                       fontSize: 11,
@@ -2097,7 +2153,7 @@ class _GamePanel extends StatelessWidget {
                               LucideIcons.chevronRight,
                               size: 17,
                             ),
-                            label: const Text('Следующий уровень'),
+                            label: Text(context.l10n.nextLevel),
                           ),
                         ),
                         const SizedBox(width: 8),
@@ -2111,7 +2167,7 @@ class _GamePanel extends StatelessWidget {
                                   LucideIcons.rotateCcw,
                                   size: 16,
                                 ),
-                                label: const Text('Повторить уровень'),
+                                label: Text(context.l10n.retryLevel),
                               )
                             : FilledButton.icon(
                                 onPressed: () =>
@@ -2120,14 +2176,14 @@ class _GamePanel extends StatelessWidget {
                                   LucideIcons.rotateCcw,
                                   size: 16,
                                 ),
-                                label: const Text('Повторить уровень'),
+                                label: Text(context.l10n.retryLevel),
                               ),
                       ),
                     ],
                   ),
                   TextButton(
                     onPressed: openLevels,
-                    child: const Text('К уровням'),
+                    child: Text(context.l10n.backToLevels),
                   ),
                 ] else ...[
                   Row(
@@ -2154,8 +2210,8 @@ class _GamePanel extends StatelessWidget {
                           ),
                           label: Text(
                             waitingForRematch
-                                ? 'Ждём согласия соперника'
-                                : 'Ещё партия',
+                                ? context.l10n.waitingOpponentApproval
+                                : context.l10n.anotherGame,
                           ),
                         ),
                       ),
@@ -2165,7 +2221,7 @@ class _GamePanel extends StatelessWidget {
                           onPressed: () =>
                               bloc.add(const GameEvent$OpenReplay()),
                           icon: const Icon(LucideIcons.play, size: 17),
-                          label: const Text('Повтор партии'),
+                          label: Text(context.l10n.replayGame),
                         ),
                       ),
                     ],
@@ -2178,7 +2234,7 @@ class _GamePanel extends StatelessWidget {
                       }
                       bloc.add(const GameEvent$Menu());
                     },
-                    child: const Text('Главное меню'),
+                    child: Text(context.l10n.mainMenu),
                   ),
                 ],
               ],

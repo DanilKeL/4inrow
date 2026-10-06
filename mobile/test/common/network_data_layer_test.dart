@@ -36,7 +36,7 @@ void main() {
     final datasource = _FakeAccountDatasource()
       ..profileResponse = <String, dynamic>{
         'username': 'cube',
-        'guestName': 'Гость_123456',
+        'guestName': 'Guest_123456',
         'email': 'cube@example.com',
         'emailVerified': true,
         'createdAt': 42.0,
@@ -49,7 +49,7 @@ void main() {
     final AccountProfile profile = await repository.load();
 
     expect(profile.username, 'cube');
-    expect(profile.guestName, 'Гость_123456');
+    expect(profile.guestName, 'Guest_123456');
     expect(profile.email, 'cube@example.com');
     expect(profile.emailVerified, isTrue);
     expect(profile.createdAt, 42);
@@ -64,7 +64,7 @@ void main() {
       final datasource = _FakeAccountDatasource()
         ..registerResponse = <String, dynamic>{
           'verificationRequired': true,
-          'message': 'Письмо с подтверждением отправлено. Проверьте «Входящие» и папку «Спам».',
+          'message': 'Verification sent. Check your inbox and spam folder.',
         };
       final repository = AccountRepository(
         datasource: datasource,
@@ -78,7 +78,7 @@ void main() {
       );
 
       expect(result.verificationRequired, isTrue);
-      expect(result.notice, contains('папку «Спам»'));
+      expect(result.notice.remote, contains('spam folder'));
     },
   );
 
@@ -87,7 +87,7 @@ void main() {
     final SharedPreferences preferences = await SharedPreferences.getInstance();
     final datasource = _FakeAccountDatasource()
       ..registerError = const RestClientException(
-        'Аккаунт создан, но письмо не отправлено. Повторите отправку позже.',
+        'Account created, but email delivery failed. Try again later.',
         statusCode: 503,
         data: <String, dynamic>{'verificationRequired': true},
       );
@@ -103,7 +103,7 @@ void main() {
     );
 
     expect(result.verificationRequired, isTrue);
-    expect(result.notice, startsWith('Аккаунт создан'));
+    expect(result.notice.remote, startsWith('Account created'));
   });
 
   test('leaderboard repository converts raw rows into models', () async {

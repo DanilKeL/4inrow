@@ -40,10 +40,7 @@ final class SettingsState$Ready extends SettingsState {
 }
 
 final class SettingsState$Failure extends SettingsState {
-  const new(this.message);
-  final String message;
-  @override
-  List<Object> get props => [message];
+  const new();
 }
 
 final class SettingsBloc extends Bloc<SettingsEvent, SettingsState> {
@@ -70,7 +67,7 @@ final class SettingsBloc extends Bloc<SettingsEvent, SettingsState> {
         try {
           await _repository.save(settings);
         } on Exception {
-          emit(const SettingsState$Failure('Не удалось сохранить настройки.'));
+          emit(const SettingsState$Failure());
           emit(SettingsState$Ready(settings));
         }
     }

@@ -1,6 +1,7 @@
 import 'dart:ui';
 
 import 'package:flutter/material.dart';
+import 'package:four3/src/common/utils/build_context_extension.dart';
 
 Future<T?> showAppDialog<T>({
   required BuildContext context,
@@ -77,7 +78,7 @@ Future<T?> showAppDialog<T>({
                           ),
                         ),
                         IconButton(
-                          tooltip: 'Закрыть',
+                          tooltip: context.l10n.close,
                           onPressed: () => Navigator.pop(context),
                           icon: const Icon(Icons.close_rounded, size: 20),
                         ),

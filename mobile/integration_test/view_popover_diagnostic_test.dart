@@ -29,19 +29,19 @@ void main() {
       bloc.add(const GameEvent$Menu());
       await tester.pump(const Duration(milliseconds: 500));
     }
-    await tester.tap(find.text('Вдвоём'));
+    await tester.tap(find.text('Two players'));
     await tester.pump(const Duration(milliseconds: 300));
-    await tester.tap(find.text('Начать игру'));
+    await tester.tap(find.text('Start game'));
     await tester.pump(const Duration(seconds: 1));
-    if (find.text('Как играть').evaluate().isNotEmpty) {
-      await tester.tap(find.text('Начать'));
+    if (find.text('How to play').evaluate().isNotEmpty) {
+      await tester.tap(find.text('Start'));
       await tester.pump(const Duration(seconds: 1));
     }
 
-    await tester.tap(find.text('Вид'));
+    await tester.tap(find.text('View'));
     await tester.pump(const Duration(milliseconds: 300));
     await binding.takeScreenshot('view-popover-portrait');
-    await tester.tap(find.byTooltip('Закрыть меню вида'));
+    await tester.tap(find.byTooltip('Close view menu'));
     await tester.pump(const Duration(milliseconds: 300));
 
     tester.view.physicalSize = const Size(2556, 1179);

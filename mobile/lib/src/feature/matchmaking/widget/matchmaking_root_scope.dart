@@ -64,9 +64,13 @@ class _MatchmakingRootScopeState extends State<MatchmakingRootScope>
                   connection: connection,
                 ),
               );
-            case MatchmakingState$Failure(:final message):
+            case MatchmakingState$Failure(:final message, :final failure):
               if (game.data?.mode == GameMode.online) {
-                game.add(GameEvent$OnlineFailure(message));
+                game.add(
+                  GameEvent$OnlineFailure(
+                    _failureText(context, message, failure),
+                  ),
+                );
               }
             default:
               break;
@@ -74,6 +78,23 @@ class _MatchmakingRootScopeState extends State<MatchmakingRootScope>
         },
         child: _InheritedMatchmakingScope(bloc: _bloc, child: widget.child),
       );
+}
+
+String _failureText(
+  BuildContext context,
+  String remoteMessage,
+  MatchmakingFailure? failure,
+) {
+  if (remoteMessage.isNotEmpty) return remoteMessage;
+  return switch (failure) {
+    MatchmakingFailure.invalidCode => context.l10n.enterFiveLetterCode,
+    MatchmakingFailure.moveNotSent => context.l10n.moveNotSent,
+    MatchmakingFailure.invalidServerResponse =>
+      context.l10n.invalidServerResponse,
+    MatchmakingFailure.connectionLost => context.l10n.connectionLost,
+    MatchmakingFailure.lobbyClosed => context.l10n.connectionClosed,
+    MatchmakingFailure.generic || null => context.l10n.matchSearchFailed,
+  };
 }
 
 class _InheritedMatchmakingScope extends InheritedWidget {

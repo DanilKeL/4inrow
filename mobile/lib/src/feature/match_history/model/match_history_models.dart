@@ -57,7 +57,7 @@ final class SavedMatch extends Equatable {
 
   factory fromJson(Map<String, dynamic> json) => SavedMatch(
     id: json['id']?.toString() ?? '',
-    title: json['title']?.toString() ?? 'Партия',
+    title: json['title']?.toString() ?? '',
     date: (json['date'] as num?)?.toInt() ?? 0,
     names: (json['names'] as List<dynamic>? ?? const [])
         .map((e) => e.toString())

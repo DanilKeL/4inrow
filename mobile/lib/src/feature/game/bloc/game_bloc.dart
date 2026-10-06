@@ -15,19 +15,22 @@ import 'package:four3/src/feature/settings/model/app_settings.dart';
 
 const _unset = Object();
 
+enum GameNotice { columnFull, aiMoveFailed, reconnecting }
+
 final class GameViewData extends Equatable {
   const new({
     required this.snapshot,
     this.phase = GamePhase.menu,
     this.mode = GameMode.local,
     this.difficulty = Difficulty.medium,
-    this.names = const ['Игрок 1', 'Игрок 2'],
+    this.names = const ['Player 1', 'Player 2'],
     this.elapsed = 0,
     this.xray = false,
     this.layers = const [0, 1, 2, 3, 4],
     this.cameraView = CameraView.perspective,
     this.cameraReset = 0,
-    this.message = '',
+    this.notice,
+    this.remoteMessage = '',
     this.replayIndex = 0,
     this.levelId,
     this.levelChapter,
@@ -49,10 +52,11 @@ final class GameViewData extends Equatable {
   final List<int> layers;
   final CameraView cameraView;
   final int cameraReset;
-  final String message;
+  final GameNotice? notice;
+  final String remoteMessage;
   final int replayIndex;
   final int? levelId;
-  final String? levelChapter;
+  final LevelChapter? levelChapter;
   final int levelPresetLength;
   final int? levelBestBefore;
 
@@ -88,7 +92,8 @@ final class GameViewData extends Equatable {
     List<int>? layers,
     CameraView? cameraView,
     int? cameraReset,
-    String? message,
+    Object? notice = _unset,
+    String? remoteMessage,
     int? replayIndex,
     Object? levelId = _unset,
     Object? levelChapter = _unset,
@@ -109,12 +114,13 @@ final class GameViewData extends Equatable {
     layers: layers ?? this.layers,
     cameraView: cameraView ?? this.cameraView,
     cameraReset: cameraReset ?? this.cameraReset,
-    message: message ?? this.message,
+    notice: identical(notice, _unset) ? this.notice : notice as GameNotice?,
+    remoteMessage: remoteMessage ?? this.remoteMessage,
     replayIndex: replayIndex ?? this.replayIndex,
     levelId: identical(levelId, _unset) ? this.levelId : levelId as int?,
     levelChapter: identical(levelChapter, _unset)
         ? this.levelChapter
-        : levelChapter as String?,
+        : levelChapter as LevelChapter?,
     levelPresetLength: levelPresetLength ?? this.levelPresetLength,
     levelBestBefore: identical(levelBestBefore, _unset)
         ? this.levelBestBefore
@@ -143,7 +149,8 @@ final class GameViewData extends Equatable {
     layers,
     cameraView,
     cameraReset,
-    message,
+    notice,
+    remoteMessage,
     replayIndex,
     levelId,
     levelChapter,
@@ -434,7 +441,7 @@ final class GameBloc extends Bloc<GameEvent, GameState> {
             GameViewData(
               snapshot: snapshot,
               phase: GamePhase.replay,
-              names: names.length == 2 ? names : const ['Игрок 1', 'Игрок 2'],
+              names: names.length == 2 ? names : const ['Player 1', 'Player 2'],
               replayIndex: snapshot.history.length,
               xray: _settings().xrayDefault,
               cameraReset: (data?.cameraReset ?? 0) + 1,
@@ -453,7 +460,7 @@ final class GameBloc extends Bloc<GameEvent, GameState> {
           emit(
             GameState$Ready(
               current.copyWith(
-                message: message,
+                remoteMessage: message,
                 onlineConnection: OnlineConnectionStatus.error,
               ),
             ),
@@ -476,7 +483,7 @@ final class GameBloc extends Bloc<GameEvent, GameState> {
               ? GamePhase.paused
               : GamePhase.menu,
           xray: _settings().xrayDefault,
-          names: [_playerName(), 'Игрок 2'],
+          names: [_playerName(), 'Player 2'],
         ),
       ),
     );
@@ -500,7 +507,7 @@ final class GameBloc extends Bloc<GameEvent, GameState> {
       if (mode == GameMode.ai)
         'FOUR AI'
       else if (names.length < 2 || names[1].trim().isEmpty)
-        'Игрок 2'
+        'Player 2'
       else
         names[1].trim(),
     ];
@@ -527,7 +534,7 @@ final class GameBloc extends Bloc<GameEvent, GameState> {
       snapshot: _levels.position(level),
       phase: GamePhase.playing,
       mode: GameMode.level,
-      names: const ['Вы', 'Бот'],
+      names: const ['You', 'Bot'],
       xray: _settings().xrayDefault,
       cameraReset: (data?.cameraReset ?? 0) + 1,
       levelId: id,
@@ -549,16 +556,13 @@ final class GameBloc extends Bloc<GameEvent, GameState> {
     final MoveResult result = GameEngine.makeMove(current.snapshot, x, y);
     switch (result) {
       case MoveResult$Invalid():
-        emit(
-          GameState$Ready(
-            current.copyWith(message: 'Столбец заполнен. Выберите другой.'),
-          ),
-        );
+        emit(GameState$Ready(current.copyWith(notice: GameNotice.columnFull)));
       case MoveResult$Valid(:final snapshot):
         final GameViewData next = current.copyWith(
           snapshot: snapshot,
           phase: GamePhase.animating,
-          message: '',
+          notice: null,
+          remoteMessage: '',
           layers: const [0, 1, 2, 3, 4],
         );
         emit(GameState$Ready(next));
@@ -627,7 +631,7 @@ final class GameBloc extends Bloc<GameEvent, GameState> {
         GameState$Ready(
           current.copyWith(
             phase: GamePhase.paused,
-            message: 'Не удалось рассчитать ход. Нажмите «Продолжить», чтобы повторить.',
+            notice: GameNotice.aiMoveFailed,
           ),
         ),
       );
@@ -695,7 +699,8 @@ final class GameBloc extends Bloc<GameEvent, GameState> {
         current.copyWith(
           snapshot: snapshot,
           phase: GamePhase.playing,
-          message: '',
+          notice: null,
+          remoteMessage: '',
           layers: const [0, 1, 2, 3, 4],
         ),
       ),
@@ -727,7 +732,8 @@ final class GameBloc extends Bloc<GameEvent, GameState> {
           levelChapter: null,
           levelPresetLength: 0,
           levelBestBefore: null,
-          message: '',
+          notice: null,
+          remoteMessage: '',
         ),
       ),
     );
@@ -800,8 +806,8 @@ final class GameBloc extends Bloc<GameEvent, GameState> {
           phase: phase,
           mode: GameMode.online,
           names: [
-            players[0]?.name ?? 'Игрок 1',
-            players[1]?.name ?? 'Ожидание…',
+            players[0]?.name ?? 'Player 1',
+            players[1]?.name ?? 'Waiting…',
           ],
           elapsed: previous?.mode == GameMode.online ? previous!.elapsed : 0,
           xray: previous?.xray ?? _settings().xrayDefault,
@@ -811,9 +817,9 @@ final class GameBloc extends Bloc<GameEvent, GameState> {
                   previous?.onlineCode == snapshot.code)
               ? previous!.cameraReset
               : (previous?.cameraReset ?? 0) + 1,
-          message: connection == OnlineConnectionStatus.reconnecting
-              ? 'Восстанавливаем соединение…'
-              : '',
+          notice: connection == OnlineConnectionStatus.reconnecting
+              ? GameNotice.reconnecting
+              : null,
           onlinePlayer: player,
           onlineConnection: connection,
           onlineCode: snapshot.code,

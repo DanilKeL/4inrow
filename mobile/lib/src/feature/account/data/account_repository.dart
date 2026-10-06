@@ -5,11 +5,26 @@ import 'package:four3/src/feature/account/data/account_datasource.dart';
 import 'package:four3/src/feature/account/model/account_profile.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+enum AccountNotice {
+  emailVerified,
+  passwordChanged,
+  accountCreatedVerify,
+  emailSent,
+  passwordResetSent,
+}
+
+final class AccountActionNotice {
+  const new({this.remote = '', this.client});
+
+  final String remote;
+  final AccountNotice? client;
+}
+
 final class AccountRegistrationResult {
   const new({required this.verificationRequired, required this.notice});
 
   final bool verificationRequired;
-  final String notice;
+  final AccountActionNotice notice;
 }
 
 final class AccountRepository {
@@ -21,10 +36,10 @@ final class AccountRepository {
 
   String get guestName {
     final String? stored = _preferences.getString(_guestKey);
-    if (stored != null && RegExp(r'^Гость_\d{6}$').hasMatch(stored)) {
+    if (stored != null && stored.isNotEmpty) {
       return stored;
     }
-    final String value = 'Гость_${Random.secure().nextInt(900000) + 100000}';
+    final String value = 'Guest_${Random.secure().nextInt(900000) + 100000}';
     _preferences.setString(_guestKey, value);
     return value;
   }
@@ -61,17 +76,22 @@ final class AccountRepository {
       if (error.data?['verificationRequired'] == true) {
         return AccountRegistrationResult(
           verificationRequired: true,
-          notice: error.message,
+          notice: AccountActionNotice(remote: error.message),
         );
       }
       rethrow;
     }
     final bool verificationRequired = json['verificationRequired'] == true;
+    final Object? remoteNotice = json['message'] ?? json['error'];
     return AccountRegistrationResult(
       verificationRequired: verificationRequired,
       notice: verificationRequired
-          ? json['message']?.toString() ?? json['error']?.toString() ?? 'Аккаунт создан. Проверьте «Входящие» и папку «Спам», затем подтвердите email.'
-          : '',
+          ? remoteNotice == null
+                ? const AccountActionNotice(
+                    client: AccountNotice.accountCreatedVerify,
+                  )
+                : AccountActionNotice(remote: remoteNotice.toString())
+          : const AccountActionNotice(),
     );
   }
 
@@ -80,19 +100,24 @@ final class AccountRepository {
     return _profileFromJson(await _datasource.profile());
   }
 
-  Future<String> resendVerification(String identifier) async {
+  Future<AccountActionNotice> resendVerification(String identifier) async {
     final Map<String, dynamic> json = await _datasource.resendVerification(
       identifier: identifier,
     );
-    return json['message']?.toString() ?? 'Письмо отправлено.';
+    final String? message = json['message']?.toString();
+    return message == null
+        ? const AccountActionNotice(client: AccountNotice.emailSent)
+        : AccountActionNotice(remote: message);
   }
 
-  Future<String> requestPasswordReset(String email) async {
+  Future<AccountActionNotice> requestPasswordReset(String email) async {
     final Map<String, dynamic> json = await _datasource.requestPasswordReset(
       email: email,
     );
-    return json['message']?.toString() ??
-        'Если аккаунт существует, письмо отправлено.';
+    final String? message = json['message']?.toString();
+    return message == null
+        ? const AccountActionNotice(client: AccountNotice.passwordResetSent)
+        : AccountActionNotice(remote: message);
   }
 
   Future<AccountProfile> completePasswordReset(
