@@ -1,0 +1,248 @@
+import 'package:flutter/material.dart';
+import 'package:four3/src/common/theme/app_theme.dart';
+import 'package:four3/src/common/widget/app_controls.dart';
+import 'package:four3/src/common/widget/app_dialog.dart';
+import 'package:four3/src/feature/account/model/account_profile.dart';
+import 'package:four3/src/feature/account/widget/account_root_scope.dart';
+import 'package:four3/src/feature/game/bloc/game_bloc.dart';
+import 'package:four3/src/feature/game/model/game_models.dart';
+import 'package:four3/src/feature/game/widget/game_root_scope.dart';
+import 'package:four3/src/feature/matchmaking/bloc/matchmaking_bloc.dart';
+import 'package:four3/src/feature/matchmaking/widget/matchmaking_root_scope.dart';
+import 'package:four3/src/feature/matchmaking/widget/online_setup_view.dart';
+import 'package:four3/src/feature/settings/bloc/settings_bloc.dart';
+import 'package:four3/src/feature/settings/widget/settings_root_scope.dart';
+import 'package:four3/src/feature/tutorial/widget/tutorial_view.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
+
+class GameSetupView extends StatefulWidget {
+  const new({required this.initialMode, super.key});
+
+  final GameMode initialMode;
+
+  @override
+  State<GameSetupView> createState() => _GameSetupViewState();
+}
+
+class _GameSetupViewState extends State<GameSetupView> {
+  late GameMode _mode = widget.initialMode;
+  Difficulty _difficulty = Difficulty.medium;
+
+  @override
+  Widget build(BuildContext context) {
+    final AccountProfile? profile = AccountRootScope.of(context).profile;
+    final String player = profile?.displayName ?? 'Игрок 1';
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Row(
+          children: [
+            Expanded(
+              child: _ModeChoice(
+                icon: LucideIcons.usersRound,
+                title: 'Вдвоём',
+                subtitle: 'На одном устройстве',
+                selected: _mode == GameMode.local,
+                onTap: () => setState(() => _mode = GameMode.local),
+              ),
+            ),
+            const SizedBox(width: 6),
+            Expanded(
+              child: _ModeChoice(
+                icon: LucideIcons.cpu,
+                title: 'Против AI',
+                subtitle: 'Три сложности',
+                selected: _mode == GameMode.ai,
+                onTap: () => setState(() => _mode = GameMode.ai),
+              ),
+            ),
+            const SizedBox(width: 6),
+            Expanded(
+              child: _ModeChoice(
+                icon: LucideIcons.globe2,
+                title: 'Онлайн',
+                subtitle: 'По коду лобби',
+                selected: _mode == GameMode.online,
+                onTap: () => setState(() => _mode = GameMode.online),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 12),
+        Wrap(
+          spacing: 12,
+          runSpacing: 4,
+          children: [
+            Text.rich(
+              TextSpan(
+                text: 'Вы играете как ',
+                children: [
+                  TextSpan(
+                    text: player,
+                    style: const TextStyle(
+                      color: AppColors.ink,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ],
+              ),
+              style: const TextStyle(color: AppColors.muted, fontSize: 11),
+            ),
+            if (_mode == GameMode.local)
+              const Text.rich(
+                TextSpan(
+                  text: 'Второй игрок: ',
+                  children: [
+                    TextSpan(
+                      text: 'Игрок 2',
+                      style: TextStyle(
+                        color: AppColors.ink,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ],
+                ),
+                style: TextStyle(color: AppColors.muted, fontSize: 11),
+              ),
+          ],
+        ),
+        if (_mode == GameMode.ai) ...[
+          const SizedBox(height: 14),
+          const Text('Сложность', style: TextStyle(fontSize: 11)),
+          const SizedBox(height: 7),
+          AppSegmentedControl<Difficulty>(
+            options: const [
+              AppSegment(value: Difficulty.easy, label: 'Легко'),
+              AppSegment(value: Difficulty.medium, label: 'Средне'),
+              AppSegment(value: Difficulty.hard, label: 'Сложно'),
+            ],
+            selected: _difficulty,
+            onChanged: (value) => setState(() => _difficulty = value),
+          ),
+        ],
+        if (_mode == GameMode.online) ...[
+          const SizedBox(height: 14),
+          OnlineSetupView(onQuickStart: () => _openQuick(context, player)),
+        ],
+        if (_mode != GameMode.online) ...[
+          const SizedBox(height: 18),
+          SizedBox(
+            height: 48,
+            child: FilledButton.icon(
+              onPressed: () => _start(context, player),
+              iconAlignment: IconAlignment.end,
+              icon: const Icon(LucideIcons.arrowRight, size: 18),
+              label: const Text('Начать игру'),
+            ),
+          ),
+        ],
+      ],
+    );
+  }
+
+  void _start(BuildContext context, String player) {
+    final GameBloc game = GameRootScope.of(context);
+    final SettingsBloc settings = SettingsRootScope.of(context);
+    final BuildContext appContext = Navigator.of(context).context;
+    game.add(
+      GameEvent$Start(
+        mode: _mode,
+        difficulty: _difficulty,
+        names: <String>[player, 'Игрок 2'],
+      ),
+    );
+    Navigator.pop(context);
+    if (settings.settings.tutorialSeen) return;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!appContext.mounted) return;
+      game.add(const GameEvent$Pause());
+      showAppDialog<void>(
+        context: appContext,
+        title: 'Как играть',
+        wide: true,
+        child: TutorialView(
+          starting: true,
+          onDone: () {
+            settings.add(
+              SettingsEvent$Update(
+                settings.settings.copyWith(tutorialSeen: true),
+              ),
+            );
+            Navigator.pop(appContext);
+            game.add(const GameEvent$Resume());
+          },
+        ),
+      );
+    });
+  }
+
+  void _openQuick(BuildContext context, String player) {
+    final BuildContext appContext = Navigator.of(context).context;
+    MatchmakingRootScope.of(context).add(MatchmakingEvent$Find(player));
+    Navigator.pop(context);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!appContext.mounted) return;
+      showAppDialog<void>(
+        context: appContext,
+        title: 'Рейтинговая игра',
+        child: const OnlineSetupView(quickOnly: true),
+      );
+    });
+  }
+}
+
+class _ModeChoice extends StatelessWidget {
+  const new({
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final IconData icon;
+  final String title;
+  final String subtitle;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) => InkWell(
+    onTap: onTap,
+    borderRadius: BorderRadius.circular(10),
+    child: Ink(
+      height: 78,
+      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
+      decoration: BoxDecoration(
+        color: selected ? const Color(0xFFE8EDFE) : const Color(0xFFF4F5EF),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(
+          color: selected ? const Color(0xFF9FB2F4) : const Color(0xFFDCE0D4),
+        ),
+      ),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(icon, size: 20, color: selected ? AppColors.accent : null),
+          const SizedBox(height: 4),
+          Text(
+            title,
+            maxLines: 1,
+            style: TextStyle(
+              color: selected ? AppColors.accent : null,
+              fontSize: 11,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          const SizedBox(height: 2),
+          Text(
+            subtitle,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(color: AppColors.muted, fontSize: 8),
+          ),
+        ],
+      ),
+    ),
+  );
+}

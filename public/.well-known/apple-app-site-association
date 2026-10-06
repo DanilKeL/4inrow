@@ -1,0 +1,17 @@
+{
+  "applinks": {
+    "details": [
+      {
+        "appIDs": [
+          "JHFPMW6MK3.com.example.four3"
+        ],
+        "components": [
+          {
+            "/": "/auth/verify",
+            "comment": "Opens email verification links in FOUR3."
+          }
+        ]
+      }
+    ]
+  }
+}

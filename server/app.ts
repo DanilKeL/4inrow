@@ -610,6 +610,24 @@ export function createOnlineServer(options: OnlineServerOptions = {}) {
           }
           return;
         }
+        if (pathname === '/auth/verify' && req.method === 'POST') {
+          try {
+            checkRate(mailAttempts, 10);
+            const data = await readAuthJson();
+            const result = await auth.verifyEmail(data.token);
+            res.setHeader('Set-Cookie', auth.cookie(result.token, secure));
+            respond(200, {
+              authenticated: true,
+              username: result.username,
+              emailVerified: true,
+            });
+          } catch (error) {
+            respond(error instanceof AuthError ? error.status : 400, {
+              error: error instanceof AuthError ? error.message : 'Не удалось подтвердить email.',
+            });
+          }
+          return;
+        }
         if (pathname === '/auth/verify' && req.method === 'GET') {
           try {
             const result = await auth.verifyEmail(requestUrl.searchParams.get('token'));
@@ -780,6 +798,9 @@ export function createOnlineServer(options: OnlineServerOptions = {}) {
         return;
       }
       const video = ['.mp4', '.webm'].includes(extname(filename));
+      const appleAppSiteAssociation = filename.endsWith(
+        `${sep}.well-known${sep}apple-app-site-association`,
+      );
       let start = 0;
       let end = fileStat.size - 1;
       const range = video && req.method === 'GET' ? req.headers.range : undefined;
@@ -802,7 +823,9 @@ export function createOnlineServer(options: OnlineServerOptions = {}) {
         }
       }
       res.writeHead(range ? 206 : 200, {
-        'Content-Type': mime[extname(filename)] ?? 'application/octet-stream',
+        'Content-Type': appleAppSiteAssociation
+          ? 'application/json'
+          : (mime[extname(filename)] ?? 'application/octet-stream'),
         'Content-Length': range ? end - start + 1 : fileStat.size,
         ...(video ? { 'Accept-Ranges': 'bytes' } : {}),
         ...(range ? { 'Content-Range': `bytes ${start}-${end}/${fileStat.size}` } : {}),
