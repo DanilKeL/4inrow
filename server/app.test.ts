@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import { WebSocket } from 'ws';
-import { mkdtemp, writeFile, rm } from 'node:fs/promises';
+import { mkdir, mkdtemp, writeFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import type { AddressInfo } from 'node:net';
@@ -1558,10 +1558,18 @@ describe('online lobby server over real WebSockets', () => {
     dirs.push(dir);
     await writeFile(join(dir, 'index.html'), '<html>FOUR</html>');
     await writeFile(join(dir, 'app.js'), 'export {}');
+    await mkdir(join(dir, '.well-known'));
+    await writeFile(
+      join(dir, '.well-known', 'apple-app-site-association'),
+      '{"applinks":{"details":[]}}',
+    );
     const { url } = await start({ staticDir: dir });
     expect(await (await fetch(`${url}/`)).text()).toBe('<html>FOUR</html>');
     expect(await (await fetch(`${url}/room/ABCDE`)).text()).toBe('<html>FOUR</html>');
     expect((await fetch(`${url}/app.js`)).headers.get('content-type')).toContain('javascript');
+    const association = await fetch(`${url}/.well-known/apple-app-site-association`);
+    expect(association.headers.get('content-type')).toBe('application/json');
+    expect(await association.json()).toEqual({ applinks: { details: [] } });
     expect((await fetch(`${url}/missing.js`)).status).toBe(404);
     expect((await fetch(`${url}/%2e%2e%5csecret.txt`)).status).toBe(403);
     expect((await fetch(`${url}/health`, { method: 'POST' })).status).toBe(405);

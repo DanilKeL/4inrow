@@ -798,6 +798,9 @@ export function createOnlineServer(options: OnlineServerOptions = {}) {
         return;
       }
       const video = ['.mp4', '.webm'].includes(extname(filename));
+      const appleAppSiteAssociation = filename.endsWith(
+        `${sep}.well-known${sep}apple-app-site-association`,
+      );
       let start = 0;
       let end = fileStat.size - 1;
       const range = video && req.method === 'GET' ? req.headers.range : undefined;
@@ -820,7 +823,9 @@ export function createOnlineServer(options: OnlineServerOptions = {}) {
         }
       }
       res.writeHead(range ? 206 : 200, {
-        'Content-Type': mime[extname(filename)] ?? 'application/octet-stream',
+        'Content-Type': appleAppSiteAssociation
+          ? 'application/json'
+          : (mime[extname(filename)] ?? 'application/octet-stream'),
         'Content-Length': range ? end - start + 1 : fileStat.size,
         ...(video ? { 'Accept-Ranges': 'bytes' } : {}),
         ...(range ? { 'Content-Range': `bytes ${start}-${end}/${fileStat.size}` } : {}),
