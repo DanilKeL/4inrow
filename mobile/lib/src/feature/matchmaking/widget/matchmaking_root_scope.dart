@@ -3,10 +3,14 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 
 import 'package:four3/src/common/utils/build_context_extension.dart';
 import 'package:four3/src/feature/game/bloc/game_bloc.dart';
+import 'package:four3/src/feature/game/bloc/game_event.dart';
 import 'package:four3/src/feature/game/model/game_models.dart';
 import 'package:four3/src/feature/game/widget/game_root_scope.dart';
 import 'package:four3/src/feature/initialization/widget/root_scope.dart';
 import 'package:four3/src/feature/matchmaking/bloc/matchmaking_bloc.dart';
+import 'package:four3/src/feature/matchmaking/bloc/matchmaking_event.dart';
+import 'package:four3/src/feature/matchmaking/bloc/matchmaking_state.dart';
+import 'package:four3/src/feature/matchmaking/bloc/matchmaking_status.dart';
 
 class MatchmakingRootScope extends StatefulWidget {
   const new({required this.child, super.key});

@@ -1,10 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:four3/src/common/theme/app_theme.dart';
 import 'package:four3/src/common/utils/build_context_extension.dart';
 import 'package:four3/src/feature/account/widget/account_root_scope.dart';
+import 'package:four3/src/feature/app_theme/utils/app_theme.dart';
+import 'package:four3/src/feature/app_theme/utils/theme_context_extension.dart';
 import 'package:four3/src/feature/leaderboard/bloc/leaderboard_bloc.dart';
-import 'package:four3/src/feature/leaderboard/model/leaderboard_player.dart';
+import 'package:four3/src/feature/leaderboard/bloc/leaderboard_event.dart';
+import 'package:four3/src/feature/leaderboard/bloc/leaderboard_state.dart';
+import 'package:four3/src/feature/leaderboard/domain/model/leaderboard_player.dart';
 import 'package:four3/src/feature/leaderboard/widget/leaderboard_root_scope.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
@@ -36,7 +39,7 @@ class _LeaderboardViewState extends State<LeaderboardView> {
             Expanded(
               child: Text(
                 context.l10n.leaderboardTop,
-                style: const TextStyle(color: AppColors.muted, fontSize: 12),
+                style: context.textStyle.caption.copyWith(fontSize: 12),
               ),
             ),
             SizedBox(
@@ -147,9 +150,7 @@ class _TableRow extends StatelessWidget {
             : const Border(bottom: BorderSide(color: Color(0xFFE8EBE3))),
       ),
       child: DefaultTextStyle(
-        style: TextStyle(
-          color: AppColors.ink,
-          fontFamily: 'Manrope',
+        style: context.textStyle.body.copyWith(
           fontSize: header ? (compact ? 10 : 11) : (compact ? 11 : 13),
         ),
         child: Row(
@@ -248,7 +249,7 @@ class _StateText extends StatelessWidget {
           child: Text(
             text,
             textAlign: TextAlign.center,
-            style: const TextStyle(color: AppColors.muted, fontSize: 13),
+            style: context.textStyle.body.copyWith(color: context.colors.muted),
           ),
         ),
         if (action != null) ...[

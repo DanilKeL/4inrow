@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:four3/l10n/generated/app_localizations.dart';
-import 'package:four3/src/common/theme/app_theme.dart';
 import 'package:four3/src/common/utils/build_context_extension.dart';
+import 'package:four3/src/feature/app_theme/utils/app_theme.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:video_player/video_player.dart';
 
@@ -125,15 +125,29 @@ class _TutorialViewState extends State<TutorialView> {
                 SizedBox(
                   key: const ValueKey('tutorial-selector'),
                   width: 170,
-                  child: _lessonButtons(context, lessons, vertical: true),
+                  child: _LessonButtons(
+                    lessons: lessons,
+                    selected: _selected,
+                    vertical: true,
+                    onSelected: _selectLesson,
+                  ),
                 ),
                 const SizedBox(width: 16),
                 Expanded(
                   child: Column(
                     children: [
-                      Expanded(child: _media(lesson)),
+                      Expanded(
+                        child: _TutorialMedia(
+                          lesson: lesson,
+                          video: _video,
+                          failed: _failed,
+                          ended: _ended,
+                          onTogglePlayback: _togglePlayback,
+                          onReplay: _replay,
+                        ),
+                      ),
                       const SizedBox(height: 6),
-                      _caption(context, lesson, compact: true),
+                      _TutorialCaption(lesson: lesson, compact: true),
                     ],
                   ),
                 ),
@@ -141,7 +155,12 @@ class _TutorialViewState extends State<TutorialView> {
             ),
           ),
           const SizedBox(height: 6),
-          _footer(context),
+          _TutorialFooter(
+            selected: _selected,
+            starting: widget.starting,
+            onNext: _nextLesson,
+            onDone: widget.onDone,
+          ),
         ],
       );
     }
@@ -152,41 +171,105 @@ class _TutorialViewState extends State<TutorialView> {
         SizedBox(
           key: const ValueKey('tutorial-selector'),
           height: 78,
-          child: _lessonButtons(context, lessons, vertical: false),
+          child: _LessonButtons(
+            lessons: lessons,
+            selected: _selected,
+            vertical: false,
+            onSelected: _selectLesson,
+          ),
         ),
         const SizedBox(height: 10),
-        Expanded(child: _media(lesson)),
+        Expanded(
+          child: _TutorialMedia(
+            lesson: lesson,
+            video: _video,
+            failed: _failed,
+            ended: _ended,
+            onTogglePlayback: _togglePlayback,
+            onReplay: _replay,
+          ),
+        ),
         const SizedBox(height: 10),
-        _caption(context, lesson),
+        _TutorialCaption(lesson: lesson),
         const SizedBox(height: 8),
-        _footer(context),
+        _TutorialFooter(
+          selected: _selected,
+          starting: widget.starting,
+          onNext: _nextLesson,
+          onDone: widget.onDone,
+        ),
       ],
     );
   }
 
-  Widget _lessonButtons(
-    BuildContext context,
-    List<_Lesson> lessons, {
-    required bool vertical,
-  }) {
+  void _selectLesson(int index) {
+    setState(() => _selected = index);
+    if (widget.loadVideos) _load();
+  }
+
+  void _nextLesson() => _selectLesson((_selected + 1) % _lessonIds.length);
+
+  Future<void> _togglePlayback() async {
+    final VideoPlayerController? video = _video;
+    if (video == null) return;
+    if (video.value.isPlaying) {
+      await video.pause();
+    } else {
+      if (_ended) {
+        await video.seekTo(Duration.zero);
+        _ended = false;
+      }
+      await video.play();
+    }
+    if (mounted) setState(() {});
+  }
+
+  Future<void> _replay() async {
+    final VideoPlayerController? video = _video;
+    if (video == null) return;
+    await video.seekTo(Duration.zero);
+    _ended = false;
+    await video.play();
+    if (mounted) setState(() {});
+  }
+
+  @override
+  void dispose() {
+    _video?.dispose();
+    super.dispose();
+  }
+}
+
+class _LessonButtons extends StatelessWidget {
+  const new({
+    required this.lessons,
+    required this.selected,
+    required this.vertical,
+    required this.onSelected,
+  });
+
+  final List<_Lesson> lessons;
+  final int selected;
+  final bool vertical;
+  final ValueChanged<int> onSelected;
+
+  @override
+  Widget build(BuildContext context) {
     final List<Widget> buttons = [
       for (var index = 0; index < lessons.length; index++)
         OutlinedButton(
-          onPressed: () {
-            setState(() => _selected = index);
-            if (widget.loadVideos) _load();
-          },
+          onPressed: () => onSelected(index),
           style: OutlinedButton.styleFrom(
             minimumSize: Size(0, vertical ? 31 : 36),
             padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 4),
-            backgroundColor: index == _selected
+            backgroundColor: index == selected
                 ? const Color(0xFFEDF1FF)
                 : Colors.transparent,
-            foregroundColor: index == _selected
+            foregroundColor: index == selected
                 ? AppColors.accent
                 : AppColors.ink,
             side: BorderSide(
-              color: index == _selected
+              color: index == selected
                   ? const Color(0xFFCAD5FB)
                   : const Color(0xFFE0E3D9),
             ),
@@ -222,8 +305,27 @@ class _TutorialViewState extends State<TutorialView> {
       children: buttons,
     );
   }
+}
 
-  Widget _media(_Lesson lesson) => ClipRRect(
+class _TutorialMedia extends StatelessWidget {
+  const new({
+    required this.lesson,
+    required this.video,
+    required this.failed,
+    required this.ended,
+    required this.onTogglePlayback,
+    required this.onReplay,
+  });
+
+  final _Lesson lesson;
+  final VideoPlayerController? video;
+  final bool failed;
+  final bool ended;
+  final Future<void> Function() onTogglePlayback;
+  final Future<void> Function() onReplay;
+
+  @override
+  Widget build(BuildContext context) => ClipRRect(
     key: const ValueKey('tutorial-media'),
     borderRadius: BorderRadius.circular(12),
     child: ColoredBox(
@@ -236,21 +338,21 @@ class _TutorialViewState extends State<TutorialView> {
                 Expanded(
                   child: ClipRect(
                     child: Center(
-                      child: _failed
+                      child: failed
                           ? Image.asset(
                               'assets/tutorial/${lesson.id}.webp',
                               fit: BoxFit.contain,
                             )
-                          : _video?.value.isInitialized == true
+                          : video?.value.isInitialized == true
                           ? AspectRatio(
-                              aspectRatio: _video!.value.aspectRatio,
-                              child: VideoPlayer(_video!),
+                              aspectRatio: video!.value.aspectRatio,
+                              child: VideoPlayer(video!),
                             )
                           : const CircularProgressIndicator(),
                     ),
                   ),
                 ),
-                if (_video?.value.isInitialized == true)
+                if (video?.value.isInitialized == true)
                   SizedBox(
                     height: 36,
                     child: ColoredBox(
@@ -258,23 +360,12 @@ class _TutorialViewState extends State<TutorialView> {
                       child: Row(
                         children: [
                           IconButton(
-                            tooltip: _video!.value.isPlaying
+                            tooltip: video!.value.isPlaying
                                 ? context.l10n.pauseExample
                                 : context.l10n.playExample,
-                            onPressed: () async {
-                              if (_video!.value.isPlaying) {
-                                await _video!.pause();
-                              } else {
-                                if (_ended) {
-                                  await _video!.seekTo(Duration.zero);
-                                  _ended = false;
-                                }
-                                await _video!.play();
-                              }
-                              if (mounted) setState(() {});
-                            },
+                            onPressed: onTogglePlayback,
                             icon: Icon(
-                              _video!.value.isPlaying
+                              video!.value.isPlaying
                                   ? LucideIcons.pause
                                   : LucideIcons.play,
                               size: 16,
@@ -284,7 +375,7 @@ class _TutorialViewState extends State<TutorialView> {
                             child: Semantics(
                               label: context.l10n.videoPosition,
                               child: VideoProgressIndicator(
-                                _video!,
+                                video!,
                                 allowScrubbing: true,
                                 colors: const VideoProgressColors(
                                   playedColor: AppColors.accent,
@@ -294,12 +385,7 @@ class _TutorialViewState extends State<TutorialView> {
                           ),
                           IconButton(
                             tooltip: context.l10n.replayExample,
-                            onPressed: () async {
-                              await _video!.seekTo(Duration.zero);
-                              _ended = false;
-                              await _video!.play();
-                              if (mounted) setState(() {});
-                            },
+                            onPressed: onReplay,
                             icon: const Icon(LucideIcons.rotateCcw, size: 16),
                           ),
                         ],
@@ -309,7 +395,7 @@ class _TutorialViewState extends State<TutorialView> {
               ],
             ),
           ),
-          if (_ended && lesson.id != 'stacking')
+          if (ended && lesson.id != 'stacking')
             Positioned(
               left: 12,
               top: 12,
@@ -332,7 +418,7 @@ class _TutorialViewState extends State<TutorialView> {
                 ),
               ),
             ),
-          if (_failed)
+          if (failed)
             Positioned(
               left: 8,
               right: 8,
@@ -347,12 +433,16 @@ class _TutorialViewState extends State<TutorialView> {
       ),
     ),
   );
+}
 
-  Widget _caption(
-    BuildContext context,
-    _Lesson lesson, {
-    bool compact = false,
-  }) => Column(
+class _TutorialCaption extends StatelessWidget {
+  const new({required this.lesson, this.compact = false});
+
+  final _Lesson lesson;
+  final bool compact;
+
+  @override
+  Widget build(BuildContext context) => Column(
     crossAxisAlignment: CrossAxisAlignment.stretch,
     children: [
       Text(
@@ -375,19 +465,31 @@ class _TutorialViewState extends State<TutorialView> {
       ),
     ],
   );
+}
 
-  Widget _footer(BuildContext context) => Row(
+class _TutorialFooter extends StatelessWidget {
+  const new({
+    required this.selected,
+    required this.starting,
+    required this.onNext,
+    required this.onDone,
+  });
+
+  final int selected;
+  final bool starting;
+  final VoidCallback onNext;
+  final VoidCallback? onDone;
+
+  @override
+  Widget build(BuildContext context) => Row(
     mainAxisAlignment: MainAxisAlignment.spaceBetween,
     children: [
       TextButton.icon(
-        onPressed: () {
-          setState(() => _selected = (_selected + 1) % _lessonIds.length);
-          if (widget.loadVideos) _load();
-        },
+        onPressed: onNext,
         iconAlignment: IconAlignment.end,
         icon: const Icon(LucideIcons.arrowRight, size: 16),
         label: Text(
-          _selected == _lessonIds.length - 1
+          selected == _lessonIds.length - 1
               ? context.l10n.firstExample
               : context.l10n.nextExample,
           style: const TextStyle(fontSize: 11),
@@ -395,17 +497,11 @@ class _TutorialViewState extends State<TutorialView> {
       ),
       const SizedBox(width: 8),
       FilledButton(
-        onPressed: widget.onDone ?? () => Navigator.maybePop(context),
-        child: Text(widget.starting ? context.l10n.start : context.l10n.gotIt),
+        onPressed: onDone ?? () => Navigator.maybePop(context),
+        child: Text(starting ? context.l10n.start : context.l10n.gotIt),
       ),
     ],
   );
-
-  @override
-  void dispose() {
-    _video?.dispose();
-    super.dispose();
-  }
 }
 
 List<_Lesson> _localizedLessons(BuildContext context) {

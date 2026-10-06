@@ -5,6 +5,7 @@ import 'package:flutter_scene/scene.dart' as fs;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:four3/main.dart' as app;
 import 'package:four3/src/feature/game/bloc/game_bloc.dart';
+import 'package:four3/src/feature/game/bloc/game_event.dart';
 import 'package:four3/src/feature/game/model/game_models.dart';
 import 'package:four3/src/feature/game/service/game_engine.dart';
 import 'package:four3/src/feature/game/widget/game_root_scope.dart';

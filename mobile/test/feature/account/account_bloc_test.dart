@@ -1,7 +1,12 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:four3/src/common/preferences/preferences_datasource_tool.dart';
 import 'package:four3/src/feature/account/bloc/account_bloc.dart';
-import 'package:four3/src/feature/account/data/account_datasource.dart';
-import 'package:four3/src/feature/account/data/account_repository.dart';
+import 'package:four3/src/feature/account/bloc/account_event.dart';
+import 'package:four3/src/feature/account/bloc/account_state.dart';
+import 'package:four3/src/feature/account/data/datasource/account_datasource.dart';
+import 'package:four3/src/feature/account/data/datasource/account_preferences_datasource.dart';
+import 'package:four3/src/feature/account/data/repository/account_repository.dart';
+import 'package:four3/src/feature/account/domain/repository/account_repository.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 void main() {
@@ -9,14 +14,18 @@ void main() {
   late AccountBloc bloc;
 
   setUp(() async {
-    SharedPreferences.setMockInitialValues(const {
-      'four-cubed-guest-name': 'Guest_123456',
-    });
+    SharedPreferences.setMockInitialValues(const {});
     datasource = _AccountDatasource();
+    final accountPreferences = AccountPreferencesDatasource$Preferences(
+      preferencesDatasourceTool: PreferencesDatasourceTool$Shared(
+        sharedPreferences: await SharedPreferences.getInstance(),
+      ),
+    );
+    await accountPreferences.saveGuestName('Guest_123456');
     bloc = AccountBloc(
-      repository: AccountRepository(
+      repository: AccountRepository$Api(
         datasource: datasource,
-        preferences: await SharedPreferences.getInstance(),
+        preferencesDatasource: accountPreferences,
       ),
     );
   });

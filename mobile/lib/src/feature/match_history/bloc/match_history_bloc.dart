@@ -1,74 +1,11 @@
 import 'package:bloc_concurrency/bloc_concurrency.dart';
-import 'package:equatable/equatable.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:four3/src/feature/game/bloc/game_bloc.dart';
 import 'package:four3/src/feature/game/model/game_models.dart';
-import 'package:four3/src/feature/match_history/data/match_history_repository.dart';
-import 'package:four3/src/feature/match_history/model/match_history_models.dart';
-
-sealed class MatchHistoryEvent extends Equatable {
-  const new();
-  @override
-  List<Object?> get props => const [];
-}
-
-final class MatchHistoryEvent$Load extends MatchHistoryEvent {
-  const new();
-}
-
-final class MatchHistoryEvent$Save extends MatchHistoryEvent {
-  const new(this.data);
-  final GameViewData data;
-  @override
-  List<Object> get props => [data];
-}
-
-final class MatchHistoryEvent$Rename extends MatchHistoryEvent {
-  const new(this.id, this.title);
-  final String id;
-  final String title;
-  @override
-  List<Object> get props => [id, title];
-}
-
-final class MatchHistoryEvent$Remove extends MatchHistoryEvent {
-  const new(this.id);
-  final String id;
-  @override
-  List<Object> get props => [id];
-}
-
-sealed class MatchHistoryState extends Equatable {
-  const new();
-  @override
-  List<Object?> get props => const [];
-}
-
-final class MatchHistoryState$Initial extends MatchHistoryState {
-  const new();
-}
-
-final class MatchHistoryState$Loading extends MatchHistoryState {
-  const new();
-}
-
-final class MatchHistoryState$Ready extends MatchHistoryState {
-  const new(this.data);
-  final MatchHistorySnapshot data;
-  @override
-  List<Object> get props => [data];
-}
-
-final class MatchHistoryState$Guest extends MatchHistoryState {
-  const new();
-}
-
-final class MatchHistoryState$Failure extends MatchHistoryState {
-  const new(this.message);
-  final String message;
-  @override
-  List<Object> get props => [message];
-}
+import 'package:four3/src/feature/game/model/game_view_data.dart';
+import 'package:four3/src/feature/match_history/bloc/match_history_event.dart';
+import 'package:four3/src/feature/match_history/bloc/match_history_state.dart';
+import 'package:four3/src/feature/match_history/domain/model/match_history_models.dart';
+import 'package:four3/src/feature/match_history/domain/repository/match_history_repository.dart';
 
 final class MatchHistoryBloc
     extends Bloc<MatchHistoryEvent, MatchHistoryState> {

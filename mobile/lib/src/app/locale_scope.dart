@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:four3/src/common/utils/build_context_extension.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+import 'package:four3/src/feature/localization/data/datasource/app_locale_datasource.dart';
 
 typedef LocaleSetter = Future<void> Function(Locale? locale);
 
@@ -37,12 +37,10 @@ Locale resolveAppLocale(List<Locale>? preferred, Iterable<Locale> supported) {
 }
 
 final class LocaleController extends ChangeNotifier {
-  new(this._preferences)
-    : _locale = appLocaleFromTag(_preferences.getString(preferenceKey));
+  new(this._datasource)
+    : _locale = appLocaleFromTag(_datasource.loadLanguageTag());
 
-  static const String preferenceKey = 'settings.locale';
-
-  final SharedPreferences _preferences;
+  final AppLocaleDatasource _datasource;
   Locale? _locale;
 
   Locale? get locale => _locale;
@@ -51,11 +49,7 @@ final class LocaleController extends ChangeNotifier {
     if (_locale == locale) return;
     _locale = locale;
     notifyListeners();
-    if (locale == null) {
-      await _preferences.remove(preferenceKey);
-    } else {
-      await _preferences.setString(preferenceKey, locale.toLanguageTag());
-    }
+    await _datasource.saveLanguageTag(locale?.toLanguageTag());
   }
 }
 

@@ -1,13 +1,16 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:four3/src/common/theme/app_theme.dart';
 import 'package:four3/src/common/utils/build_context_extension.dart';
-import 'package:four3/src/common/widget/app_controls.dart';
-import 'package:four3/src/feature/game/bloc/game_bloc.dart';
+import 'package:four3/src/feature/app_theme/utils/app_theme.dart';
+import 'package:four3/src/feature/app_theme/utils/theme_context_extension.dart';
+import 'package:four3/src/feature/components/fields/app_text_field.dart';
+import 'package:four3/src/feature/game/bloc/game_event.dart';
 import 'package:four3/src/feature/game/model/game_models.dart';
 import 'package:four3/src/feature/game/widget/game_root_scope.dart';
 import 'package:four3/src/feature/match_history/bloc/match_history_bloc.dart';
-import 'package:four3/src/feature/match_history/model/match_history_models.dart';
+import 'package:four3/src/feature/match_history/bloc/match_history_event.dart';
+import 'package:four3/src/feature/match_history/bloc/match_history_state.dart';
+import 'package:four3/src/feature/match_history/domain/model/match_history_models.dart';
 import 'package:four3/src/feature/match_history/widget/match_history_root_scope.dart';
 import 'package:intl/intl.dart';
 
@@ -39,7 +42,7 @@ class _MatchHistoryViewState extends State<MatchHistoryView> {
         MatchHistoryState$Loading() || MatchHistoryState$Initial() => Center(
           child: Text(
             context.l10n.historyLoading,
-            style: const TextStyle(color: AppColors.muted, fontSize: 11),
+            style: context.textStyle.caption,
           ),
         ),
         MatchHistoryState$Guest() => _Guest(onSignIn: widget.onSignIn),
@@ -47,20 +50,51 @@ class _MatchHistoryViewState extends State<MatchHistoryView> {
           message: message,
           retry: () => bloc.add(const MatchHistoryEvent$Load()),
         ),
-        MatchHistoryState$Ready(:final data) => _history(context, bloc, data),
+        MatchHistoryState$Ready(:final data) => _History(
+          bloc: bloc,
+          data: data,
+          page: _page,
+          editing: _editing,
+          title: _title,
+          onPageChanged: (value) => setState(() => _page = value),
+          onEditingChanged: (value) => setState(() => _editing = value),
+        ),
       },
     );
   }
 
-  Widget _history(
-    BuildContext context,
-    MatchHistoryBloc bloc,
-    MatchHistorySnapshot data,
-  ) {
+  @override
+  void dispose() {
+    _title.dispose();
+    super.dispose();
+  }
+}
+
+class _History extends StatelessWidget {
+  const new({
+    required this.bloc,
+    required this.data,
+    required this.page,
+    required this.editing,
+    required this.title,
+    required this.onPageChanged,
+    required this.onEditingChanged,
+  });
+
+  final MatchHistoryBloc bloc;
+  final MatchHistorySnapshot data;
+  final int page;
+  final String? editing;
+  final TextEditingController title;
+  final ValueChanged<int> onPageChanged;
+  final ValueChanged<String?> onEditingChanged;
+
+  @override
+  Widget build(BuildContext context) {
     final int pages = (data.matches.length / 2).ceil().clamp(1, 999);
-    final int page = _page.clamp(0, pages - 1);
+    final int currentPage = page.clamp(0, pages - 1);
     final List<SavedMatch> shown = data.matches
-        .skip(page * 2)
+        .skip(currentPage * 2)
         .take(2)
         .toList(growable: false);
     return Column(
@@ -77,7 +111,7 @@ class _MatchHistoryViewState extends State<MatchHistoryView> {
               TextSpan(text: '. ${context.l10n.lastFiftyMatches}'),
             ],
           ),
-          style: const TextStyle(color: AppColors.muted, fontSize: 11),
+          style: context.textStyle.caption,
         ),
         const SizedBox(height: 10),
         Row(
@@ -95,10 +129,7 @@ class _MatchHistoryViewState extends State<MatchHistoryView> {
                   child: Text(
                     context.l10n.historyEmpty,
                     textAlign: TextAlign.center,
-                    style: const TextStyle(
-                      color: AppColors.muted,
-                      fontSize: 11,
-                    ),
+                    style: context.textStyle.caption,
                   ),
                 )
               : ListView.separated(
@@ -107,8 +138,8 @@ class _MatchHistoryViewState extends State<MatchHistoryView> {
                   separatorBuilder: (_, _) => const SizedBox(height: 8),
                   itemBuilder: (context, index) => ExpandedMatchCard(
                     match: shown[index],
-                    editing: _editing == shown[index].id,
-                    title: _title,
+                    editing: editing == shown[index].id,
+                    title: title,
                     onWatch: () {
                       GameRootScope.of(context).add(
                         GameEvent$ReplaySaved(
@@ -119,19 +150,16 @@ class _MatchHistoryViewState extends State<MatchHistoryView> {
                       Navigator.pop(context);
                     },
                     onEdit: () {
-                      if (_editing == shown[index].id) {
+                      if (editing == shown[index].id) {
                         bloc.add(
-                          MatchHistoryEvent$Rename(
-                            shown[index].id,
-                            _title.text,
-                          ),
+                          MatchHistoryEvent$Rename(shown[index].id, title.text),
                         );
-                        setState(() => _editing = null);
+                        onEditingChanged(null);
                       } else {
-                        _title.text = shown[index].title.isEmpty
+                        title.text = shown[index].title.isEmpty
                             ? context.l10n.matchTitle
                             : shown[index].title;
-                        setState(() => _editing = shown[index].id);
+                        onEditingChanged(shown[index].id);
                       }
                     },
                     onRemove: () =>
@@ -144,20 +172,20 @@ class _MatchHistoryViewState extends State<MatchHistoryView> {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               OutlinedButton(
-                onPressed: page == 0
+                onPressed: currentPage == 0
                     ? null
-                    : () => setState(() => _page = page - 1),
+                    : () => onPageChanged(currentPage - 1),
                 style: _smallButtonStyle,
                 child: Text(context.l10n.back),
               ),
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 12),
-                child: Text('${page + 1} / $pages'),
+                child: Text('${currentPage + 1} / $pages'),
               ),
               OutlinedButton(
-                onPressed: page + 1 == pages
+                onPressed: currentPage + 1 == pages
                     ? null
-                    : () => setState(() => _page = page + 1),
+                    : () => onPageChanged(currentPage + 1),
                 style: _smallButtonStyle,
                 child: Text(context.l10n.next),
               ),
@@ -165,12 +193,6 @@ class _MatchHistoryViewState extends State<MatchHistoryView> {
           ),
       ],
     );
-  }
-
-  @override
-  void dispose() {
-    _title.dispose();
-    super.dispose();
   }
 }
 
@@ -239,7 +261,7 @@ class ExpandedMatchCard extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(8),
       decoration: BoxDecoration(
-        border: Border.all(color: AppColors.border),
+        border: Border.all(color: context.colors.border),
         borderRadius: BorderRadius.circular(12),
       ),
       child: Column(
@@ -259,7 +281,9 @@ class ExpandedMatchCard extends StatelessWidget {
               match.title.isEmpty ? context.l10n.matchTitle : match.title,
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
-              style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w800),
+              style: context.textStyle.bodyStrong.copyWith(
+                fontWeight: FontWeight.w800,
+              ),
             ),
           Text(
             context.l10n.matchSummary(
@@ -267,16 +291,14 @@ class ExpandedMatchCard extends StatelessWidget {
               mode,
               context.l10n.moves(match.game.history.length),
             ),
-            style: const TextStyle(
-              color: AppColors.muted,
+            style: context.textStyle.caption.copyWith(
               fontSize: 10,
               height: 1.6,
             ),
           ),
           Text(
             '$result${match.ratingChange == null ? '' : ' · ${match.ratingChange! >= 0 ? '+' : ''}${match.ratingChange} Elo'}${match.endReason == null ? '' : ' · ${context.l10n.earlyFinish}'}',
-            style: const TextStyle(
-              color: AppColors.muted,
+            style: context.textStyle.caption.copyWith(
               fontSize: 10,
               height: 1.6,
             ),
@@ -330,11 +352,7 @@ class _Guest extends StatelessWidget {
     children: [
       Text(
         context.l10n.historyGuestHint,
-        style: const TextStyle(
-          color: AppColors.muted,
-          fontSize: 11,
-          height: 1.5,
-        ),
+        style: context.textStyle.caption.copyWith(height: 1.5),
       ),
       const SizedBox(height: 12),
       FilledButton(

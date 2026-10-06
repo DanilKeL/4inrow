@@ -3,7 +3,7 @@ import 'package:flutter_localizations/flutter_localizations.dart';
 
 import 'package:four3/l10n/generated/app_localizations.dart';
 import 'package:four3/src/app/locale_scope.dart';
-import 'package:four3/src/common/theme/app_theme.dart';
+import 'package:four3/src/feature/app_theme/utils/app_theme.dart';
 import 'package:four3/src/feature/game/widget/game_shell.dart';
 import 'package:four3/src/feature/initialization/widget/root_scope.dart';
 
@@ -23,7 +23,7 @@ class _FourAppState extends State<FourApp> {
     super.didChangeDependencies();
     if (_loaded) return;
     _loaded = true;
-    _controller = LocaleController(RootScope.of(context).preferences)
+    _controller = LocaleController(RootScope.of(context).appLocaleDatasource)
       ..addListener(_localeChanged);
   }
 

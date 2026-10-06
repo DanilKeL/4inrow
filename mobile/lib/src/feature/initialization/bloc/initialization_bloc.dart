@@ -1,42 +1,7 @@
 import 'package:bloc_concurrency/bloc_concurrency.dart';
-import 'package:equatable/equatable.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-
-sealed class InitializationEvent extends Equatable {
-  const new();
-  @override
-  List<Object?> get props => const [];
-}
-
-final class InitializationEvent$Start extends InitializationEvent {
-  const new();
-}
-
-final class InitializationEvent$Foreground extends InitializationEvent {
-  const new();
-}
-
-final class InitializationEvent$Background extends InitializationEvent {
-  const new();
-}
-
-sealed class InitializationState extends Equatable {
-  const new();
-  @override
-  List<Object?> get props => const [];
-}
-
-final class InitializationState$Initial extends InitializationState {
-  const new();
-}
-
-final class InitializationState$Ready extends InitializationState {
-  const new({required this.foreground, required this.resumeCount});
-  final bool foreground;
-  final int resumeCount;
-  @override
-  List<Object> get props => [foreground, resumeCount];
-}
+import 'package:four3/src/feature/initialization/bloc/initialization_event.dart';
+import 'package:four3/src/feature/initialization/bloc/initialization_state.dart';
 
 final class InitializationBloc
     extends Bloc<InitializationEvent, InitializationState> {

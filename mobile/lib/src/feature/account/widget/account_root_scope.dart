@@ -3,6 +3,8 @@ import 'dart:async';
 import 'package:flutter/widgets.dart';
 import 'package:four3/src/common/utils/build_context_extension.dart';
 import 'package:four3/src/feature/account/bloc/account_bloc.dart';
+import 'package:four3/src/feature/account/bloc/account_event.dart';
+import 'package:four3/src/feature/initialization/domain/model/dependencies_container.dart';
 import 'package:four3/src/feature/initialization/widget/root_scope.dart';
 
 class AccountRootScope extends StatefulWidget {
@@ -23,7 +25,7 @@ class _AccountRootScopeState extends State<AccountRootScope> {
   @override
   void initState() {
     super.initState();
-    final RootDependencies root = RootScope.of(context);
+    final RootDependenciesContainer root = RootScope.of(context);
     _accountBloc = AccountBloc(repository: root.accountRepository)
       ..add(const AccountEvent$Load());
     _links = root.deepLinkService.links.listen(_handleLink);

@@ -3,6 +3,7 @@ import 'package:flutter/widgets.dart';
 import 'package:four3/src/common/utils/build_context_extension.dart';
 import 'package:four3/src/feature/initialization/widget/root_scope.dart';
 import 'package:four3/src/feature/settings/bloc/settings_bloc.dart';
+import 'package:four3/src/feature/settings/bloc/settings_event.dart';
 
 class SettingsRootScope extends StatefulWidget {
   const new({required this.child, super.key});

@@ -2,6 +2,7 @@ import 'package:flutter/widgets.dart';
 
 import 'package:four3/src/common/utils/build_context_extension.dart';
 import 'package:four3/src/feature/initialization/bloc/initialization_bloc.dart';
+import 'package:four3/src/feature/initialization/bloc/initialization_event.dart';
 
 class InitializationRootScope extends StatefulWidget {
   const new({required this.child, super.key});

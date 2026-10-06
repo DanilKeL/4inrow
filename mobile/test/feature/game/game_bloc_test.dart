@@ -1,9 +1,15 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:four3/src/common/preferences/preferences_datasource_tool.dart';
 import 'package:four3/src/feature/game/bloc/game_bloc.dart';
+import 'package:four3/src/feature/game/bloc/game_event.dart';
+import 'package:four3/src/feature/game/bloc/game_state.dart';
+import 'package:four3/src/feature/game/data/datasource/game_storage_datasource_preferences.dart';
+import 'package:four3/src/feature/game/data/repository/game_storage_repository.dart';
 import 'package:four3/src/feature/game/model/game_models.dart';
-import 'package:four3/src/feature/game/service/game_storage_repository.dart';
-import 'package:four3/src/feature/levels/service/level_repository.dart';
-import 'package:four3/src/feature/settings/model/app_settings.dart';
+import 'package:four3/src/feature/levels/data/datasource/level_asset_datasource.dart';
+import 'package:four3/src/feature/levels/data/datasource/level_preferences_datasource.dart';
+import 'package:four3/src/feature/levels/data/repository/level_repository.dart';
+import 'package:four3/src/feature/settings/domain/model/app_settings.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 void main() {
@@ -13,8 +19,21 @@ void main() {
     SharedPreferences.setMockInitialValues({});
     final SharedPreferences preferences = await SharedPreferences.getInstance();
     return GameBloc(
-      storage: GameStorageRepository(preferences),
-      levels: LevelRepository(preferences),
+      storage: GameStorageRepository$Local(
+        datasource: GameStorageDatasource$Preferences(
+          preferencesDatasourceTool: PreferencesDatasourceTool$Shared(
+            sharedPreferences: preferences,
+          ),
+        ),
+      ),
+      levels: LevelRepository$Local(
+        assetDatasource: LevelAssetDatasource$Bundle(),
+        preferencesDatasource: LevelPreferencesDatasource$Preferences(
+          preferencesDatasourceTool: PreferencesDatasourceTool$Shared(
+            sharedPreferences: preferences,
+          ),
+        ),
+      ),
       settings: () => const AppSettings(animations: false),
       playerName: () => 'Tester',
     );

@@ -5,6 +5,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:four3/l10n/generated/app_localizations.dart';
 import 'package:four3/src/app/locale_scope.dart';
+import 'package:four3/src/common/preferences/preferences_datasource_tool.dart';
+import 'package:four3/src/feature/localization/data/datasource/app_locale_datasource.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 void main() {
@@ -90,17 +92,38 @@ void main() {
       SharedPreferences.setMockInitialValues(<String, Object>{});
       final SharedPreferences preferences =
           await SharedPreferences.getInstance();
-      final LocaleController controller = LocaleController(preferences);
+      final LocaleController controller = LocaleController(
+        AppLocaleDatasource$Preferences(
+          preferencesDatasourceTool: PreferencesDatasourceTool$Shared(
+            sharedPreferences: preferences,
+          ),
+        ),
+      );
       expect(controller.locale, isNull);
 
       await controller.setLocale(
         const Locale.fromSubtags(languageCode: 'pt', countryCode: 'BR'),
       );
-      expect(preferences.getString(LocaleController.preferenceKey), 'pt-BR');
-      expect(LocaleController(preferences).locale?.toLanguageTag(), 'pt-BR');
+      expect(
+        preferences.getString(AppLocaleDatasource$Preferences.preferenceKey),
+        'pt-BR',
+      );
+      expect(
+        LocaleController(
+          AppLocaleDatasource$Preferences(
+            preferencesDatasourceTool: PreferencesDatasourceTool$Shared(
+              sharedPreferences: preferences,
+            ),
+          ),
+        ).locale?.toLanguageTag(),
+        'pt-BR',
+      );
 
       await controller.setLocale(null);
-      expect(preferences.containsKey(LocaleController.preferenceKey), isFalse);
+      expect(
+        preferences.containsKey(AppLocaleDatasource$Preferences.preferenceKey),
+        isFalse,
+      );
       controller.dispose();
     },
   );

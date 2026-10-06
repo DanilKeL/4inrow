@@ -15,6 +15,35 @@ pass `--dart-define=FOUR_API_BASE_URL=http://127.0.0.1:3000`; for an Android
 emulator use `http://10.0.2.2:3000`. Override `FOUR_ONLINE_URL` only when the
 WebSocket endpoint is not derived from the API host.
 
+## Architecture
+
+Features follow the same layered shape throughout the app:
+
+```text
+Widget -> Scope/BLoC -> Repository -> Datasource -> RestClient
+                                             \----> PreferencesDatasourceTool
+```
+
+- `domain/` contains feature models and repository contracts.
+- `data/datasource/` owns transport or persistence details.
+- `data/repository/` implements domain contracts by coordinating datasources.
+- `bloc/` contains separate event, state, and BLoC files connected with normal
+  imports; Dart `part` files are not used.
+- `widget/` keeps small screen-specific widgets private and close to the screen.
+  Only large or reusable UI is promoted to its own file under the feature or
+  `feature/components/`.
+
+`SharedPreferences` is an infrastructure detail. Feature code accesses it only
+through `PreferencesDatasourceTool` and a feature-specific preferences
+datasource. Preference keys, default values, and serialization belong to that
+datasource—not to repositories, BLoCs, widgets, or services. The composition
+root is the only place that creates the underlying `SharedPreferences` instance.
+
+UI must be represented by `StatelessWidget` or `StatefulWidget` classes rather
+than functions returning `Widget`. Theme access goes through the app theme
+extensions (`context.colors` and `context.textStyle`) so shared visual tokens
+remain centralized.
+
 ## Verification
 
 ```sh

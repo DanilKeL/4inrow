@@ -1,11 +1,15 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:four3/src/common/preferences/preferences_datasource_tool.dart';
 import 'package:four3/src/common/rest_client/rest_client.dart';
-import 'package:four3/src/feature/account/data/account_datasource.dart';
-import 'package:four3/src/feature/account/data/account_repository.dart';
-import 'package:four3/src/feature/account/model/account_profile.dart';
-import 'package:four3/src/feature/leaderboard/data/leaderboard_datasource.dart';
-import 'package:four3/src/feature/leaderboard/data/leaderboard_repository.dart';
-import 'package:four3/src/feature/leaderboard/model/leaderboard_player.dart';
+import 'package:four3/src/feature/account/data/datasource/account_datasource.dart';
+import 'package:four3/src/feature/account/data/datasource/account_datasource_rest_client.dart';
+import 'package:four3/src/feature/account/data/datasource/account_preferences_datasource.dart';
+import 'package:four3/src/feature/account/data/repository/account_repository.dart';
+import 'package:four3/src/feature/account/domain/model/account_profile.dart';
+import 'package:four3/src/feature/account/domain/repository/account_repository.dart';
+import 'package:four3/src/feature/leaderboard/data/datasource/leaderboard_datasource_rest_client.dart';
+import 'package:four3/src/feature/leaderboard/data/repository/leaderboard_repository.dart';
+import 'package:four3/src/feature/leaderboard/domain/model/leaderboard_player.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 void main() {
@@ -41,9 +45,13 @@ void main() {
         'emailVerified': true,
         'createdAt': 42.0,
       };
-    final repository = AccountRepository(
+    final repository = AccountRepository$Api(
       datasource: datasource,
-      preferences: preferences,
+      preferencesDatasource: AccountPreferencesDatasource$Preferences(
+        preferencesDatasourceTool: PreferencesDatasourceTool$Shared(
+          sharedPreferences: preferences,
+        ),
+      ),
     );
 
     final AccountProfile profile = await repository.load();
@@ -66,9 +74,13 @@ void main() {
           'verificationRequired': true,
           'message': 'Verification sent. Check your inbox and spam folder.',
         };
-      final repository = AccountRepository(
+      final repository = AccountRepository$Api(
         datasource: datasource,
-        preferences: preferences,
+        preferencesDatasource: AccountPreferencesDatasource$Preferences(
+          preferencesDatasourceTool: PreferencesDatasourceTool$Shared(
+            sharedPreferences: preferences,
+          ),
+        ),
       );
 
       final AccountRegistrationResult result = await repository.register(
@@ -91,9 +103,13 @@ void main() {
         statusCode: 503,
         data: <String, dynamic>{'verificationRequired': true},
       );
-    final repository = AccountRepository(
+    final repository = AccountRepository$Api(
       datasource: datasource,
-      preferences: preferences,
+      preferencesDatasource: AccountPreferencesDatasource$Preferences(
+        preferencesDatasourceTool: PreferencesDatasourceTool$Shared(
+          sharedPreferences: preferences,
+        ),
+      ),
     );
 
     final AccountRegistrationResult result = await repository.register(
@@ -121,7 +137,7 @@ void main() {
         },
       }),
     );
-    final repository = LeaderboardRepository(datasource: datasource);
+    final repository = LeaderboardRepository$Api(datasource: datasource);
 
     final List<LeaderboardPlayer> players = await repository.load();
 

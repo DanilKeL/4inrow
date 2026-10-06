@@ -1,12 +1,12 @@
 import 'package:flutter/material.dart';
-import 'package:four3/src/common/theme/app_theme.dart';
 import 'package:four3/src/common/utils/build_context_extension.dart';
 import 'package:four3/src/feature/account/widget/account_root_scope.dart';
-import 'package:four3/src/feature/game/bloc/game_bloc.dart';
+import 'package:four3/src/feature/app_theme/utils/app_theme.dart';
+import 'package:four3/src/feature/game/bloc/game_event.dart';
 import 'package:four3/src/feature/game/widget/game_root_scope.dart';
 import 'package:four3/src/feature/initialization/widget/root_scope.dart';
-import 'package:four3/src/feature/levels/model/game_level.dart';
-import 'package:four3/src/feature/levels/service/level_repository.dart';
+import 'package:four3/src/feature/levels/domain/model/game_level.dart';
+import 'package:four3/src/feature/levels/domain/repository/level_repository.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 class LevelsView extends StatefulWidget {

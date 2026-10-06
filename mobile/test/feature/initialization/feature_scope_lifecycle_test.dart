@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:four3/src/feature/initialization/bloc/initialization_bloc.dart';
+import 'package:four3/src/feature/initialization/bloc/initialization_state.dart';
 import 'package:four3/src/feature/initialization/widget/initialization_root_scope.dart';
 
 void main() {

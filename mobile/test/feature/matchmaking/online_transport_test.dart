@@ -3,7 +3,9 @@ import 'dart:convert';
 
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:four3/src/common/preferences/preferences_datasource_tool.dart';
 import 'package:four3/src/common/rest_client/rest_client.dart';
+import 'package:four3/src/feature/matchmaking/data/datasource/online_session_datasource.dart';
 import 'package:four3/src/feature/matchmaking/service/online_transport.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:stream_channel/stream_channel.dart';
@@ -16,9 +18,15 @@ void main() {
     final String token = List<String>.filled(64, 'a').join();
     final List<_FakeWebSocketChannel> channels = [];
     final List<OnlineTransportEvent> events = [];
+    final OnlineSessionDatasource persistenceDatasource =
+        OnlineSessionDatasource$Preferences(
+          preferencesDatasourceTool: PreferencesDatasourceTool$Shared(
+            sharedPreferences: preferences,
+          ),
+        );
     final OnlineTransport transport = OnlineTransport(
       endpoint: Uri.parse('ws://localhost/online'),
-      preferences: preferences,
+      persistenceDatasource: persistenceDatasource,
       cookieStorage: const SessionCookieStorage(FlutterSecureStorage()),
       cookieReader: () async => 'four_session=test-cookie',
       socketFactory: (endpoint, headers) {
@@ -38,10 +46,7 @@ void main() {
     final Map<String, dynamic> search = _sent(channels.first);
     expect(search['type'], 'quick_find');
     expect(search['searchId'], matches(RegExp(r'^[a-f0-9]{32}$')));
-    expect(
-      preferences.getString('four-cubed-online-search'),
-      contains(search['searchId'].toString()),
-    );
+    expect(persistenceDatasource.loadSearch()?['searchId'], search['searchId']);
 
     channels.first.serverAdd(jsonEncode(const {'type': 'queue'}));
     await _flush();
@@ -72,11 +77,8 @@ void main() {
       }),
     );
     await _flush();
-    expect(preferences.getString('four-cubed-online-search'), isNull);
-    expect(
-      preferences.getString('four-cubed-online-session'),
-      contains('ABCDE'),
-    );
+    expect(persistenceDatasource.loadSearch(), isNull);
+    expect(persistenceDatasource.loadSession()?['code'], 'ABCDE');
 
     await subscription.cancel();
     await transport.dispose();
@@ -84,7 +86,7 @@ void main() {
     final List<_FakeWebSocketChannel> restoredChannels = [];
     final OnlineTransport restored = OnlineTransport(
       endpoint: Uri.parse('ws://localhost/online'),
-      preferences: preferences,
+      persistenceDatasource: persistenceDatasource,
       cookieStorage: const SessionCookieStorage(FlutterSecureStorage()),
       cookieReader: () async => null,
       socketFactory: (_, _) {

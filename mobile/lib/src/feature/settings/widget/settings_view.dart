@@ -1,13 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-
 import 'package:four3/l10n/generated/app_localizations.dart';
 import 'package:four3/src/app/locale_scope.dart';
-import 'package:four3/src/common/theme/app_theme.dart';
 import 'package:four3/src/common/utils/build_context_extension.dart';
-import 'package:four3/src/common/widget/app_controls.dart';
+import 'package:four3/src/feature/app_theme/utils/theme_context_extension.dart';
+import 'package:four3/src/feature/components/selectors/app_toggle.dart';
 import 'package:four3/src/feature/settings/bloc/settings_bloc.dart';
-import 'package:four3/src/feature/settings/model/app_settings.dart';
+import 'package:four3/src/feature/settings/bloc/settings_event.dart';
+import 'package:four3/src/feature/settings/bloc/settings_state.dart';
+import 'package:four3/src/feature/settings/domain/model/app_settings.dart';
 import 'package:four3/src/feature/settings/widget/settings_root_scope.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
@@ -38,16 +39,15 @@ class SettingsView extends StatelessWidget {
                     Expanded(
                       child: Text(
                         l10n.soundVolume,
-                        style: const TextStyle(
+                        style: context.textStyle.bodyStrong.copyWith(
                           fontSize: 12,
-                          fontWeight: FontWeight.w700,
                         ),
                       ),
                     ),
                     Text(
                       '${(settings.volume * 100).round()}%',
-                      style: const TextStyle(
-                        color: AppColors.accent,
+                      style: context.textStyle.bodyStrong.copyWith(
+                        color: context.colors.accent,
                         fontSize: 12,
                       ),
                     ),
@@ -61,10 +61,7 @@ class SettingsView extends StatelessWidget {
                 if (!settings.sound)
                   Text(
                     l10n.soundDisabledInHeader,
-                    style: const TextStyle(
-                      color: AppColors.muted,
-                      fontSize: 10,
-                    ),
+                    style: context.textStyle.caption.copyWith(fontSize: 10),
                   ),
               ],
             ),
@@ -124,7 +121,7 @@ class _LanguagePicker extends StatelessWidget {
         Expanded(
           child: Text(
             l10n.language,
-            style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700),
+            style: context.textStyle.bodyStrong.copyWith(fontSize: 12),
           ),
         ),
         DropdownButton<Locale?>(
@@ -179,8 +176,8 @@ class _SettingRow extends StatelessWidget {
     padding: EdgeInsets.symmetric(
       vertical: MediaQuery.sizeOf(context).width <= 650 ? 10 : 18,
     ),
-    decoration: const BoxDecoration(
-      border: Border(bottom: BorderSide(color: AppColors.border)),
+    decoration: BoxDecoration(
+      border: Border(bottom: BorderSide(color: context.colors.border)),
     ),
     child: Row(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -222,15 +219,12 @@ class _SettingSwitch extends StatelessWidget {
             children: [
               Text(
                 title,
-                style: const TextStyle(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w700,
-                ),
+                style: context.textStyle.bodyStrong.copyWith(fontSize: 12),
               ),
               const SizedBox(height: 3),
               Text(
                 subtitle,
-                style: const TextStyle(color: AppColors.muted, fontSize: 10),
+                style: context.textStyle.caption.copyWith(fontSize: 10),
               ),
             ],
           ),

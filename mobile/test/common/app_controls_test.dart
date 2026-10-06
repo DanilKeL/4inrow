@@ -3,7 +3,10 @@ import 'dart:ui' show Tristate;
 import 'package:flutter/material.dart';
 import 'package:flutter/semantics.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:four3/src/common/widget/app_controls.dart';
+import 'package:four3/src/feature/app_theme/utils/app_theme.dart';
+import 'package:four3/src/feature/components/fields/app_text_field.dart';
+import 'package:four3/src/feature/components/selectors/app_segmented_control.dart';
+import 'package:four3/src/feature/components/selectors/app_toggle.dart';
 
 void main() {
   testWidgets('web toggle keeps its geometry and changes value', (
@@ -12,6 +15,7 @@ void main() {
     var value = false;
     await tester.pumpWidget(
       MaterialApp(
+        theme: AppTheme.light,
         home: StatefulBuilder(
           builder: (context, setState) => Material(
             child: Center(
@@ -40,6 +44,7 @@ void main() {
     var selected = 1;
     await tester.pumpWidget(
       MaterialApp(
+        theme: AppTheme.light,
         home: StatefulBuilder(
           builder: (context, setState) => Material(
             child: AppSegmentedControl<int>(
@@ -67,6 +72,7 @@ void main() {
     addTearDown(controller.dispose);
     await tester.pumpWidget(
       MaterialApp(
+        theme: AppTheme.light,
         home: Material(
           child: AppTextField(controller: controller, label: 'Email'),
         ),

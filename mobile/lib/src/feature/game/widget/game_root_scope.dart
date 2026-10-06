@@ -4,9 +4,13 @@ import 'package:four3/src/common/utils/build_context_extension.dart';
 import 'package:four3/src/feature/account/widget/account_root_scope.dart';
 import 'package:four3/src/feature/audio/service/audio_service.dart';
 import 'package:four3/src/feature/game/bloc/game_bloc.dart';
+import 'package:four3/src/feature/game/bloc/game_event.dart';
+import 'package:four3/src/feature/game/bloc/game_state.dart';
 import 'package:four3/src/feature/game/model/game_models.dart';
+import 'package:four3/src/feature/game/model/game_view_data.dart';
+import 'package:four3/src/feature/initialization/domain/model/dependencies_container.dart';
 import 'package:four3/src/feature/initialization/widget/root_scope.dart';
-import 'package:four3/src/feature/settings/model/app_settings.dart';
+import 'package:four3/src/feature/settings/domain/model/app_settings.dart';
 import 'package:four3/src/feature/settings/widget/settings_root_scope.dart';
 
 class GameRootScope extends StatefulWidget {
@@ -26,7 +30,7 @@ class _GameRootScopeState extends State<GameRootScope> {
   @override
   void initState() {
     super.initState();
-    final RootDependencies root = RootScope.of(context);
+    final RootDependenciesContainer root = RootScope.of(context);
     _gameBloc = GameBloc(
       storage: root.gameStorageRepository,
       levels: root.levelRepository,

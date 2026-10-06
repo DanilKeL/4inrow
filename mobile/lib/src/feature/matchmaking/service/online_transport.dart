@@ -3,7 +3,7 @@ import 'dart:convert';
 import 'dart:math';
 
 import 'package:four3/src/common/rest_client/rest_client.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+import 'package:four3/src/feature/matchmaking/data/datasource/online_session_datasource.dart';
 import 'package:web_socket_channel/io.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
 
@@ -37,20 +37,18 @@ final class OnlineTransportEvent$Failure extends OnlineTransportEvent {
 final class OnlineTransport {
   new({
     required this._endpoint,
-    required this._preferences,
+    required this.persistenceDatasource,
     required SessionCookieStorage cookieStorage,
     OnlineSocketFactory? socketFactory,
     Future<String?> Function()? cookieReader,
   }) : _socketFactory = socketFactory ?? _defaultSocketFactory,
        _cookieReader = cookieReader ?? cookieStorage.read;
 
-  static const _sessionKey = 'four-cubed-online-session';
-  static const _searchKey = 'four-cubed-online-search';
   static const _reconnectLimit = Duration(minutes: 5);
   static const _handshakeTimeout = Duration(seconds: 8);
 
   final Uri _endpoint;
-  final SharedPreferences _preferences;
+  final OnlineSessionDatasource persistenceDatasource;
   final OnlineSocketFactory _socketFactory;
   final Future<String?> Function() _cookieReader;
   final _events = StreamController<OnlineTransportEvent>.broadcast();
@@ -80,8 +78,8 @@ final class OnlineTransport {
         'savedAt': DateTime.now().millisecondsSinceEpoch,
       };
       _command = Map<String, dynamic>.from(_search!);
-      await _save(_searchKey, _search!);
-      await _remove(_sessionKey);
+      await persistenceDatasource.saveSearch(_search!);
+      await persistenceDatasource.clearSession();
       _session = null;
     } else if (command['type'] == 'resume') {
       _session = {
@@ -92,7 +90,7 @@ final class OnlineTransport {
       _command = command;
     } else {
       _session = null;
-      await _remove(_sessionKey);
+      await persistenceDatasource.clearSession();
       _command = command;
     }
     _retry = 0;
@@ -143,8 +141,8 @@ final class OnlineTransport {
     send(const {'type': 'leave'});
     _session = null;
     _search = null;
-    await _remove(_sessionKey);
-    await _remove(_searchKey);
+    await persistenceDatasource.clearSession();
+    await persistenceDatasource.clearSearch();
     await disconnect();
   }
 
@@ -156,8 +154,8 @@ final class OnlineTransport {
     if (clearPersistence) {
       _session = null;
       _search = null;
-      await _remove(_sessionKey);
-      await _remove(_searchKey);
+      await persistenceDatasource.clearSession();
+      await persistenceDatasource.clearSearch();
     }
     _command = null;
   }
@@ -220,8 +218,8 @@ final class OnlineTransport {
           'player': event['player'],
         };
         _search = null;
-        await _save(_sessionKey, _session!);
-        await _remove(_searchKey);
+        await persistenceDatasource.saveSession(_session!);
+        await persistenceDatasource.clearSearch();
         _events.add(OnlineTransportEvent$Message(event));
         _emitStatus('connected');
       case 'queue':
@@ -233,7 +231,7 @@ final class OnlineTransport {
         _emitStatus('connected');
       case 'queue_removed':
         _search = null;
-        await _remove(_searchKey);
+        await persistenceDatasource.clearSearch();
         _events.add(OnlineTransportEvent$Message(event));
         await disconnect();
       case 'closed':
@@ -292,17 +290,9 @@ final class OnlineTransport {
     if (!_events.isClosed) _events.add(OnlineTransportEvent$Status(value));
   }
 
-  Map<String, dynamic>? _read(String key) {
-    try {
-      final Object? decoded = jsonDecode(_preferences.getString(key) ?? 'null');
-      return decoded is Map<String, dynamic> ? decoded : null;
-    } on FormatException {
-      return null;
-    }
-  }
-
   Map<String, dynamic>? _readSession() {
-    final Map<String, dynamic>? value = _session ?? _read(_sessionKey);
+    final Map<String, dynamic>? value =
+        _session ?? persistenceDatasource.loadSession();
     if (value == null ||
         !RegExp(r'^[A-Z]{5}$').hasMatch(value['code']?.toString() ?? '') ||
         !RegExp(r'^[a-f0-9]{64}$').hasMatch(value['token']?.toString() ?? '')) {
@@ -312,7 +302,8 @@ final class OnlineTransport {
   }
 
   Map<String, dynamic>? _readSearch() {
-    final Map<String, dynamic>? value = _search ?? _read(_searchKey);
+    final Map<String, dynamic>? value =
+        _search ?? persistenceDatasource.loadSearch();
     final Object? savedAt = value?['savedAt'];
     if (value == null ||
         value['type'] != 'quick_find' ||
@@ -325,10 +316,6 @@ final class OnlineTransport {
     }
     return value;
   }
-
-  Future<void> _save(String key, Map<String, dynamic> value) =>
-      _preferences.setString(key, jsonEncode(value));
-  Future<void> _remove(String key) => _preferences.remove(key);
 
   String _randomHex(int bytes) {
     final random = Random.secure();

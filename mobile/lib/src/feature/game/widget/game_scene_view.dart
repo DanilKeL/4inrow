@@ -5,11 +5,11 @@ import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_scene/scene.dart' as fs;
 import 'package:four3/src/common/utils/build_context_extension.dart';
-import 'package:four3/src/feature/game/bloc/game_bloc.dart';
 import 'package:four3/src/feature/game/model/game_models.dart';
+import 'package:four3/src/feature/game/model/game_view_data.dart';
 import 'package:four3/src/feature/game/scene/game_camera_orbit.dart';
 import 'package:four3/src/feature/game/scene/game_scene_controller.dart';
-import 'package:four3/src/feature/settings/model/app_settings.dart';
+import 'package:four3/src/feature/settings/domain/model/app_settings.dart';
 import 'package:vector_math/vector_math.dart' as vm;
 
 class GameSceneView extends StatefulWidget {
