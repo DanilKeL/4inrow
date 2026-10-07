@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:four3/src/common/utils/build_context_extension.dart';
 import 'package:four3/src/feature/localization/data/datasource/app_locale_datasource.dart';
 
 typedef LocaleSetter = Future<void> Function(Locale? locale);
@@ -64,8 +63,15 @@ class AppLocaleScope extends InheritedWidget {
   final Locale? locale;
   final LocaleSetter setLocale;
 
-  static AppLocaleScope of(BuildContext context) =>
-      context.inheritedOf<AppLocaleScope>();
+  static AppLocaleScope of(BuildContext context) {
+    final AppLocaleScope? scope = context
+        .dependOnInheritedWidgetOfExactType<AppLocaleScope>();
+    assert(scope != null, 'No AppLocaleScope found above this context.');
+    if (scope == null) {
+      throw StateError('No AppLocaleScope found above this context.');
+    }
+    return scope;
+  }
 
   @override
   bool updateShouldNotify(covariant AppLocaleScope oldWidget) =>

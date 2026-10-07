@@ -88,6 +88,7 @@ flutter:
     - assets/data/
     - assets/licenses/
     - assets/audio/
+    - assets/flags/
   uses-material-design: true
 
   fonts:

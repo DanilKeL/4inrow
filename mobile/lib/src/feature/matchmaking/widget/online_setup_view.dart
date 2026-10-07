@@ -7,6 +7,7 @@ import 'package:four3/src/common/utils/build_context_extension.dart';
 import 'package:four3/src/feature/account/domain/model/account_profile.dart';
 import 'package:four3/src/feature/account/widget/account_root_scope.dart';
 import 'package:four3/src/feature/app_theme/utils/app_theme.dart';
+import 'package:four3/src/feature/app_theme/utils/theme_context_extension.dart';
 import 'package:four3/src/feature/components/fields/app_text_field.dart';
 import 'package:four3/src/feature/matchmaking/bloc/matchmaking_bloc.dart';
 import 'package:four3/src/feature/matchmaking/bloc/matchmaking_event.dart';
@@ -193,7 +194,7 @@ class _Setup extends StatelessWidget {
       if (error case final value?) ...[
         Text(
           value,
-          style: TextStyle(
+          style: context.textStyle.caption.copyWith(
             color: Theme.of(context).colorScheme.error,
             fontSize: 12,
             height: 1.7,
@@ -272,7 +273,7 @@ class _QuickSearching extends StatelessWidget {
           reconnecting
               ? context.l10n.restoringSearch
               : context.l10n.searchingOpponent,
-          style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w800),
+          style: context.textStyle.headline,
         ),
         const SizedBox(height: 14),
         Text(
@@ -282,9 +283,8 @@ class _QuickSearching extends StatelessWidget {
               ? context.l10n.ratedSearchHint
               : context.l10n.guestSearchHint,
           textAlign: TextAlign.center,
-          style: const TextStyle(
-            color: Color(0xFF7A8073),
-            fontSize: 11,
+          style: context.textStyle.caption.copyWith(
+            color: const Color(0xFF7A8073),
             height: 1.5,
           ),
         ),
@@ -329,7 +329,7 @@ class _QuickFound extends StatelessWidget {
         Text(
           context.l10n.opponentFound(opponent),
           textAlign: TextAlign.center,
-          style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w800),
+          style: context.textStyle.headline,
         ),
         const SizedBox(height: 8),
         Text(
@@ -337,7 +337,7 @@ class _QuickFound extends StatelessWidget {
               ? context.l10n.guestUnratedGame
               : '${context.l10n.opponentRating(rating!)} · ${rated ? context.l10n.ratedLabel : context.l10n.unratedMeetingLimit}',
           textAlign: TextAlign.center,
-          style: const TextStyle(fontSize: 11),
+          style: context.textStyle.caption.copyWith(color: AppColors.ink),
         ),
         const SizedBox(height: 14),
         Text(
@@ -345,9 +345,8 @@ class _QuickFound extends StatelessWidget {
               ? context.l10n.confirmRatedMatch(seconds)
               : context.l10n.confirmMatch(seconds),
           textAlign: TextAlign.center,
-          style: const TextStyle(
-            color: Color(0xFF7A8073),
-            fontSize: 11,
+          style: context.textStyle.caption.copyWith(
+            color: const Color(0xFF7A8073),
             height: 1.5,
           ),
         ),
@@ -397,7 +396,10 @@ class _QuickFailure extends StatelessWidget {
       Text(
         message.isEmpty ? context.l10n.matchSearchFailed : message,
         textAlign: TextAlign.center,
-        style: const TextStyle(color: AppColors.danger, fontSize: 12),
+        style: context.textStyle.caption.copyWith(
+          color: AppColors.danger,
+          fontSize: 12,
+        ),
       ),
       const SizedBox(height: 14),
       FilledButton.icon(

@@ -88,8 +88,17 @@ abstract final class AppTheme {
       ),
       button: TextStyle(
         fontFamily: 'Manrope',
+        fontSize: 14,
+        fontWeight: FontWeight.w700,
+        letterSpacing: .1,
+        height: 1.2,
+        color: AppColors.ink,
+      ),
+      buttonSmall: TextStyle(
+        fontFamily: 'Manrope',
         fontSize: 11,
         fontWeight: FontWeight.w700,
+        height: 1.2,
         color: AppColors.ink,
       ),
     );
@@ -99,11 +108,24 @@ abstract final class AppTheme {
       extensions: const [colors, textStyle],
       scaffoldBackgroundColor: AppColors.background,
       fontFamily: 'Manrope',
-      textTheme: ThemeData.light().textTheme.apply(
-        fontFamily: 'Manrope',
-        bodyColor: AppColors.ink,
-        displayColor: AppColors.ink,
-      ),
+      textTheme: ThemeData.light().textTheme
+          .copyWith(
+            displayLarge: textStyle.display,
+            titleLarge: textStyle.title,
+            titleMedium: textStyle.headline,
+            titleSmall: textStyle.bodyStrong.copyWith(fontSize: 14),
+            bodyLarge: textStyle.body.copyWith(fontSize: 16),
+            bodyMedium: textStyle.body.copyWith(fontSize: 14),
+            bodySmall: textStyle.caption.copyWith(fontSize: 12),
+            labelLarge: textStyle.button,
+            labelMedium: textStyle.captionStrong.copyWith(fontSize: 12),
+            labelSmall: textStyle.captionStrong,
+          )
+          .apply(
+            fontFamily: 'Manrope',
+            bodyColor: AppColors.ink,
+            displayColor: AppColors.ink,
+          ),
       dividerColor: AppColors.border,
       dialogTheme: const DialogThemeData(
         backgroundColor: AppColors.surface,
@@ -139,6 +161,13 @@ abstract final class AppTheme {
           minimumSize: const Size(48, 48),
           side: const BorderSide(color: AppColors.border),
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+          textStyle: textStyle.button,
+        ),
+      ),
+      textButtonTheme: TextButtonThemeData(
+        style: TextButton.styleFrom(
+          foregroundColor: AppColors.accent,
+          textStyle: textStyle.button,
         ),
       ),
     );

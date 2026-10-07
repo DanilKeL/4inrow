@@ -2,12 +2,17 @@ import 'package:flutter/material.dart';
 import 'package:four3/l10n/generated/app_localizations.dart';
 import 'package:four3/src/app/locale_scope.dart';
 import 'package:four3/src/common/utils/build_context_extension.dart';
+import 'package:four3/src/feature/app_theme/utils/app_theme.dart';
 import 'package:four3/src/feature/initialization/domain/model/dependencies_container.dart';
 import 'package:four3/src/feature/initialization/logic/composition_root.dart';
 
+typedef AppScopesBuilder = Widget Function(Widget child);
+
 class RootScope extends StatefulWidget {
-  const new({required this.child, super.key});
+  const new({required this.child, required this.scopesBuilder, super.key});
+
   final Widget child;
+  final AppScopesBuilder scopesBuilder;
 
   static RootDependenciesContainer of(BuildContext context) =>
       context.inheritedOf<_InheritedRootScope>().dependencies;
@@ -17,53 +22,113 @@ class RootScope extends StatefulWidget {
 }
 
 class _RootScopeState extends State<RootScope> {
+  static const Duration _launchTransitionDuration = Duration(milliseconds: 650);
+
   late Future<RootDependenciesContainer> _future = const CompositionRoot()
       .compose();
   RootDependenciesContainer? _dependencies;
+  LocaleController? _localeController;
+
+  void _localeChanged() => setState(() {});
+
+  void _bindDependencies(RootDependenciesContainer dependencies) {
+    if (_dependencies != null) return;
+    _dependencies = dependencies;
+    _localeController = LocaleController(dependencies.appLocaleDatasource)
+      ..addListener(_localeChanged);
+  }
 
   @override
   void dispose() {
+    _localeController?.removeListener(_localeChanged);
+    _localeController?.dispose();
     _dependencies?.dispose();
     super.dispose();
   }
 
   @override
-  Widget build(BuildContext context) =>
-      FutureBuilder<RootDependenciesContainer>(
-        future: _future,
-        builder: (context, snapshot) {
-          if (snapshot.hasError) {
-            return MaterialApp(
-              localizationsDelegates: AppLocalizations.localizationsDelegates,
-              supportedLocales: appSupportedLocales,
-              localeListResolutionCallback: resolveAppLocale,
-              home: _LaunchScreen(
-                failed: true,
-                onRetry: () =>
-                    setState(() => _future = const CompositionRoot().compose()),
-              ),
-            );
-          }
+  Widget build(
+    BuildContext context,
+  ) => FutureBuilder<RootDependenciesContainer>(
+    future: _future,
+    builder: (context, snapshot) {
+      late final Widget screen;
+      if (snapshot.hasError) {
+        screen = _LaunchScreen(
+          key: const ValueKey<String>('launch-error'),
+          failed: true,
+          onRetry: () =>
+              setState(() => _future = const CompositionRoot().compose()),
+        );
+      } else if (snapshot.data case final dependencies?) {
+        _bindDependencies(dependencies);
+        screen = KeyedSubtree(
+          key: const ValueKey<String>('application'),
+          child: widget.child,
+        );
+      } else {
+        screen = const _LaunchScreen(key: ValueKey<String>('launch-loading'));
+      }
+
+      final bool animationsDisabled = WidgetsBinding
+          .instance
+          .platformDispatcher
+          .accessibilityFeatures
+          .disableAnimations;
+      return MaterialApp(
+        onGenerateTitle: (context) => AppLocalizations.of(context).appTitle,
+        debugShowCheckedModeBanner: false,
+        theme: AppTheme.light,
+        locale: _localeController?.locale,
+        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        supportedLocales: appSupportedLocales,
+        localeListResolutionCallback: resolveAppLocale,
+        builder: (context, navigator) {
+          final Widget navigatorChild = navigator ?? const SizedBox.shrink();
           final RootDependenciesContainer? dependencies = snapshot.data;
-          if (dependencies == null) {
-            return const MaterialApp(
-              localizationsDelegates: AppLocalizations.localizationsDelegates,
-              supportedLocales: appSupportedLocales,
-              localeListResolutionCallback: resolveAppLocale,
-              home: _LaunchScreen(),
-            );
+          final LocaleController? localeController = _localeController;
+          if (dependencies == null || localeController == null) {
+            return navigatorChild;
           }
-          _dependencies ??= dependencies;
           return _InheritedRootScope(
             dependencies: dependencies,
-            child: widget.child,
+            child: AppLocaleScope(
+              locale: localeController.locale,
+              setLocale: localeController.setLocale,
+              child: widget.scopesBuilder(navigatorChild),
+            ),
           );
         },
+        home: AnimatedSwitcher(
+          duration: animationsDisabled
+              ? Duration.zero
+              : _launchTransitionDuration,
+          switchInCurve: Curves.easeOutCubic,
+          switchOutCurve: Curves.easeInCubic,
+          transitionBuilder: (child, animation) {
+            final Widget scaledChild = ScaleTransition(
+              scale: Tween<double>(begin: .985, end: 1).animate(animation),
+              child: child,
+            );
+            if (child.key == const ValueKey<String>('application')) {
+              return scaledChild;
+            }
+            return FadeTransition(opacity: animation, child: scaledChild);
+          },
+          layoutBuilder: (currentChild, previousChildren) => Stack(
+            alignment: Alignment.center,
+            fit: StackFit.expand,
+            children: [?currentChild, ...previousChildren],
+          ),
+          child: screen,
+        ),
       );
+    },
+  );
 }
 
 class _LaunchScreen extends StatelessWidget {
-  const new({this.failed = false, this.onRetry});
+  const new({this.failed = false, this.onRetry, super.key});
   final bool failed;
   final VoidCallback? onRetry;
 

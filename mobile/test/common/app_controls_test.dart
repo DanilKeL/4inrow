@@ -9,6 +9,28 @@ import 'package:four3/src/feature/components/selectors/app_segmented_control.dar
 import 'package:four3/src/feature/components/selectors/app_toggle.dart';
 
 void main() {
+  test('button variants use one shared typography scale', () {
+    final ThemeData theme = AppTheme.light;
+    final TextStyle? filled = theme.filledButtonTheme.style?.textStyle?.resolve(
+      const <WidgetState>{},
+    );
+    final TextStyle? outlined = theme.outlinedButtonTheme.style?.textStyle
+        ?.resolve(const <WidgetState>{});
+    final TextStyle? text = theme.textButtonTheme.style?.textStyle?.resolve(
+      const <WidgetState>{},
+    );
+
+    for (final TextStyle? style in <TextStyle?>[filled, outlined, text]) {
+      expect(style?.fontFamily, 'Manrope');
+      expect(style?.fontSize, 14);
+      expect(style?.fontWeight, FontWeight.w700);
+    }
+    expect(theme.textTheme.labelLarge?.fontSize, 14);
+    expect(theme.textTheme.labelLarge?.fontWeight, FontWeight.w700);
+    expect(theme.textTheme.bodyMedium?.fontFamily, 'Manrope');
+    expect(theme.textTheme.bodyMedium?.fontSize, 14);
+  });
+
   testWidgets('web toggle keeps its geometry and changes value', (
     tester,
   ) async {

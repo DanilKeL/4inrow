@@ -175,7 +175,7 @@ class _History extends StatelessWidget {
                 onPressed: currentPage == 0
                     ? null
                     : () => onPageChanged(currentPage - 1),
-                style: _smallButtonStyle,
+                style: _smallButtonStyle(context),
                 child: Text(context.l10n.back),
               ),
               Padding(
@@ -186,7 +186,7 @@ class _History extends StatelessWidget {
                 onPressed: currentPage + 1 == pages
                     ? null
                     : () => onPageChanged(currentPage + 1),
-                style: _smallButtonStyle,
+                style: _smallButtonStyle(context),
                 child: Text(context.l10n.next),
               ),
             ],
@@ -308,7 +308,7 @@ class ExpandedMatchCard extends StatelessWidget {
             children: [
               OutlinedButton(
                 onPressed: onWatch,
-                style: _smallButtonStyle.copyWith(
+                style: _smallButtonStyle(context).copyWith(
                   foregroundColor: const WidgetStatePropertyAll(
                     AppColors.accent,
                   ),
@@ -318,7 +318,7 @@ class ExpandedMatchCard extends StatelessWidget {
               const SizedBox(width: 6),
               OutlinedButton(
                 onPressed: onEdit,
-                style: _smallButtonStyle,
+                style: _smallButtonStyle(context),
                 child: Text(
                   editing ? context.l10n.save : context.l10n.titleAction,
                 ),
@@ -329,7 +329,7 @@ class ExpandedMatchCard extends StatelessWidget {
                   message: context.l10n.removeHistoryHint,
                   child: OutlinedButton(
                     onPressed: onRemove,
-                    style: _smallButtonStyle,
+                    style: _smallButtonStyle(context),
                     child: Text(context.l10n.delete),
                   ),
                 ),
@@ -363,12 +363,12 @@ class _Guest extends StatelessWidget {
   );
 }
 
-final ButtonStyle _smallButtonStyle = OutlinedButton.styleFrom(
+ButtonStyle _smallButtonStyle(BuildContext context) => OutlinedButton.styleFrom(
   minimumSize: const Size(0, 36),
   padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
   side: const BorderSide(color: Color(0xFFD9DFD0)),
   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-  textStyle: const TextStyle(fontSize: 11),
+  textStyle: context.textStyle.buttonSmall,
 );
 
 class _Failure extends StatelessWidget {

@@ -2,11 +2,12 @@ import 'dart:ui';
 
 import 'package:flutter/material.dart';
 import 'package:four3/src/common/utils/build_context_extension.dart';
+import 'package:four3/src/feature/app_theme/utils/theme_context_extension.dart';
 
 Future<T?> showAppDialog<T>({
   required BuildContext context,
-  required String title,
-  required Widget child,
+  required String Function(BuildContext context) titleBuilder,
+  required WidgetBuilder builder,
   bool wide = false,
 }) => showGeneralDialog<T>(
   context: context,
@@ -69,10 +70,9 @@ Future<T?> showAppDialog<T>({
                       children: [
                         Expanded(
                           child: Text(
-                            title,
-                            style: TextStyle(
+                            titleBuilder(context),
+                            style: context.textStyle.title.copyWith(
                               fontSize: compact ? 21 : 23,
-                              fontWeight: FontWeight.w700,
                               letterSpacing: -.6,
                             ),
                           ),
@@ -86,9 +86,11 @@ Future<T?> showAppDialog<T>({
                     ),
                     const SizedBox(height: 6),
                     if (wide)
-                      Flexible(child: child)
+                      Flexible(child: builder(context))
                     else
-                      Flexible(child: SingleChildScrollView(child: child)),
+                      Flexible(
+                        child: SingleChildScrollView(child: builder(context)),
+                      ),
                   ],
                 ),
               ),

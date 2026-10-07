@@ -22,6 +22,15 @@ import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 enum _AccountMode { register, login, forgot }
 
+enum _AccountLocalError {
+  usernameValidation,
+  passwordMinValidation,
+  passwordMismatch,
+  newPasswordValidation,
+  newPasswordsMismatch,
+  passwordMustDiffer,
+}
+
 class AccountView extends StatefulWidget {
   const new({this.onHistory, super.key});
   final VoidCallback? onHistory;
@@ -41,7 +50,7 @@ class _AccountViewState extends State<AccountView> {
   final _guestScrollController = ScrollController();
   _AccountMode _mode = _AccountMode.register;
   bool _security = false;
-  String _localError = '';
+  _AccountLocalError? _localError;
 
   @override
   void initState() {
@@ -66,7 +75,7 @@ class _AccountViewState extends State<AccountView> {
         FocusManager.instance.primaryFocus?.unfocus();
         setState(() {
           _mode = _AccountMode.login;
-          _localError = '';
+          _localError = null;
         });
         WidgetsBinding.instance.addPostFrameCallback((_) {
           if (_guestScrollController.hasClients) {
@@ -83,7 +92,7 @@ class _AccountViewState extends State<AccountView> {
         final bool loading = state is AccountState$Loading;
         final String failure = state is AccountState$Failure
             ? _accountFailure(context, state)
-            : _localError;
+            : _accountLocalError(context, _localError);
         final String notice = state is AccountState$Ready
             ? _accountNotice(context, state)
             : '';
@@ -111,7 +120,7 @@ class _AccountViewState extends State<AccountView> {
             newPasswordRepeat: _newPasswordRepeat,
             onSecurityChanged: (value) => setState(() {
               _security = value;
-              _localError = '';
+              _localError = null;
             }),
             onHistory: widget.onHistory,
             onChangePassword: _changePassword,
@@ -130,7 +139,7 @@ class _AccountViewState extends State<AccountView> {
           scrollController: _guestScrollController,
           onModeChanged: (value) => setState(() {
             _mode = value;
-            _localError = '';
+            _localError = null;
             bloc.add(const AccountEvent$ClearMessage());
           }),
           onSubmit: _submitGuest,
@@ -140,13 +149,15 @@ class _AccountViewState extends State<AccountView> {
   }
 
   void _submitGuest(AccountBloc bloc) {
-    setState(() => _localError = '');
+    setState(() => _localError = null);
     switch (_mode) {
       case _AccountMode.register:
         if (!RegExp(r'^[A-Za-z0-9_]{3,24}$').hasMatch(_username.text.trim())) {
-          setState(() => _localError = context.l10n.usernameValidation);
+          setState(() => _localError = _AccountLocalError.usernameValidation);
         } else if (_password.text.length < 8) {
-          setState(() => _localError = context.l10n.passwordMinValidation);
+          setState(
+            () => _localError = _AccountLocalError.passwordMinValidation,
+          );
         } else {
           bloc.add(
             AccountEvent$Register(_username.text, _email.text, _password.text),
@@ -163,8 +174,8 @@ class _AccountViewState extends State<AccountView> {
     if (_password.text.length < 8 || _password.text != _passwordRepeat.text) {
       setState(
         () => _localError = _password.text.length < 8
-            ? context.l10n.passwordMinValidation
-            : context.l10n.passwordMismatch,
+            ? _AccountLocalError.passwordMinValidation
+            : _AccountLocalError.passwordMismatch,
       );
       return;
     }
@@ -179,10 +190,10 @@ class _AccountViewState extends State<AccountView> {
       setState(
         () => _localError =
             _newPassword.text.length < 8 || _newPassword.text.length > 128
-            ? context.l10n.newPasswordValidation
+            ? _AccountLocalError.newPasswordValidation
             : _newPassword.text != _newPasswordRepeat.text
-            ? context.l10n.newPasswordsMismatch
-            : context.l10n.passwordMustDiffer,
+            ? _AccountLocalError.newPasswordsMismatch
+            : _AccountLocalError.passwordMustDiffer,
       );
       return;
     }
@@ -978,12 +989,12 @@ class _OverviewData extends StatelessWidget {
                     if (onHistory != null)
                       TextButton.icon(
                         onPressed: onHistory,
+                        style: TextButton.styleFrom(
+                          textStyle: context.textStyle.buttonSmall,
+                        ),
                         iconAlignment: IconAlignment.end,
                         icon: const Icon(LucideIcons.chevronRight, size: 15),
-                        label: Text(
-                          context.l10n.fullHistory,
-                          style: const TextStyle(fontSize: 10),
-                        ),
+                        label: Text(context.l10n.fullHistory),
                       ),
                   ],
                 ),
@@ -1144,6 +1155,20 @@ String _accountNotice(BuildContext context, AccountState$Ready state) {
     null => '',
   };
 }
+
+String _accountLocalError(BuildContext context, _AccountLocalError? error) =>
+    switch (error) {
+      _AccountLocalError.usernameValidation => context.l10n.usernameValidation,
+      _AccountLocalError.passwordMinValidation =>
+        context.l10n.passwordMinValidation,
+      _AccountLocalError.passwordMismatch => context.l10n.passwordMismatch,
+      _AccountLocalError.newPasswordValidation =>
+        context.l10n.newPasswordValidation,
+      _AccountLocalError.newPasswordsMismatch =>
+        context.l10n.newPasswordsMismatch,
+      _AccountLocalError.passwordMustDiffer => context.l10n.passwordMustDiffer,
+      null => '',
+    };
 
 String _accountFailure(BuildContext context, AccountState$Failure state) {
   if (state.message.isNotEmpty) return state.message;

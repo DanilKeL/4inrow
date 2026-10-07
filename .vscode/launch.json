@@ -8,12 +8,14 @@
         {
             "name": "mobile",
             "cwd": "mobile",
+            "program": "lib/main.dart",
             "request": "launch",
             "type": "dart"
         },
         {
             "name": "mobile (profile mode)",
             "cwd": "mobile",
+            "program": "lib/main.dart",
             "request": "launch",
             "type": "dart",
             "flutterMode": "profile"
@@ -21,6 +23,7 @@
         {
             "name": "mobile (release mode)",
             "cwd": "mobile",
+            "program": "lib/main.dart",
             "request": "launch",
             "type": "dart",
             "flutterMode": "release"

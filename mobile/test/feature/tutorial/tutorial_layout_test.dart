@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:four3/l10n/generated/app_localizations.dart';
+import 'package:four3/src/feature/app_theme/utils/app_theme.dart';
 import 'package:four3/src/feature/tutorial/widget/tutorial_view.dart';
 
 void main() {
@@ -12,10 +13,13 @@ void main() {
     addTearDown(tester.view.resetDevicePixelRatio);
     addTearDown(tester.view.resetPhysicalSize);
     await tester.pumpWidget(
-      const MaterialApp(
+      MaterialApp(
+        theme: AppTheme.light,
         localizationsDelegates: AppLocalizations.localizationsDelegates,
         supportedLocales: AppLocalizations.supportedLocales,
-        home: Scaffold(body: SafeArea(child: TutorialView(loadVideos: false))),
+        home: const Scaffold(
+          body: SafeArea(child: TutorialView(loadVideos: false)),
+        ),
       ),
     );
     await tester.pump();
@@ -24,13 +28,14 @@ void main() {
   testWidgets('portrait video stays below the lesson selector', (tester) async {
     await pumpTutorial(tester, const Size(390, 844));
 
-    final Rect selector = tester.getRect(
-      find.byKey(const ValueKey('tutorial-selector')),
+    final Finder selector = find.byKey(const ValueKey('tutorial-selector'));
+    final Rect lastTab = tester.getRect(
+      find.descendant(of: selector, matching: find.byType(OutlinedButton)).last,
     );
     final Rect media = tester.getRect(
       find.byKey(const ValueKey('tutorial-media')),
     );
-    expect(selector.bottom, lessThanOrEqualTo(media.top));
+    expect(lastTab.bottom, lessThanOrEqualTo(media.top));
   });
 
   testWidgets('landscape video stays to the right of the lesson selector', (

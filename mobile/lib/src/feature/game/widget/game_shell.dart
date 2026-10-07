@@ -11,6 +11,7 @@ import 'package:four3/src/feature/account/bloc/account_state.dart';
 import 'package:four3/src/feature/account/widget/account_root_scope.dart';
 import 'package:four3/src/feature/account/widget/account_view.dart';
 import 'package:four3/src/feature/app_theme/utils/app_theme.dart';
+import 'package:four3/src/feature/app_theme/utils/theme_context_extension.dart';
 import 'package:four3/src/feature/components/modals/app_dialog.dart';
 import 'package:four3/src/feature/game/bloc/game_bloc.dart';
 import 'package:four3/src/feature/game/bloc/game_event.dart';
@@ -247,8 +248,8 @@ class _GameShellBody extends StatelessWidget {
 
   void _openSetup(BuildContext context, GameMode mode) => showAppDialog<void>(
     context: context,
-    title: context.l10n.newGame,
-    child: GameSetupView(initialMode: mode),
+    titleBuilder: (context) => context.l10n.newGame,
+    builder: (_) => GameSetupView(initialMode: mode),
   );
 
   void _openRated(BuildContext context) {
@@ -258,8 +259,8 @@ class _GameShellBody extends StatelessWidget {
     MatchmakingRootScope.of(context).add(MatchmakingEvent$Find(name));
     showAppDialog<void>(
       context: context,
-      title: context.l10n.rankedGame,
-      child: const OnlineSetupView(quickOnly: true),
+      titleBuilder: (context) => context.l10n.rankedGame,
+      builder: (_) => const OnlineSetupView(quickOnly: true),
     );
   }
 }
@@ -324,9 +325,9 @@ class _Header extends StatelessWidget {
                 showLabel: expanded,
                 onTap: () => showAppDialog<void>(
                   context: context,
-                  title: context.l10n.howToPlay,
+                  titleBuilder: (context) => context.l10n.howToPlay,
                   wide: true,
-                  child: TutorialView(
+                  builder: (_) => TutorialView(
                     onDone: () {
                       settingsBloc.add(
                         SettingsEvent$Update(
@@ -364,8 +365,8 @@ class _Header extends StatelessWidget {
                 label: context.l10n.settings,
                 onTap: () => showAppDialog<void>(
                   context: context,
-                  title: context.l10n.settings,
-                  child: const SettingsView(),
+                  titleBuilder: (context) => context.l10n.settings,
+                  builder: (_) => const SettingsView(),
                 ),
               ),
             ],
@@ -379,9 +380,9 @@ class _Header extends StatelessWidget {
     var openHistory = false;
     await showAppDialog<void>(
       context: context,
-      title: context.l10n.account,
+      titleBuilder: (context) => context.l10n.account,
       wide: true,
-      child: AccountView(
+      builder: (_) => AccountView(
         onHistory: () {
           openHistory = true;
           Navigator.pop(context);
@@ -391,8 +392,8 @@ class _Header extends StatelessWidget {
     if (openHistory && context.mounted) {
       await showAppDialog<void>(
         context: context,
-        title: context.l10n.matchHistory,
-        child: SizedBox(
+        titleBuilder: (context) => context.l10n.matchHistory,
+        builder: (_) => SizedBox(
           height: math.min(560, MediaQuery.sizeOf(context).height - 180),
           child: const MatchHistoryView(),
         ),
@@ -574,9 +575,9 @@ class _MenuHero extends StatelessWidget {
                 label: context.l10n.levels,
                 onTap: () => showAppDialog<void>(
                   context: context,
-                  title: context.l10n.levels,
+                  titleBuilder: (context) => context.l10n.levels,
                   wide: true,
-                  child: const LevelsView(),
+                  builder: (_) => const LevelsView(),
                 ),
               ),
             ),
@@ -619,14 +620,14 @@ class _MenuHero extends StatelessWidget {
           child: TextButton(
             onPressed: () => showAppDialog<void>(
               context: context,
-              title: context.l10n.playerRating,
+              titleBuilder: (context) => context.l10n.playerRating,
               wide: true,
-              child: const LeaderboardView(),
+              builder: (_) => const LeaderboardView(),
             ),
             style: TextButton.styleFrom(
               padding: const EdgeInsets.symmetric(horizontal: 4),
               foregroundColor: const Color(0xFF697163),
-              textStyle: const TextStyle(fontSize: 10),
+              textStyle: context.textStyle.buttonSmall,
             ),
             child: Row(
               children: [
@@ -665,7 +666,7 @@ class _ModeButton extends StatelessWidget {
         padding: const EdgeInsets.symmetric(horizontal: 6),
         backgroundColor: Colors.white,
         foregroundColor: AppColors.ink,
-        textStyle: const TextStyle(fontSize: 10, fontWeight: FontWeight.w600),
+        textStyle: context.textStyle.buttonSmall,
       ),
       icon: Icon(icon, size: 16, color: AppColors.accent),
       label: Text(label, maxLines: 1),
@@ -825,7 +826,7 @@ class _OnlineBanner extends StatefulWidget {
 }
 
 class _OnlineBannerState extends State<_OnlineBanner> {
-  String _copyStatus = '';
+  bool _codeCopied = false;
 
   @override
   Widget build(BuildContext context) {
@@ -905,7 +906,7 @@ class _OnlineBannerState extends State<_OnlineBanner> {
                   onPressed: () async {
                     await Clipboard.setData(ClipboardData(text: snapshot.code));
                     if (mounted) {
-                      setState(() => _copyStatus = context.l10n.codeCopied);
+                      setState(() => _codeCopied = true);
                     }
                   },
                   icon: const Icon(LucideIcons.copy, size: 15),
@@ -923,8 +924,8 @@ class _OnlineBannerState extends State<_OnlineBanner> {
             rankedStatus,
             style: const TextStyle(fontSize: 9, color: AppColors.muted),
           ),
-          if (_copyStatus.isNotEmpty)
-            Text(_copyStatus, style: const TextStyle(fontSize: 8)),
+          if (_codeCopied)
+            Text(context.l10n.codeCopied, style: const TextStyle(fontSize: 8)),
         ],
       ),
     );
@@ -1693,7 +1694,7 @@ class _LayerChoice extends StatelessWidget {
           color: selected ? const Color(0xFF9FB2F4) : const Color(0xFFDFE4D5),
         ),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(5)),
-        textStyle: const TextStyle(fontSize: 10),
+        textStyle: context.textStyle.buttonSmall,
       ),
       child: Text(label),
     ),
@@ -1734,10 +1735,10 @@ Future<void> _requestGameMenu(
   }
   final bool? leave = await showAppDialog<bool>(
     context: context,
-    title: online
+    titleBuilder: (context) => online
         ? context.l10n.leaveLobbyQuestion
         : context.l10n.finishGameQuestion,
-    child: Column(
+    builder: (context) => Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         Text(
@@ -1784,8 +1785,8 @@ Future<void> _requestRestart(
   }
   final bool? restart = await showAppDialog<bool>(
     context: context,
-    title: context.l10n.restartQuestion,
-    child: Column(
+    titleBuilder: (context) => context.l10n.restartQuestion,
+    builder: (context) => Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         Text(
@@ -1817,7 +1818,6 @@ class _ConfirmationActions extends StatelessWidget {
         onPressed: () => Navigator.pop(context, true),
         style: FilledButton.styleFrom(
           padding: const EdgeInsets.symmetric(horizontal: 6),
-          textStyle: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700),
         ),
         child: Text(confirmLabel, textAlign: TextAlign.center),
       ),
@@ -1826,7 +1826,6 @@ class _ConfirmationActions extends StatelessWidget {
         onPressed: () => Navigator.pop(context, false),
         style: OutlinedButton.styleFrom(
           padding: const EdgeInsets.symmetric(horizontal: 6),
-          textStyle: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700),
         ),
         child: Text(context.l10n.stayInGame, textAlign: TextAlign.center),
       ),
@@ -1837,8 +1836,8 @@ class _ConfirmationActions extends StatelessWidget {
 void _confirmOnlineLeave(BuildContext context, GameViewData data) {
   showAppDialog<bool>(
     context: context,
-    title: context.l10n.leaveLobbyQuestion,
-    child: Column(
+    titleBuilder: (context) => context.l10n.leaveLobbyQuestion,
+    builder: (context) => Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         Text(
@@ -1870,8 +1869,8 @@ void _showPauseDialog(BuildContext context, GameViewData data) {
   if (data.mode == GameMode.online) {
     showAppDialog<void>(
       context: context,
-      title: context.l10n.pause,
-      child: Column(
+      titleBuilder: (context) => context.l10n.pause,
+      builder: (context) => Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Text(context.l10n.onlineContinuesInMenu),
@@ -1904,8 +1903,8 @@ void _showPauseDialog(BuildContext context, GameViewData data) {
             onPressed: () => afterClose(
               () => showAppDialog<void>(
                 context: context,
-                title: context.l10n.settings,
-                child: const SettingsView(),
+                titleBuilder: (context) => context.l10n.settings,
+                builder: (_) => const SettingsView(),
               ),
             ),
             icon: const Icon(LucideIcons.settings2),
@@ -1925,8 +1924,8 @@ void _showPauseDialog(BuildContext context, GameViewData data) {
   var resumeAfterDismiss = true;
   showAppDialog<void>(
     context: context,
-    title: context.l10n.pause,
-    child: Column(
+    titleBuilder: (context) => context.l10n.pause,
+    builder: (context) => Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         Text(context.l10n.timeStopped),
@@ -1957,8 +1956,8 @@ void _showPauseDialog(BuildContext context, GameViewData data) {
             afterClose(() async {
               await showAppDialog<void>(
                 context: context,
-                title: context.l10n.settings,
-                child: const SettingsView(),
+                titleBuilder: (context) => context.l10n.settings,
+                builder: (_) => const SettingsView(),
               );
               if (bloc.data?.phase == GamePhase.paused) {
                 bloc.add(const GameEvent$Resume());
@@ -1978,9 +1977,9 @@ void _showPauseDialog(BuildContext context, GameViewData data) {
               afterClose(
                 () => showAppDialog<void>(
                   context: context,
-                  title: context.l10n.levels,
+                  titleBuilder: (context) => context.l10n.levels,
                   wide: true,
-                  child: LevelsView(initialId: initialId),
+                  builder: (_) => LevelsView(initialId: initialId),
                 ),
               );
             },
@@ -2033,9 +2032,9 @@ class _GamePanel extends StatelessWidget {
       bloc.add(const GameEvent$Menu());
       showAppDialog<void>(
         context: context,
-        title: context.l10n.levels,
+        titleBuilder: (context) => context.l10n.levels,
         wide: true,
-        child: LevelsView(initialId: initialId),
+        builder: (_) => LevelsView(initialId: initialId),
       );
     }
 

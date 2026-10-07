@@ -4,6 +4,7 @@ import 'package:four3/src/common/utils/build_context_extension.dart';
 import 'package:four3/src/feature/account/domain/model/account_profile.dart';
 import 'package:four3/src/feature/account/widget/account_root_scope.dart';
 import 'package:four3/src/feature/app_theme/utils/app_theme.dart';
+import 'package:four3/src/feature/app_theme/utils/theme_context_extension.dart';
 import 'package:four3/src/feature/components/modals/app_dialog.dart';
 import 'package:four3/src/feature/components/selectors/app_segmented_control.dart';
 import 'package:four3/src/feature/game/bloc/game_bloc.dart';
@@ -84,14 +85,11 @@ class _GameSetupViewState extends State<GameSetupView> {
                 children: [
                   TextSpan(
                     text: player,
-                    style: const TextStyle(
-                      color: AppColors.ink,
-                      fontWeight: FontWeight.w700,
-                    ),
+                    style: context.textStyle.captionStrong,
                   ),
                 ],
               ),
-              style: const TextStyle(color: AppColors.muted, fontSize: 11),
+              style: context.textStyle.caption,
             ),
             if (_mode == GameMode.local)
               Text.rich(
@@ -100,20 +98,17 @@ class _GameSetupViewState extends State<GameSetupView> {
                   children: [
                     TextSpan(
                       text: l10n.playerTwo,
-                      style: const TextStyle(
-                        color: AppColors.ink,
-                        fontWeight: FontWeight.w700,
-                      ),
+                      style: context.textStyle.captionStrong,
                     ),
                   ],
                 ),
-                style: const TextStyle(color: AppColors.muted, fontSize: 11),
+                style: context.textStyle.caption,
               ),
           ],
         ),
         if (_mode == GameMode.ai) ...[
           const SizedBox(height: 14),
-          Text(l10n.difficulty, style: const TextStyle(fontSize: 11)),
+          Text(l10n.difficulty, style: context.textStyle.caption),
           const SizedBox(height: 7),
           AppSegmentedControl<Difficulty>(
             options: [
@@ -163,9 +158,9 @@ class _GameSetupViewState extends State<GameSetupView> {
       game.add(const GameEvent$Pause());
       showAppDialog<void>(
         context: appContext,
-        title: context.l10n.howToPlay,
+        titleBuilder: (context) => context.l10n.howToPlay,
         wide: true,
-        child: TutorialView(
+        builder: (_) => TutorialView(
           starting: true,
           onDone: () {
             settings.add(
@@ -189,8 +184,8 @@ class _GameSetupViewState extends State<GameSetupView> {
       if (!appContext.mounted) return;
       showAppDialog<void>(
         context: appContext,
-        title: context.l10n.rankedGame,
-        child: const OnlineSetupView(quickOnly: true),
+        titleBuilder: (context) => context.l10n.rankedGame,
+        builder: (_) => const OnlineSetupView(quickOnly: true),
       );
     });
   }
@@ -233,10 +228,8 @@ class _ModeChoice extends StatelessWidget {
           Text(
             title,
             maxLines: 1,
-            style: TextStyle(
+            style: context.textStyle.captionStrong.copyWith(
               color: selected ? AppColors.accent : null,
-              fontSize: 11,
-              fontWeight: FontWeight.w700,
             ),
           ),
           const SizedBox(height: 2),
@@ -244,7 +237,7 @@ class _ModeChoice extends StatelessWidget {
             subtitle,
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
-            style: const TextStyle(color: AppColors.muted, fontSize: 8),
+            style: context.textStyle.micro.copyWith(fontSize: 8),
           ),
         ],
       ),

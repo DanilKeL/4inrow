@@ -13,6 +13,7 @@ final class AppTextStyleExtension
     required this.captionStrong,
     required this.micro,
     required this.button,
+    required this.buttonSmall,
   });
 
   final TextStyle display;
@@ -24,6 +25,7 @@ final class AppTextStyleExtension
   final TextStyle captionStrong;
   final TextStyle micro;
   final TextStyle button;
+  final TextStyle buttonSmall;
 
   @override
   AppTextStyleExtension copyWith({
@@ -36,6 +38,7 @@ final class AppTextStyleExtension
     TextStyle? captionStrong,
     TextStyle? micro,
     TextStyle? button,
+    TextStyle? buttonSmall,
   }) => AppTextStyleExtension(
     display: display ?? this.display,
     title: title ?? this.title,
@@ -46,6 +49,7 @@ final class AppTextStyleExtension
     captionStrong: captionStrong ?? this.captionStrong,
     micro: micro ?? this.micro,
     button: button ?? this.button,
+    buttonSmall: buttonSmall ?? this.buttonSmall,
   );
 
   @override
@@ -66,6 +70,8 @@ final class AppTextStyleExtension
           captionStrong,
       micro: TextStyle.lerp(micro, other.micro, t) ?? micro,
       button: TextStyle.lerp(button, other.button, t) ?? button,
+      buttonSmall:
+          TextStyle.lerp(buttonSmall, other.buttonSmall, t) ?? buttonSmall,
     );
   }
 }

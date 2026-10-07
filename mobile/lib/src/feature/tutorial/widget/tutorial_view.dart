@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:four3/l10n/generated/app_localizations.dart';
 import 'package:four3/src/common/utils/build_context_extension.dart';
 import 'package:four3/src/feature/app_theme/utils/app_theme.dart';
+import 'package:four3/src/feature/app_theme/utils/theme_context_extension.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:video_player/video_player.dart';
 
@@ -168,15 +169,12 @@ class _TutorialViewState extends State<TutorialView> {
       children: [
         goal,
         const SizedBox(height: 10),
-        SizedBox(
+        _LessonButtons(
           key: const ValueKey('tutorial-selector'),
-          height: 78,
-          child: _LessonButtons(
-            lessons: lessons,
-            selected: _selected,
-            vertical: false,
-            onSelected: _selectLesson,
-          ),
+          lessons: lessons,
+          selected: _selected,
+          vertical: false,
+          onSelected: _selectLesson,
         ),
         const SizedBox(height: 10),
         Expanded(
@@ -246,6 +244,7 @@ class _LessonButtons extends StatelessWidget {
     required this.selected,
     required this.vertical,
     required this.onSelected,
+    super.key,
   });
 
   final List<_Lesson> lessons;
@@ -273,13 +272,13 @@ class _LessonButtons extends StatelessWidget {
                   ? const Color(0xFFCAD5FB)
                   : const Color(0xFFE0E3D9),
             ),
+            textStyle: context.textStyle.buttonSmall.copyWith(fontSize: 9),
           ),
           child: Text(
             vertical
                 ? '${(index + 1).toString().padLeft(2, '0')}  ${lessons[index].tab}'
                 : lessons[index].tab,
             maxLines: 1,
-            style: const TextStyle(fontSize: 9),
           ),
         ),
     ];
@@ -297,6 +296,7 @@ class _LessonButtons extends StatelessWidget {
       );
     }
     return GridView.count(
+      shrinkWrap: true,
       physics: const NeverScrollableScrollPhysics(),
       crossAxisCount: 3,
       childAspectRatio: 2.7,
@@ -486,13 +486,13 @@ class _TutorialFooter extends StatelessWidget {
     children: [
       TextButton.icon(
         onPressed: onNext,
+        style: TextButton.styleFrom(textStyle: context.textStyle.buttonSmall),
         iconAlignment: IconAlignment.end,
         icon: const Icon(LucideIcons.arrowRight, size: 16),
         label: Text(
           selected == _lessonIds.length - 1
               ? context.l10n.firstExample
               : context.l10n.nextExample,
-          style: const TextStyle(fontSize: 11),
         ),
       ),
       const SizedBox(width: 8),
