@@ -13,6 +13,8 @@ final class BotOptions {
 
 abstract final class AiEngine {
   static const int _win = 1000000;
+  static const double _mediumDefenseMissChance = .07;
+  static const int _mediumDefenseMissAfterMoves = 10;
   static const List<int> _weights = [0, 3, 32, 180, _win];
   static final math.Random _random = math.Random();
   static final List<List<int>> _segments = _buildSegments();
@@ -84,18 +86,36 @@ abstract final class AiEngine {
     GameSnapshot snapshot,
     Difficulty difficulty, {
     BotOptions options = const BotOptions(),
+    math.Random? random,
   }) {
     if (snapshot.status != GameStatus.playing) return null;
     final position = _Position(snapshot);
     if (position.legal().isEmpty) return null;
+    final math.Random moveRandom = random ?? _random;
     final Player player = snapshot.currentPlayer;
     final List<int> wins = position.threats(player);
     final List<int> blocks = position.threats(player.other);
-    late final int column;
+    final int column;
     if (wins.isNotEmpty) {
       column = wins.first;
     } else if (blocks.isNotEmpty) {
-      column = blocks.first;
+      int selected = blocks.first;
+      // Ordinary medium games occasionally overlook a single immediate
+      // threat. Levels stay deterministic, and a win always takes priority.
+      if (difficulty == Difficulty.medium &&
+          !options.deterministic &&
+          snapshot.history.length >= _mediumDefenseMissAfterMoves &&
+          blocks.length == 1) {
+        final List<int> alternatives = position
+            .legal()
+            .where((move) => move != selected)
+            .toList();
+        if (alternatives.isNotEmpty &&
+            moveRandom.nextDouble() < _mediumDefenseMissChance) {
+          selected = position.ordered(player, alternatives, -1).first;
+        }
+      }
+      column = selected;
     } else {
       final List<_RankedMove> ranked = _candidates(position, player);
       if (ranked.first.score == _win) {
@@ -107,8 +127,9 @@ abstract final class AiEngine {
         final List<_RankedMove> pool = (safe.isNotEmpty ? safe : ranked)
             .take(4)
             .toList();
-        column = pool[options.deterministic ? 0 : _random.nextInt(pool.length)]
-            .column;
+        column =
+            pool[options.deterministic ? 0 : moveRandom.nextInt(pool.length)]
+                .column;
       } else {
         final List<_RankedMove> safe = ranked
             .where((move) => move.score > -_win)
@@ -120,6 +141,7 @@ abstract final class AiEngine {
           ranked.first.column,
           (safe.isNotEmpty ? safe : ranked).map((move) => move.column).toList(),
           options,
+          moveRandom,
         );
       }
     }
@@ -151,6 +173,7 @@ abstract final class AiEngine {
     int fallback,
     List<int> roots,
     BotOptions options,
+    math.Random random,
   ) {
     final timer = Stopwatch()..start();
     final deadlineMs = difficulty == Difficulty.hard ? 650 : 180;
@@ -291,8 +314,8 @@ abstract final class AiEngine {
     final chance = difficulty == Difficulty.hard ? 0.25 : 0.35;
     if (!options.deterministic &&
         alternatives.isNotEmpty &&
-        _random.nextDouble() < chance) {
-      return alternatives[_random.nextInt(alternatives.length)].column;
+        random.nextDouble() < chance) {
+      return alternatives[random.nextInt(alternatives.length)].column;
     }
     return chosen;
   }
