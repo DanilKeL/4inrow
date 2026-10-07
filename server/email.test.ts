@@ -27,8 +27,24 @@ describe('ResendMailer recipient validation', () => {
 
     await expect(mailer.validateRecipient('player@invalid.test')).resolves.toBe(false);
   });
+  it('deduplicates concurrent domain lookups and keeps rejecting explicit Null MX', async () => {
+    const resolveMx = vi.fn(async () => [{ exchange: '.', priority: 0 }]);
+    const mailer = new ResendMailer(
+      'test-key',
+      'FOUR <no-reply@4inrow.ru>',
+      'https://4inrow.ru',
+      resolveMx,
+    );
+    await expect(
+      Promise.all([
+        mailer.validateRecipient('one@invalid.test'),
+        mailer.validateRecipient('two@invalid.test'),
+      ]),
+    ).resolves.toEqual([false, false]);
+    expect(resolveMx).toHaveBeenCalledOnce();
+  });
 
-  it('fails closed during a temporary DNS failure to avoid a bounce', async () => {
+  it('reports a temporary DNS outage separately and retries without a negative cache', async () => {
     const resolveMx = vi.fn(async () => {
       const error = new Error('temporary failure') as NodeJS.ErrnoException;
       error.code = 'ETIMEOUT';
@@ -41,7 +57,18 @@ describe('ResendMailer recipient validation', () => {
       resolveMx,
     );
 
-    await expect(mailer.validateRecipient('player@example.test')).resolves.toBe(false);
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    try {
+      await expect(mailer.validateRecipient('player@example.test')).rejects.toMatchObject({
+        status: 503,
+      });
+      await expect(mailer.validateRecipient('player@example.test')).rejects.toMatchObject({
+        status: 503,
+      });
+      expect(resolveMx).toHaveBeenCalledTimes(2);
+    } finally {
+      warn.mockRestore();
+    }
   });
 
   it('uses the dedicated branded logo in transactional emails', async () => {

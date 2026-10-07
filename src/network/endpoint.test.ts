@@ -12,8 +12,13 @@ describe('online endpoint', () => {
   });
   it('uses a configured online server', () => {
     expect(
-      onlineEndpoint({ protocol: 'http:', host: 'localhost' }, 'ws://116.206.95.180/online'),
-    ).toBe('ws://116.206.95.180/online');
+      onlineEndpoint({ protocol: 'http:', host: 'localhost' }, 'wss://4inrow.ru/online'),
+    ).toBe('wss://4inrow.ru/online');
+  });
+  it('uses the production domain for secure online games', () => {
+    expect(onlineEndpoint({ protocol: 'https:', host: '4inrow.ru' }, '')).toBe(
+      'wss://4inrow.ru/online',
+    );
   });
   it('rejects invalid WebSocket protocols', () => {
     expect(() =>

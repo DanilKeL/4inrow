@@ -7,6 +7,7 @@ import type { AddressInfo } from 'node:net';
 import { createOnlineServer, type OnlineServerOptions } from './app';
 import { createAdminPasswordHash } from './admin';
 import { createGame, makeMove, serialize } from '../src/game/core';
+import { AuthError } from './auth';
 import type { Mailer, MailMessage } from './email';
 import type { ClientCommand, LobbySnapshot, ServerEvent } from '../src/network/protocol';
 
@@ -1132,6 +1133,38 @@ describe('online lobby server over real WebSockets', () => {
     expect(database).not.toContain('new-password-456');
   });
 
+  it('distinguishes unavailable DNS from an invalid email domain before creating an account', async () => {
+    let dnsUnavailable = true;
+    const mailer: Mailer = {
+      validateRecipient: async () => {
+        if (dnsUnavailable)
+          throw new AuthError(503, 'Проверка почтового домена временно недоступна.');
+        return false;
+      },
+      sendVerification: async () => {
+        throw new Error('Must not send');
+      },
+      sendPasswordReset: async () => {},
+    };
+    const { url } = await start({ mailer });
+    const register = () =>
+      fetch(`${url}/auth/register`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          username: 'DnsPlayer',
+          email: 'player@example.test',
+          password: 'strong-test-password',
+        }),
+      });
+    const unavailable = await register();
+    expect(unavailable.status).toBe(503);
+    expect((await unavailable.json()).error).toContain('временно недоступна');
+    dnsUnavailable = false;
+    const invalid = await register();
+    expect(invalid.status).toBe(400);
+    expect((await invalid.json()).error).toContain('не найден почтовый сервер');
+  });
   it('confirms email and resets a forgotten password with one-time mail tokens', async () => {
     const dir = await mkdtemp(join(tmpdir(), 'four-email-auth-'));
     dirs.push(dir);

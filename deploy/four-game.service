@@ -1,0 +1,29 @@
+[Unit]
+Description=FOUR game server
+After=network.target
+
+[Service]
+Type=simple
+User=fourgame
+Group=fourgame
+WorkingDirectory=/srv/four-game
+Environment=NODE_ENV=production
+Environment=HOST=127.0.0.1
+Environment=PORT=3001
+Environment=FOUR_AUTH_FILE=/srv/four-game-data/accounts.json
+Environment=FOUR_STATS_FILE=/srv/four-game-data/statistics.sqlite
+Environment=FOUR_PUBLIC_URL=https://4inrow.ru
+EnvironmentFile=/etc/four-game/admin.env
+EnvironmentFile=/etc/four-game/mail.env
+ExecStart=/usr/bin/node /srv/four-game/dist-server/index.js
+Restart=on-failure
+RestartSec=3
+UMask=0077
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/srv/four-game-data
+
+[Install]
+WantedBy=multi-user.target

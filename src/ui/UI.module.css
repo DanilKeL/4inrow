@@ -9,6 +9,7 @@
 }
 .header {
   height: 104px;
+  background: var(--background);
   display: flex;
   align-items: center;
   border-bottom: 1px solid var(--line);
@@ -2384,6 +2385,18 @@
 }
 .leaderboardButton > svg:last-child {
   margin-left: auto;
+}
+/* Let Safari detect the actual header at the viewport edge. Keep its controls
+   below the notch while its opaque background extends through the safe area. */
+:global(html[data-ios-standalone]) .app {
+  padding-top: 0;
+}
+:global(html[data-ios-standalone]) .header {
+  position: sticky;
+  top: 0;
+  box-sizing: content-box;
+  padding-top: var(--safe-area-inset-top, env(safe-area-inset-top, 0px));
+  z-index: 10;
 }
 @media (max-width: 650px), (orientation: landscape) and (max-height: 500px) {
   .leaderboardButton {

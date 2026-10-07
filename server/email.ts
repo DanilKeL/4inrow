@@ -1,5 +1,6 @@
-import { resolveMx } from 'node:dns/promises';
 import { domainToASCII } from 'node:url';
+import { AuthError } from './auth.ts';
+import { permanentDnsFailure, resolveMailExchangers, type MxResolver } from './mailDns.ts';
 
 export interface MailMessage {
   email: string;
@@ -12,8 +13,6 @@ export interface Mailer {
   sendVerification(message: MailMessage): Promise<void>;
   sendPasswordReset(message: MailMessage): Promise<void>;
 }
-
-type MxResolver = (domain: string) => Promise<readonly { exchange: string; priority: number }[]>;
 
 function escapeHtml(value: string) {
   return value
@@ -84,12 +83,13 @@ function renderEmail(options: {
 
 export class ResendMailer implements Mailer {
   private readonly domainCache = new Map<string, { valid: boolean; expires: number }>();
+  private readonly pendingDomains = new Map<string, Promise<boolean>>();
 
   constructor(
     private apiKey: string,
     private from: string,
     private publicUrl: string,
-    private resolveMxRecords: MxResolver = resolveMx,
+    private resolveMxRecords: MxResolver = resolveMailExchangers,
   ) {}
 
   static fromEnv() {
@@ -154,20 +154,38 @@ export class ResendMailer implements Mailer {
     if (!domain || !/^[a-z0-9.-]+$/.test(domain)) return true;
     const cached = this.domainCache.get(domain);
     if (cached && cached.expires > Date.now()) return cached.valid;
+    const pending = this.pendingDomains.get(domain);
+    if (pending) return pending;
+    const lookup = this.checkDomain(domain);
+    this.pendingDomains.set(domain, lookup);
+    try {
+      return await lookup;
+    } finally {
+      this.pendingDomains.delete(domain);
+    }
+  }
+
+  private async checkDomain(domain: string) {
+    const cache = (valid: boolean) => {
+      if (this.domainCache.size >= 2048)
+        this.domainCache.delete(this.domainCache.keys().next().value!);
+      this.domainCache.set(domain, { valid, expires: Date.now() + 10 * 60_000 });
+      return valid;
+    };
     try {
       const records = await this.resolveMxRecords(domain);
       const valid = records.some((record) => Boolean(record.exchange && record.exchange !== '.'));
-      this.domainCache.set(domain, { valid, expires: Date.now() + 10 * 60_000 });
-      return valid;
+      return cache(valid);
     } catch (error) {
-      const code = (error as NodeJS.ErrnoException).code;
-      const permanent = code === 'ENODATA' || code === 'ENOTFOUND' || code === 'EFORMERR';
-      this.domainCache.set(domain, {
-        valid: false,
-        expires: Date.now() + (permanent ? 10 * 60_000 : 30_000),
-      });
-      // Fail closed: sending blindly during a DNS outage creates bounces and harms reputation.
-      return false;
+      if (permanentDnsFailure(error)) return cache(false);
+      console.warn(
+        'Mail domain DNS lookup temporarily unavailable:',
+        (error as NodeJS.ErrnoException)?.code ?? 'UNKNOWN',
+      );
+      throw new AuthError(
+        503,
+        'Проверка почтового домена временно недоступна. Попробуйте зарегистрироваться через минуту.',
+      );
     }
   }
 
