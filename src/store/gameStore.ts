@@ -59,6 +59,7 @@ function cancelPending() {
 interface Store {
   hasSavedGame: boolean;
   resumeSavedGame: () => void;
+  discardSavedGame: (recordId: string) => void;
   levelId: number | null;
   levelBestBefore: number | null;
   startLevel: (id: number) => void;
@@ -317,6 +318,18 @@ function saveFinishedMatch() {
 
 export const useGame = create<Store>((set, get) => ({
   hasSavedGame: Boolean(readSavedGame()),
+  discardSavedGame: (recordId) => {
+    const saved = readSavedGame();
+    if (
+      get().phase !== 'menu' ||
+      !saved ||
+      saved.recordId !== recordId ||
+      saved.accountAtStart !== useAccount.getState().username
+    )
+      return;
+    removeSavedGame(recordId);
+    set({ hasSavedGame: Boolean(readSavedGame()) });
+  },
   resumeSavedGame: () => {
     const saved = readSavedGame();
     if (!saved || saved.accountAtStart !== useAccount.getState().username) return;

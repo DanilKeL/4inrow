@@ -118,6 +118,7 @@ export default function App() {
   const state = useGame();
   const offline = useOffline();
   const username = useAccount((account) => account.username);
+  const identityReady = useAccount((account) => account.identityReady);
   const saved = state.hasSavedGame ? readSavedGame() : null;
   const canContinue = saved && saved.accountAtStart === username;
   useEffect(() => {
@@ -189,6 +190,11 @@ export default function App() {
     else setOverlay((current) => (current === 'online-pause' ? null : current));
   }, [pauseIdentity]);
   const isMenu = state.phase === 'menu';
+  const showResumeBanner = ready && identityReady && isMenu && canContinue && !overlay;
+  const savedRecordId = saved?.recordId;
+  const discardSaved = useCallback(() => {
+    if (savedRecordId) useGame.getState().discardSavedGame(savedRecordId);
+  }, [savedRecordId]);
   const demo = useMemo(demoGame, []);
   const shown = useMemo(() => (isMenu ? demo : displayedGame(state)), [isMenu, demo, state]);
   const closeOverlay = useCallback(() => {
@@ -243,7 +249,7 @@ export default function App() {
   }, []);
   useEffect(() => {
     const handler = (event: KeyboardEvent) => {
-      if (event.target instanceof HTMLInputElement || overlay) return;
+      if (event.target instanceof HTMLInputElement || overlay || showResumeBanner) return;
       const game = useGame.getState();
       if (event.key === 'Escape' && game.phase !== 'menu') {
         game.pause();
@@ -254,7 +260,7 @@ export default function App() {
     };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
-  }, [overlay]);
+  }, [overlay, showResumeBanner]);
 
   const turnText =
     state.phase === 'ai-thinking'
@@ -351,17 +357,11 @@ export default function App() {
               </p>
               <button
                 className={styles.primary + ' ' + styles.playButton}
-                disabled={!offline.online && !canContinue}
-                onClick={() => (canContinue ? state.resumeSavedGame() : beginQuick())}
+                disabled={!offline.online}
+                onClick={() => beginQuick()}
               >
-                {canContinue ? <Play size={19} /> : <Search size={19} />}
-                {canContinue ? 'Продолжить партию' : 'Рейтинговая игра'} <ArrowRight size={19} />
+                <Search size={19} /> Рейтинговая игра <ArrowRight size={19} />
               </button>
-              {canContinue && offline.online && (
-                <button className={styles.resumeAlternate} onClick={() => beginQuick()}>
-                  <Search size={15} /> Рейтинговая игра <ArrowRight size={15} />
-                </button>
-              )}
               <div className={styles.quickModes}>
                 <button onClick={openLevels}>
                   <Puzzle size={19} />
@@ -615,9 +615,21 @@ export default function App() {
 
         <RankedResult
           key={`${state.online?.snapshot.code ?? 'none'}-${state.online?.snapshot.round ?? 0}`}
-          blocked={Boolean(overlay)}
+          blocked={Boolean(overlay || showResumeBanner)}
         />
 
+        {showResumeBanner && (
+          <Dialog title="Продолжить партию?" onClose={discardSaved}>
+            <div className={styles.dialogActions}>
+              <button className={styles.primary} onClick={state.resumeSavedGame}>
+                <Play size={18} /> Продолжить
+              </button>
+              <button className={styles.secondary} onClick={discardSaved}>
+                Не продолжать
+              </button>
+            </div>
+          </Dialog>
+        )}
         {overlay === 'leaderboard' && (
           <Dialog title="Рейтинг игроков" onClose={closeOverlay} wide>
             <Leaderboard />

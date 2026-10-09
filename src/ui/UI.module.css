@@ -2403,18 +2403,6 @@
   color: var(--accent);
   font-size: inherit;
 }
-.resumeAlternate {
-  display: flex;
-  width: 100%;
-  justify-content: space-between;
-  align-items: center;
-  gap: 8px;
-  padding: 6px 0 0;
-  border: 0;
-  background: none;
-  color: var(--accent);
-  font-size: 11px;
-}
 .hero button:disabled {
   opacity: 0.45;
   cursor: default;

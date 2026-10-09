@@ -396,4 +396,32 @@ describe('clock and replay', () => {
     expect(state().phase).toBe('menu');
     useAccount.setState({ username: null });
   });
+  it('discards a declined save without recreating it from menu actions', () => {
+    useAccount.setState({ username: null });
+    state().start('local');
+    state().place(2, 2);
+    const id = state().recordId;
+    state().menu();
+    state().discardSavedGame(id);
+    expect(readSavedGame()).toBeNull();
+    expect(state().hasSavedGame).toBe(false);
+    state().view('top');
+    expect(readSavedGame()).toBeNull();
+    state().resumeSavedGame();
+    expect(state().phase).toBe('menu');
+  });
+  it('does not discard an active, replaced or other account save', () => {
+    useAccount.setState({ username: 'Alice' });
+    state().start('local');
+    const id = state().recordId;
+    state().discardSavedGame(id);
+    expect(readSavedGame()?.recordId).toBe(id);
+    state().menu();
+    state().discardSavedGame('older-record');
+    expect(readSavedGame()?.recordId).toBe(id);
+    useAccount.setState({ username: 'Bob' });
+    state().discardSavedGame(id);
+    expect(readSavedGame()?.recordId).toBe(id);
+    useAccount.setState({ username: null });
+  });
 });

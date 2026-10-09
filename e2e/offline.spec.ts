@@ -94,7 +94,10 @@ for (const viewport of [
         await page.evaluate(() => document.documentElement.scrollHeight - innerHeight),
       ).toBeLessThanOrEqual(1);
       await expect(page.getByRole('button', { name: 'Онлайн', exact: true })).toBeDisabled();
-      await page.getByRole('button', { name: 'Продолжить партию', exact: true }).click();
+      await page
+        .getByRole('dialog', { name: 'Продолжить партию?' })
+        .getByRole('button', { name: 'Продолжить', exact: true })
+        .click();
       await expect(page.getByTestId('move-count')).toHaveText('2 / 125');
       await page.mouse.click(canvas.x + canvas.width / 2, canvas.y + canvas.height / 2);
       await expect(page.getByTestId('move-count')).toHaveText('4 / 125');
@@ -149,6 +152,33 @@ for (const viewport of [
     }
   });
 }
+
+test('declining the resume banner clears its save and keeps the ranked menu button', async ({
+  page,
+}) => {
+  await page.goto('/');
+  await ready(page);
+  await page.getByRole('button', { name: 'Вдвоём', exact: true }).click();
+  await page.getByRole('button', { name: 'Начать игру', exact: true }).click();
+  await page.getByRole('button', { name: 'Начать', exact: true }).click();
+  const board = (await page.locator('canvas').boundingBox())!;
+  await page.mouse.click(board.x + board.width / 2, board.y + board.height / 2);
+  await expect(page.getByTestId('move-count')).toHaveText('1 / 125');
+  await page.reload();
+  const banner = page.getByRole('dialog', { name: 'Продолжить партию?' });
+  await expect(banner).toBeVisible();
+  const menu = page.getByRole('region', { name: 'Режимы игры' });
+  await expect(menu.getByRole('button', { name: 'Рейтинговая игра', exact: true })).toBeVisible();
+  await expect(menu.getByRole('button', { name: /Продолжить/ })).toHaveCount(0);
+  await banner.getByRole('button', { name: 'Не продолжать', exact: true }).click();
+  await expect(banner).toBeHidden();
+  expect(await page.evaluate(() => localStorage.getItem('four-cubed-active-game-v1'))).toBeNull();
+  await page.reload();
+  await expect(page.getByTestId('loading-screen')).toBeHidden();
+  await expect(banner).toBeHidden();
+  await page.getByRole('button', { name: 'Против AI', exact: true }).click();
+  await expect(page.getByRole('dialog', { name: 'Новая игра' })).toBeVisible();
+});
 
 test('offline account level win survives reload and syncs to its account', async ({
   page,
