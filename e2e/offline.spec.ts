@@ -8,24 +8,28 @@ import { strict as assert } from 'node:assert';
 async function ready(page: Page) {
   await expect(page.getByTestId('loading-screen')).toBeHidden();
   await page.waitForFunction(() => Boolean(navigator.serviceWorker.controller));
-  await page.waitForFunction(
-    () =>
-      new Promise<boolean>((resolve) => {
-        const channel = new MessageChannel();
-        const timer = setTimeout(() => {
-          channel.port1.close();
-          resolve(false);
-        }, 2000);
-        channel.port1.onmessage = (event) => {
-          clearTimeout(timer);
-          channel.port1.close();
-          resolve(Boolean(event.data?.ready));
-        };
-        navigator.serviceWorker.controller!.postMessage({ type: 'offline-status' }, [
-          channel.port2,
-        ]);
-      }),
-  );
+  await expect
+    .poll(() =>
+      page.evaluate(
+        () =>
+          new Promise<boolean>((resolve) => {
+            const channel = new MessageChannel();
+            const timer = setTimeout(() => {
+              channel.port1.close();
+              resolve(false);
+            }, 2000);
+            channel.port1.onmessage = (event) => {
+              clearTimeout(timer);
+              channel.port1.close();
+              resolve(Boolean(event.data?.ready));
+            };
+            navigator.serviceWorker.controller!.postMessage({ type: 'offline-status' }, [
+              channel.port2,
+            ]);
+          }),
+      ),
+    )
+    .toBe(true);
 }
 async function topView(page: Page) {
   await page.getByRole('button', { name: 'Вид', exact: true }).click();
