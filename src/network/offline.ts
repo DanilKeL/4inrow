@@ -7,12 +7,10 @@ let snapshot = {
   loaded: 0,
   total: 0,
   error: false,
-  update: false,
 };
 const listeners = new Set<() => void>();
 let registration: ServiceWorkerRegistration | undefined;
 let pending: Promise<ServiceWorkerRegistration> | undefined;
-let reloadOnUpdate = false;
 const publish = (patch: Partial<typeof snapshot>) => {
   snapshot = { ...snapshot, ...patch };
   listeners.forEach((listener) => listener());
@@ -50,7 +48,6 @@ export function registerGameWorker(): Promise<ServiceWorkerRegistration> {
       .then((result) => {
         registration = result;
         void checkWorker(result.active);
-        publish({ update: Boolean(result.waiting) });
         const watch = () => {
           const worker = result.installing;
           if (!worker) return;
@@ -58,7 +55,6 @@ export function registerGameWorker(): Promise<ServiceWorkerRegistration> {
           worker.addEventListener('statechange', () => {
             if (worker.state === 'installed') {
               void checkWorker(worker);
-              publish({ update: Boolean(result.waiting) });
             }
             if (worker.state === 'activated') void checkWorker(worker);
             if (worker.state === 'redundant') {
@@ -89,11 +85,6 @@ export function retryOffline() {
     publish({ saving: false, error: true }),
   );
 }
-export function applyOfflineUpdate() {
-  if (!registration?.waiting) return;
-  reloadOnUpdate = true;
-  registration.waiting.postMessage({ type: 'offline-activate' });
-}
 export function initializeOffline() {
   window.addEventListener('online', () => {
     publish({ online: true });
@@ -109,7 +100,6 @@ export function initializeOffline() {
   });
   navigator.serviceWorker.addEventListener('controllerchange', () => {
     void checkWorker(navigator.serviceWorker.controller);
-    if (reloadOnUpdate) window.location.reload();
   });
   void registerGameWorker().catch(() => {});
 }

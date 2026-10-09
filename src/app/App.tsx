@@ -63,7 +63,7 @@ import {
   tutorialMediaSnapshot,
 } from '../network/tutorialMedia';
 import styles from '../ui/UI.module.css';
-import { useOffline, applyOfflineUpdate } from '../network/offline';
+import { useOffline } from '../network/offline';
 import { readSavedGame } from '../store/savedGame';
 import { DailyChallenge } from '../ui/DailyChallenge';
 import { useDaily } from '../store/dailyStore';
@@ -424,11 +424,6 @@ export default function App() {
                   <span>Рейтинг игроков</span>
                 </button>
               </div>
-              {offline.online && offline.update && (
-                <div className={styles.offlineStatus}>
-                  <button onClick={applyOfflineUpdate}>Обновить игру</button>
-                </div>
-              )}
             </section>
           ) : (
             <GamePanel

@@ -217,7 +217,7 @@ test('offline account level win survives reload and syncs to its account', async
     .toBe(1);
 });
 
-test('a failed update retains offline play; a complete update waits for acceptance', async ({
+test('a failed update retains offline play; a complete update activates after closing the game', async ({
   page,
   context,
 }) => {
@@ -283,19 +283,44 @@ test('a failed update retains offline play; a complete update waits for acceptan
     expect(status.version).toBe(build.version);
     await page.reload();
     await expect(page.getByTestId('loading-screen')).toBeHidden();
-    await page.getByRole('button', { name: 'Обновить игру', exact: true }).click();
+    await expect(page.getByRole('button', { name: 'Обновить игру', exact: true })).toHaveCount(0);
+    const workers = context.serviceWorkers();
+    const versions = await Promise.all(
+      workers.map((worker) => worker.evaluate('OFFLINE_BUILD.version').catch(() => null)),
+    );
+    const nextWorker = workers[versions.indexOf(`${build.version}-next`)];
+    expect(nextWorker).toBeDefined();
+    await page.close();
     await expect
       .poll(() =>
-        page.evaluate(async (version) => {
-          const keys = await caches.keys();
-          return keys.includes(`four-offline-${version}-next`);
-        }, build.version),
+        nextWorker.evaluate(
+          "self.registration.active?.state === 'activated' && !self.registration.waiting",
+        ),
       )
       .toBe(true);
-    await expect(page.getByRole('button', { name: 'Обновить игру', exact: true })).toBeHidden();
+    const reopened = await context.newPage();
+    await reopened.goto('/');
+    await ready(reopened);
+    const version = await reopened.evaluate(
+      () =>
+        new Promise<string>((resolve) => {
+          const channel = new MessageChannel();
+          channel.port1.onmessage = (event) => {
+            channel.port1.close();
+            resolve(event.data.version);
+          };
+          navigator.serviceWorker.controller!.postMessage({ type: 'offline-status' }, [
+            channel.port2,
+          ]);
+        }),
+    );
+    expect(version).toBe(`${build.version}-next`);
+    await expect(reopened.getByRole('button', { name: 'Обновить игру', exact: true })).toHaveCount(
+      0,
+    );
     await context.setOffline(true);
-    expect((await page.reload())?.fromServiceWorker()).toBe(true);
-    await expect(page.getByTestId('loading-screen')).toBeHidden();
+    expect((await reopened.reload())?.fromServiceWorker()).toBe(true);
+    await expect(reopened.getByTestId('loading-screen')).toBeHidden();
   } finally {
     await writeFile(path, original);
   }
