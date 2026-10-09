@@ -13,6 +13,7 @@ import { StatisticsStore } from './statistics.ts';
 import { onlineElapsed } from '../src/network/matchTime.ts';
 import type { AnalyticsFilter } from '../src/network/analyticsTypes.ts';
 import { DailyService, type DailyServiceOptions } from './dailyService.ts';
+import { waitingPairs } from './matchmaking.ts';
 
 interface Seat {
   account: string | null;
@@ -41,18 +42,23 @@ interface Room {
   rematch: Player[];
   lastActivity: number;
 }
+interface QueuedPlayer {
+  name: string;
+  queuedAt: number;
+  order: number;
+}
+interface MatchPlayer extends QueuedPlayer {
+  socket: WebSocket;
+  accepted: boolean;
+}
 interface PendingMatch {
   id: string;
-  players: [
-    { socket: WebSocket; name: string; accepted: boolean },
-    { socket: WebSocket; name: string; accepted: boolean },
-  ];
+  players: [MatchPlayer, MatchPlayer];
   deadline: number;
   timer: ReturnType<typeof setTimeout>;
 }
-interface QuickSearch {
+interface QuickSearch extends QueuedPlayer {
   account: string | null;
-  name: string;
   socket: WebSocket;
   disconnectedAt?: number;
   seat?: { room: Room; player: Player };
@@ -68,6 +74,7 @@ export interface OnlineServerOptions {
   maxConnections?: number;
   messagesPerMinute?: number;
   matchConfirmMs?: number;
+  matchmakingIntervalMs?: number;
   /** Account database path. Set null for an isolated in-memory test server. */
   authFile?: string | null;
   statsFile?: string | null;
@@ -185,7 +192,8 @@ export function createOnlineServer(options: OnlineServerOptions = {}) {
   const memberships = new WeakMap<WebSocket, { room: Room; player: Player }>();
   const socketNames = new WeakMap<WebSocket, string>();
   const socketAccounts = new WeakMap<WebSocket, string | null>();
-  const waiting = new Map<WebSocket, string>();
+  const waiting = new Map<WebSocket, QueuedPlayer>();
+  let queueSequence = 0;
   const searches = new Map<string, QuickSearch>();
   const searchBySocket = new WeakMap<WebSocket, string>();
   const pendingBySocket = new Map<WebSocket, PendingMatch>();
@@ -1220,43 +1228,31 @@ export function createOnlineServer(options: OnlineServerOptions = {}) {
     searchBySocket.delete(ws);
   }
   function pairWaiting() {
-    while (waiting.size >= 2 && rooms.size + pendingMatches.size < (options.maxRooms ?? 1000)) {
-      const entries = Array.from(waiting.entries());
-      let pair: typeof entries = [];
-      for (const first of entries) {
-        const account = socketAccounts.get(first[0]);
-        const candidates = entries.filter(
-          (e) =>
-            e[0] !== first[0] &&
-            Boolean(socketAccounts.get(e[0])) === Boolean(account) &&
-            (!account || socketAccounts.get(e[0]) !== account),
-        );
-        if (account)
-          candidates.sort(
-            (a, b) =>
-              Math.abs(
-                statistics.rating(socketAccounts.get(a[0])!).points -
-                  statistics.rating(account).points,
-              ) -
-              Math.abs(
-                statistics.rating(socketAccounts.get(b[0])!).points -
-                  statistics.rating(account).points,
-              ),
-          );
-        if (candidates.length) {
-          pair = [first, candidates[0]];
-          break;
-        }
-      }
-      if (!pair.length) break;
-      for (const [socket] of pair) waiting.delete(socket);
+    if (waiting.size < 2) return;
+    const now = Date.now();
+    const candidates = [...waiting.entries()]
+      .filter(([socket]) => socket.readyState === WebSocket.OPEN)
+      .map(([socket, entry]) => {
+        const account = socketAccounts.get(socket) ?? null;
+        return {
+          id: socket,
+          account,
+          rating: account ? statistics.rating(account).points : null,
+          queuedAt: entry.queuedAt,
+          order: entry.order,
+        };
+      });
+    const pairs = waitingPairs(
+      candidates,
+      now,
+      Math.max(0, (options.maxRooms ?? 1000) - rooms.size - pendingMatches.size),
+    );
+    for (const pair of pairs) {
+      const players = pair.map((socket) => ({ socket, ...waiting.get(socket)!, accepted: false }));
+      for (const socket of pair) waiting.delete(socket);
       const match: PendingMatch = {
         id: randomBytes(16).toString('hex'),
-        players: pair.map(([socket, name]) => ({
-          socket,
-          name,
-          accepted: false,
-        })) as PendingMatch['players'],
+        players: players as PendingMatch['players'],
         deadline: Date.now() + (options.matchConfirmMs ?? 15_000),
         timer: undefined as unknown as ReturnType<typeof setTimeout>,
       };
@@ -1265,7 +1261,11 @@ export function createOnlineServer(options: OnlineServerOptions = {}) {
         for (const player of match.players) {
           if (player.socket.readyState !== WebSocket.OPEN) continue;
           if (player.accepted) {
-            waiting.set(player.socket, player.name);
+            waiting.set(player.socket, {
+              name: player.name,
+              queuedAt: player.queuedAt,
+              order: player.order,
+            });
             send(player.socket, { type: 'queue', status: 'searching' });
           } else {
             forgetSearch(player.socket);
@@ -1321,7 +1321,7 @@ export function createOnlineServer(options: OnlineServerOptions = {}) {
     finishMatch(match);
     const other = match.players.find((player) => player.socket !== ws)!;
     if (other.socket.readyState === WebSocket.OPEN) {
-      waiting.set(other.socket, other.name);
+      waiting.set(other.socket, { name: other.name, queuedAt: other.queuedAt, order: other.order });
       send(other.socket, { type: 'queue', status: 'searching' });
     }
     pairWaiting();
@@ -1403,7 +1403,7 @@ export function createOnlineServer(options: OnlineServerOptions = {}) {
           attach(ws, room, player);
           return;
         }
-        waiting.set(ws, saved.name);
+        waiting.set(ws, { name: saved.name, queuedAt: saved.queuedAt, order: saved.order });
         send(ws, { type: 'queue', status: 'searching' });
         pairWaiting();
         return;
@@ -1435,6 +1435,8 @@ export function createOnlineServer(options: OnlineServerOptions = {}) {
         error(ws, 'SERVER_FULL', 'Сервер заполнен. Попробуйте позже.');
         return;
       }
+      const queuedAt = Date.now();
+      const order = queueSequence++;
       if (command.searchId) {
         if (searches.size >= (options.maxConnections ?? 2000) * 2) {
           error(ws, 'SERVER_FULL', 'Сервер заполнен. Попробуйте позже.');
@@ -1443,11 +1445,13 @@ export function createOnlineServer(options: OnlineServerOptions = {}) {
         searches.set(command.searchId, {
           account: account ?? null,
           name: socketNames.get(ws)!,
+          queuedAt,
+          order,
           socket: ws,
         });
         searchBySocket.set(ws, command.searchId);
       }
-      waiting.set(ws, socketNames.get(ws)!);
+      waiting.set(ws, { name: socketNames.get(ws)!, queuedAt, order });
       send(ws, { type: 'queue', status: 'searching' });
       pairWaiting();
       return;
@@ -1829,6 +1833,8 @@ export function createOnlineServer(options: OnlineServerOptions = {}) {
       ws.ping();
     }
   }, options.heartbeatIntervalMs ?? 30_000);
+  const matchmaking = setInterval(pairWaiting, options.matchmakingIntervalMs ?? 500);
+  matchmaking.unref();
   cleanup.unref();
   heartbeat.unref();
 
@@ -1836,6 +1842,7 @@ export function createOnlineServer(options: OnlineServerOptions = {}) {
     shuttingDown = true;
     clearInterval(cleanup);
     clearInterval(heartbeat);
+    clearInterval(matchmaking);
     for (const room of rooms.values()) {
       clearTimeout(room.pauseTimer);
       persistRoom(room);

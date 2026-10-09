@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { WebSocket } from 'ws';
 import { mkdir, mkdtemp, writeFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
@@ -8,6 +8,7 @@ import { createOnlineServer, type OnlineServerOptions } from './app';
 import { createAdminPasswordHash } from './admin';
 import { createGame, makeMove, serialize } from '../src/game/core';
 import { AuthError } from './auth';
+import { StatisticsStore } from './statistics';
 import type { Mailer, MailMessage } from './email';
 import type { ClientCommand, LobbySnapshot, ServerEvent } from '../src/network/protocol';
 
@@ -51,6 +52,7 @@ const apps: ReturnType<typeof createOnlineServer>[] = [];
 const clients: Client[] = [];
 const dirs: string[] = [];
 afterEach(async () => {
+  vi.restoreAllMocks();
   for (const client of clients.splice(0)) client.ws.terminate();
   await Promise.all(apps.splice(0).map((app) => app.close()));
   await Promise.all(dirs.splice(0).map((dir) => rm(dir, { recursive: true, force: true })));
@@ -267,6 +269,95 @@ async function rankedPair(options?: OnlineServerOptions) {
     );
   return { ...server, a, b, sa, sb, cookies, read };
 }
+
+async function matchmakingPlayers(ratings: number[]) {
+  const directory = await mkdtemp(join(tmpdir(), 'four-matchmaking-'));
+  dirs.push(directory);
+  const statsFile = join(directory, 'statistics.sqlite');
+  const seed = new StatisticsStore(statsFile);
+  ratings.forEach((rating, index) => seed.setRating(`MatchPlayer${index}`, rating));
+  seed.close();
+  const server = await start({ statsFile, matchmakingIntervalMs: 10 });
+  const cookies: string[] = [];
+  const players: Client[] = [];
+  for (let index = 0; index < ratings.length; index++) {
+    const registered = await fetch(`${server.url}/auth/register`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ username: `MatchPlayer${index}`, password: 'matchmaking-test-pass' }),
+    });
+    expect(registered.status).toBe(200);
+    const cookie = registered.headers.get('set-cookie')!.split(';')[0];
+    cookies.push(cookie);
+    players.push(await server.connect(cookie));
+  }
+  return { ...server, players, cookies };
+}
+
+describe('Elo queue integration', () => {
+  it('keeps a distant opponent waiting and immediately offers a newly arrived close player', async () => {
+    const { players } = await matchmakingPlayers([1000, 1500, 1050]);
+    for (const client of players.slice(0, 2)) {
+      client.send({ type: 'quick_find', name: 'ignored' });
+      await client.event('queue');
+    }
+    expect(players[0].events.some((event) => event.type === 'match_found')).toBe(false);
+    players[2].send({ type: 'quick_find', name: 'ignored' });
+    expect(await players[0].event('match_found')).toMatchObject({
+      opponent: 'MatchPlayer2',
+      opponentRating: 1050,
+    });
+    await players[2].event('match_found');
+    expect(players[1].events.some((event) => event.type === 'match_found')).toBe(false);
+  });
+
+  it('finds a widened-range opponent on its timer without further queue messages', async () => {
+    let now = Date.now();
+    vi.spyOn(Date, 'now').mockImplementation(() => now);
+    const { players } = await matchmakingPlayers([1000, 1400]);
+    for (const client of players) {
+      client.send({ type: 'quick_find', name: 'ignored' });
+      await client.event('queue');
+    }
+    expect(players[0].events.some((event) => event.type === 'match_found')).toBe(false);
+    now += 9000;
+    const offer = await players[0].event('match_found');
+    expect(offer).toMatchObject({ opponentRating: 1400, rated: true });
+    expect((await players[1].event('match_found')).matchId).toBe(offer.matchId);
+  });
+
+  it('keeps elapsed search time across a dropped connection and another players decline', async () => {
+    let now = Date.now();
+    vi.spyOn(Date, 'now').mockImplementation(() => now);
+    const { players, connect, cookies } = await matchmakingPlayers([1000, 1400, 1800]);
+    const search = { type: 'quick_find', name: 'ignored', searchId: 'd'.repeat(32) } as const;
+    players[0].send(search);
+    await players[0].event('queue');
+    players[1].send({ type: 'quick_find', name: 'ignored' });
+    await players[1].event('queue');
+    players[2].send({ type: 'quick_find', name: 'ignored' });
+    await players[2].event('queue');
+    now += 8500;
+    players[0].ws.terminate();
+    await new Promise<void>((resolve) => players[0].ws.once('close', resolve));
+    const restored = await connect(cookies[0]);
+    restored.send(search);
+    await restored.event('queue');
+    now += 500;
+    const first = await restored.event('match_found');
+    await players[1].event('match_found');
+    players[1].send({ type: 'quick_decline', matchId: first.matchId });
+    await players[1].event('queue_removed');
+    await restored.event('queue');
+    // Both remaining searches started at the original time, including the reconnected one.
+    expect(restored.events.some((event) => event.type === 'match_found')).toBe(false);
+    now += 12000;
+    const next = await restored.event('match_found');
+    expect(next.opponent).toBe('MatchPlayer2');
+    expect(next.opponentRating).toBe(1800);
+    expect((await players[2].event('match_found')).matchId).toBe(next.matchId);
+  });
+});
 
 describe('resumable quick search', () => {
   it('replaces a suspended search without duplicates and keeps the guest identity', async () => {
