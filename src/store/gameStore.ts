@@ -20,6 +20,7 @@ import { currentPlayerName, secondGuestName, useAccount } from './accountStore';
 import { prepareMatchAlerts, notifyMatchFound, clearMatchAlert } from '../network/matchAlert';
 import { getLevel, levelPosition, levelMoveCount, LEVEL_BOT_OPTIONS } from '../game/levels';
 import { useLevelProgress } from './levelStore';
+import { readSavedGame, writeSavedGame, removeSavedGame } from './savedGame';
 
 export type Phase =
   | 'menu'
@@ -56,6 +57,8 @@ function cancelPending() {
   botController = undefined;
 }
 interface Store {
+  hasSavedGame: boolean;
+  resumeSavedGame: () => void;
   levelId: number | null;
   levelBestBefore: number | null;
   startLevel: (id: number) => void;
@@ -235,6 +238,14 @@ let connectSequence = 0;
 function connectOnline(
   command: Extract<ClientCommand, { type: 'create' | 'join' | 'quick_find' }>,
 ) {
+  if (!navigator.onLine) {
+    useGame.setState({
+      onlineError: 'Для онлайн-игры нужен интернет.',
+      onlineStatus: 'error',
+      quickMatch: null,
+    });
+    return;
+  }
   useGame.setState({
     onlineError: '',
     onlineStatus: 'connecting',
@@ -305,6 +316,50 @@ function saveFinishedMatch() {
 }
 
 export const useGame = create<Store>((set, get) => ({
+  hasSavedGame: Boolean(readSavedGame()),
+  resumeSavedGame: () => {
+    const saved = readSavedGame();
+    if (!saved || saved.accountAtStart !== useAccount.getState().username) return;
+    onlineClient.leave();
+    cancelPending();
+    const {
+      mode,
+      difficulty,
+      names,
+      elapsed,
+      recordId,
+      accountAtStart,
+      levelId,
+      levelBestBefore,
+      xray,
+      layers,
+      cameraView,
+    } = saved;
+    set({
+      mode,
+      difficulty,
+      names,
+      elapsed,
+      recordId,
+      accountAtStart,
+      levelId,
+      levelBestBefore,
+      xray,
+      layers,
+      cameraView,
+      game: saved.restored,
+      phase: 'paused',
+      online: null,
+      onlineStatus: 'idle',
+      onlineError: '',
+      quickMatch: null,
+      archiveId: null,
+      message: '',
+      cameraReset: get().cameraReset + 1,
+      matchId: get().matchId + 1,
+    });
+    get().settle();
+  },
   levelId: null,
   levelBestBefore: null,
   startLevel: (id) => {
@@ -393,6 +448,7 @@ export const useGame = create<Store>((set, get) => ({
     set({ quickMatch: null, onlineStatus: 'idle', onlineError: '' });
   },
   restoreOnline: () => {
+    if (!navigator.onLine) return;
     if (get().mode === 'online' || get().onlineStatus === 'connecting') return;
     if (onlineClient.restore(onlineHandlers)) {
       if (onlineClient.isSearching)
@@ -631,4 +687,59 @@ export const useGame = create<Store>((set, get) => ({
 
 export function displayedGame(state: Store): GameState {
   return state.phase === 'replay' ? replay(state.game.history, state.replayIndex) : state.game;
+}
+
+function persistActiveGame() {
+  const state = useGame.getState();
+  if (state.mode === 'online' || state.archiveId) return;
+  if (state.game.status !== 'playing') removeSavedGame(state.recordId);
+  else if (['playing', 'animating', 'ai-thinking', 'paused'].includes(state.phase)) {
+    const {
+      mode,
+      game,
+      difficulty,
+      names,
+      elapsed,
+      recordId,
+      accountAtStart,
+      levelId,
+      levelBestBefore,
+      xray,
+      layers,
+      cameraView,
+    } = state;
+    writeSavedGame({
+      mode,
+      game,
+      difficulty,
+      names,
+      elapsed,
+      recordId,
+      accountAtStart,
+      levelId,
+      levelBestBefore,
+      xray,
+      layers,
+      cameraView,
+    });
+  }
+  const exists = Boolean(readSavedGame());
+  if (state.hasSavedGame !== exists) useGame.setState({ hasSavedGame: exists });
+}
+useGame.subscribe((state, previous) => {
+  if (
+    state.game !== previous.game ||
+    state.phase !== previous.phase ||
+    state.layers !== previous.layers ||
+    state.xray !== previous.xray ||
+    state.cameraView !== previous.cameraView ||
+    Math.floor(state.elapsed / 5) !== Math.floor(previous.elapsed / 5)
+  )
+    persistActiveGame();
+});
+if (typeof window !== 'undefined') {
+  window.addEventListener('pagehide', persistActiveGame);
+  document.addEventListener('visibilitychange', () => {
+    if (document.hidden) persistActiveGame();
+  });
 }

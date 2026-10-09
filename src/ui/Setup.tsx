@@ -4,6 +4,7 @@ import { useGame, type Mode } from '../store/gameStore';
 import { secondGuestName, useAccount } from '../store/accountStore';
 import type { Difficulty } from '../game/ai';
 import styles from './UI.module.css';
+import { useOffline } from '../network/offline';
 
 export function Setup({
   onStart,
@@ -14,6 +15,7 @@ export function Setup({
   onQuickStart: (name: string) => void;
   initialMode?: Mode;
 }) {
+  const { online: networkAvailable } = useOffline();
   const [mode, setMode] = useState<Mode>(initialMode);
   const [code, setCode] = useState('');
   const onlineStatus = useGame((state) => state.onlineStatus);
@@ -59,6 +61,7 @@ export function Setup({
         </button>
         <button
           className={mode === 'online' ? styles.selected : ''}
+          disabled={!networkAvailable}
           onClick={() => chooseMode('online')}
         >
           <Globe2 />
@@ -101,14 +104,14 @@ export function Setup({
         <div className={styles.onlineSetup}>
           <button
             className={styles.secondary}
-            disabled={connecting || !identityReady}
+            disabled={connecting || !identityReady || !networkAvailable}
             onClick={() => onQuickStart(playerName)}
           >
             Рейтинговая игра — найти соперника
           </button>
           <button
             className={styles.primary}
-            disabled={connecting || !identityReady}
+            disabled={connecting || !identityReady || !networkAvailable}
             onClick={() => useGame.getState().createOnline(playerName)}
           >
             {connecting ? 'Подключаемся…' : 'Создать лобби'}
@@ -131,7 +134,7 @@ export function Setup({
           </label>
           <button
             className={styles.secondary}
-            disabled={connecting || !identityReady || !/^[A-Z]{5}$/.test(code)}
+            disabled={connecting || !identityReady || !networkAvailable || !/^[A-Z]{5}$/.test(code)}
             onClick={() => useGame.getState().joinOnline(code, playerName)}
           >
             Войти в лобби

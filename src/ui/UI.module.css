@@ -2386,6 +2386,40 @@
 .leaderboardButton > svg:last-child {
   margin-left: auto;
 }
+.offlineStatus {
+  min-height: 14px;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 5px 10px;
+  font-size: 10px;
+  line-height: 1.4;
+  color: var(--muted);
+}
+.offlineStatus button {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--accent);
+  font-size: inherit;
+}
+.resumeAlternate {
+  display: flex;
+  width: 100%;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 0 0;
+  border: 0;
+  background: none;
+  color: var(--accent);
+  font-size: 11px;
+}
+.hero button:disabled {
+  opacity: 0.45;
+  cursor: default;
+  transform: none;
+}
 /* Let Safari detect the actual header at the viewport edge. Keep its controls
    below the notch while its opaque background extends through the safe area. */
 :global(html[data-ios-standalone]) .app {

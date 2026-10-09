@@ -1,6 +1,15 @@
 import { create } from 'zustand';
 
 const STORAGE_KEY = 'four-cubed-guest-name';
+const OFFLINE_ACCOUNT_KEY = 'four-cubed-offline-account-v1';
+function cachedUsername(): string | null {
+  try {
+    const name: unknown = JSON.parse(localStorage.getItem(OFFLINE_ACCOUNT_KEY) ?? 'null');
+    return typeof name === 'string' && /^[a-zA-Z0-9_]{3,24}$/.test(name) ? name : null;
+  } catch {
+    return null;
+  }
+}
 function newGuestName() {
   const number =
     typeof crypto !== 'undefined' && 'getRandomValues' in crypto
@@ -53,7 +62,8 @@ function saveGuestName(name: string) {
 }
 
 export const useAccount = create<AccountState>((set) => ({
-  username: null,
+  // A local identity hint for offline progress, never a credential or authorization.
+  username: cachedUsername(),
   guestName: storedGuestName(),
   email: null,
   emailVerified: false,
@@ -65,8 +75,8 @@ export const useAccount = create<AccountState>((set) => ({
   load: () => {
     if (!initialLoad)
       initialLoad = (async () => {
-        let loaded = false;
         try {
+          if (!navigator.onLine) return;
           const response = await fetch('/auth/me', {
             credentials: 'same-origin',
             signal: AbortSignal.timeout(5000),
@@ -87,14 +97,14 @@ export const useAccount = create<AccountState>((set) => ({
             createdAt: data.createdAt ?? null,
             ...(data.guestName ? { guestName: data.guestName } : {}),
           });
-          loaded = true;
         } catch {
           // Offline local play remains available as a guest.
         } finally {
           set({ identityReady: true });
-          if (!loaded) initialLoad = null;
         }
-      })();
+      })().finally(() => {
+        initialLoad = null;
+      });
     return initialLoad;
   },
   register: async (username, email, password) => {
@@ -192,13 +202,12 @@ export const useAccount = create<AccountState>((set) => ({
         emailVerified?: boolean;
         createdAt?: number | null;
       };
-      if (data.username)
-        set({
-          username: data.username,
-          email: data.email ?? null,
-          emailVerified: Boolean(data.emailVerified),
-          createdAt: data.createdAt ?? null,
-        });
+      set({
+        username: data.username,
+        email: data.email ?? null,
+        emailVerified: Boolean(data.emailVerified),
+        createdAt: data.createdAt ?? null,
+      });
     } catch {
       /* The cached profile remains usable while temporarily offline. */
     }
@@ -271,6 +280,7 @@ async function submitLogin(
 }
 
 function post(path: string, body: object) {
+  if (!navigator.onLine) return Promise.reject(new Error('Подключитесь к интернету.'));
   return fetch(path, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -278,6 +288,16 @@ function post(path: string, body: object) {
     body: JSON.stringify(body),
   });
 }
+
+useAccount.subscribe((state, previous) => {
+  if (state.username === previous.username) return;
+  try {
+    if (state.username) localStorage.setItem(OFFLINE_ACCOUNT_KEY, JSON.stringify(state.username));
+    else localStorage.removeItem(OFFLINE_ACCOUNT_KEY);
+  } catch {
+    /* Only a non-sensitive username is retained for offline play. */
+  }
+});
 
 export function currentPlayerName() {
   const { username, guestName } = useAccount.getState();

@@ -16,6 +16,7 @@ const channel =
 
 export default defineConfig({
   testDir: './e2e',
+  testIgnore: '**/offline.spec.ts',
   timeout: 45_000,
   expect: { timeout: 10_000 },
   fullyParallel: false,

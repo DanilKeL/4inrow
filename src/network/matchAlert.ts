@@ -1,5 +1,6 @@
 import { playSound, unlockAudio } from '../audio/sound';
 import { useSettings } from '../store/settingsStore';
+import { registerGameWorker } from './offline';
 
 let worker: Promise<ServiceWorkerRegistration | undefined> | undefined;
 let current: string | null = null;
@@ -43,9 +44,7 @@ function prepareWorker() {
       try {
         // Bound activation as well as registration; never wait forever on a failed worker.
         return await Promise.race([
-          navigator.serviceWorker
-            .register('/match-notifications.js')
-            .then(() => navigator.serviceWorker.ready),
+          registerGameWorker().then(() => navigator.serviceWorker.ready),
           new Promise<never>((_, reject) => {
             timer = setTimeout(() => reject(new Error('Notification worker timed out')), 10000);
           }),

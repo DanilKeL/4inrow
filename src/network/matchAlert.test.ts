@@ -88,6 +88,9 @@ it('honors mute for the system notification and asks only when permission is und
 function serviceWorker() {
   const registration = {
     active: null,
+    installing: null,
+    waiting: null,
+    addEventListener: vi.fn(),
     showNotification: vi.fn(async () => {}),
     getNotifications: vi.fn(async () => []),
   };

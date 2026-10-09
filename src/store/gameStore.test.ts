@@ -7,6 +7,8 @@ import { getLevel, levelPosition, levelMoveCount, LEVEL_BOT_OPTIONS } from '../g
 import solutions from '../game/levels/solutions.json';
 import { useLevelProgress } from './levelStore';
 import { useMatchHistory } from './matchHistory';
+import { readSavedGame } from './savedGame';
+import { useAccount } from './accountStore';
 
 const mocked = vi.hoisted(() => ({
   bot: vi.fn(),
@@ -370,5 +372,28 @@ describe('clock and replay', () => {
     expect(() => displayedGame(state())).not.toThrow();
     state().seek(Infinity);
     expect(() => displayedGame(state())).not.toThrow();
+  });
+  it('resumes an interrupted bot turn exactly once, discarding its old calculation', async () => {
+    useAccount.setState({ username: null });
+    const old = pendingBot();
+    await beginBotTurn();
+    expect(readSavedGame()?.restored.currentPlayer).toBe(2);
+    state().menu();
+    state().resumeSavedGame();
+    expect(state().phase).toBe('ai-thinking');
+    old.resolve({ x: 4, y: 4 });
+    await vi.advanceTimersByTimeAsync(1000);
+    expect(state().game.history).toHaveLength(2);
+    expect(state().game.history[1]).toMatchObject({ x: 0, y: 0 });
+  });
+  it('does not resume a save owned by another account', () => {
+    useAccount.setState({ username: 'Alice' });
+    state().start('local');
+    state().place(2, 2);
+    state().menu();
+    useAccount.setState({ username: 'Bob' });
+    state().resumeSavedGame();
+    expect(state().phase).toBe('menu');
+    useAccount.setState({ username: null });
   });
 });

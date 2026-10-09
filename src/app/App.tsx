@@ -28,6 +28,7 @@ import {
   X,
   UserRound,
   Puzzle,
+  Play,
   Trophy,
 } from 'lucide-react';
 import { MotionConfig, useReducedMotion } from 'motion/react';
@@ -53,6 +54,7 @@ import { TurnTimer } from '../ui/TurnTimer';
 import { RankedResult } from '../ui/RankedResult';
 import { Leaderboard } from '../ui/Leaderboard';
 import { useLevelProgress } from '../store/levelStore';
+import { useMatchHistory } from '../store/matchHistory';
 import { getLevel, levelMoveCount, moveLabel } from '../game/levels';
 import {
   preloadTutorialMedia,
@@ -60,6 +62,8 @@ import {
   tutorialMediaSnapshot,
 } from '../network/tutorialMedia';
 import styles from '../ui/UI.module.css';
+import { useOffline, applyOfflineUpdate, retryOffline } from '../network/offline';
+import { readSavedGame } from '../store/savedGame';
 
 const GameScene = lazy(() => import('../scene/GameScene'));
 type Overlay =
@@ -112,12 +116,23 @@ function demoGame(): GameState {
 
 export default function App() {
   const state = useGame();
+  const offline = useOffline();
+  const username = useAccount((account) => account.username);
+  const saved = state.hasSavedGame ? readSavedGame() : null;
+  const canContinue = saved && saved.accountAtStart === username;
   useEffect(() => {
     const sync = () => {
-      void useLevelProgress.getState().refresh();
+      if (!navigator.onLine) return;
+      void useAccount
+        .getState()
+        .load()
+        .then(() => {
+          void useLevelProgress.getState().refresh();
+          void useMatchHistory.getState().refresh();
+        });
     };
     const retry = () => {
-      if (useLevelProgress.getState().dirty) sync();
+      if (useLevelProgress.getState().dirty || useMatchHistory.getState().pending.length) sync();
     };
     window.addEventListener('online', sync);
     window.addEventListener('focus', sync);
@@ -336,10 +351,17 @@ export default function App() {
               </p>
               <button
                 className={styles.primary + ' ' + styles.playButton}
-                onClick={() => beginQuick()}
+                disabled={!offline.online && !canContinue}
+                onClick={() => (canContinue ? state.resumeSavedGame() : beginQuick())}
               >
-                <Search size={19} /> Рейтинговая игра <ArrowRight size={19} />
+                {canContinue ? <Play size={19} /> : <Search size={19} />}
+                {canContinue ? 'Продолжить партию' : 'Рейтинговая игра'} <ArrowRight size={19} />
               </button>
+              {canContinue && offline.online && (
+                <button className={styles.resumeAlternate} onClick={() => beginQuick()}>
+                  <Search size={15} /> Рейтинговая игра <ArrowRight size={15} />
+                </button>
+              )}
               <div className={styles.quickModes}>
                 <button onClick={openLevels}>
                   <Puzzle size={19} />
@@ -356,7 +378,11 @@ export default function App() {
                   <span>Вдвоём</span>
                   <ArrowRight size={16} />
                 </button>
-                <button onClick={() => openSetup('online')}>
+                <button
+                  onClick={() => openSetup('online')}
+                  disabled={!offline.online}
+                  title={!offline.online ? 'Нужен интернет' : undefined}
+                >
                   <Globe2 size={19} />
                   <span>Онлайн</span>
                   <ArrowRight size={16} />
@@ -364,12 +390,32 @@ export default function App() {
               </div>
               <button
                 className={styles.leaderboardButton}
+                disabled={!offline.online}
                 onClick={() => setOverlay('leaderboard')}
               >
                 <Trophy size={18} />
                 <span>Рейтинг игроков</span>
                 <ArrowRight size={16} />
               </button>
+              <div className={styles.offlineStatus} role="status" data-testid="offline-status">
+                {!offline.online
+                  ? offline.ready
+                    ? 'Без интернета · боты и уровни доступны'
+                    : 'Без интернета'
+                  : offline.error && !offline.ready
+                    ? 'Не удалось сохранить игру для офлайна'
+                    : offline.saving && !offline.ready
+                      ? `Сохраняем для офлайна${offline.total ? ` · ${Math.round((offline.loaded / offline.total) * 100)}%` : '…'}`
+                      : offline.ready
+                        ? 'Доступно без интернета'
+                        : null}
+                {offline.online && offline.error && !offline.ready && (
+                  <button onClick={retryOffline}>Повторить</button>
+                )}
+                {offline.online && offline.update && (
+                  <button onClick={applyOfflineUpdate}>Обновить игру</button>
+                )}
+              </div>
             </section>
           ) : (
             <GamePanel onMenu={requestMenu} onLevels={openLevels} />
@@ -629,7 +675,14 @@ export default function App() {
         )}
         {overlay === 'account' && (
           <Dialog title="Личный кабинет" onClose={closeOverlay} wide>
-            <Account onOpenHistory={() => setOverlay('history')} />
+            {offline.online ? (
+              <Account onOpenHistory={() => setOverlay('history')} />
+            ) : (
+              <p className={styles.muted}>
+                {username ? `Офлайн-профиль: ${username}. ` : ''}Для входа, просмотра статистики и
+                изменения аккаунта нужен интернет. Результаты уровней сохраняются на устройстве.
+              </p>
+            )}
           </Dialog>
         )}
         {overlay === 'quick' && (
@@ -733,7 +786,11 @@ export default function App() {
             title={overlay === 'leave' ? 'Завершить текущую партию?' : 'Начать партию заново?'}
             onClose={closeOverlay}
           >
-            <p className={styles.muted}>Текущие ходы будут потеряны.</p>
+            <p className={styles.muted}>
+              {overlay === 'leave'
+                ? 'Партия сохранится. Продолжить её можно из главного меню.'
+                : 'Текущие ходы будут потеряны.'}
+            </p>
             <div className={styles.dialogActions}>
               <button
                 className={styles.primary}

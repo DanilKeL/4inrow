@@ -3,6 +3,7 @@ import { createRoot } from 'react-dom/client';
 import App from './app/App';
 import './styles/global.css';
 import { initializeAnalytics } from './network/analytics';
+import { initializeOffline } from './network/offline';
 
 const AdminApp = lazy(() => import('./admin/AdminApp'));
 // Home-screen Safari can omit version tokens and use navigator.standalone.
@@ -20,7 +21,10 @@ function updateStandalone() {
 }
 updateStandalone();
 standalone.addEventListener('change', updateStandalone);
-if (!window.location.pathname.startsWith('/admin')) initializeAnalytics();
+if (!window.location.pathname.startsWith('/admin')) {
+  initializeOffline();
+  initializeAnalytics();
+}
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>

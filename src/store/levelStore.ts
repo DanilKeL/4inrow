@@ -64,7 +64,7 @@ export const useLevelProgress = create<LevelProgress>()(
       },
       refresh: () => {
         const owner = useAccount.getState().username;
-        if (!owner) return Promise.resolve();
+        if (!owner || !navigator.onLine) return Promise.resolve();
         if (task) return task;
         const version = generation;
         set({ loading: true, error: '' });

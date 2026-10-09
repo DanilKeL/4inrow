@@ -49,7 +49,7 @@ describe('server statistics client', () => {
     useMatchHistory.getState().save(entry);
     expect(fetch).not.toHaveBeenCalled();
   });
-  it('keeps failed submissions in memory for explicit retry without local history storage', async () => {
+  it('persists failed submissions for retry after browser closure', async () => {
     useAccount.setState({ username: 'Alice' });
     const fetch = vi
       .fn()
@@ -60,10 +60,16 @@ describe('server statistics client', () => {
     await useMatchHistory.getState().refresh();
     expect(useMatchHistory.getState().pending).toHaveLength(1);
     expect(useMatchHistory.getState().error).toContain('ещё не сохранена');
+    expect(JSON.parse(localStorage.getItem('four-cubed-match-outbox-v1')!)).toHaveLength(1);
+    useAccount.setState({ username: 'Bob' });
+    expect(useMatchHistory.getState().pending).toHaveLength(0);
+    useAccount.setState({ username: 'Alice' });
+    expect(useMatchHistory.getState().pending).toHaveLength(1);
     await useMatchHistory.getState().refresh();
     expect(useMatchHistory.getState().pending).toHaveLength(0);
     expect(useMatchHistory.getState().statistics.wins).toBe(1);
     expect(localStorage.getItem('four-cubed-match-history-v1')).toBeNull();
+    expect(JSON.parse(localStorage.getItem('four-cubed-match-outbox-v1')!)).toEqual([]);
   });
   it('only reads online results; the browser never submits them', async () => {
     useAccount.setState({ username: 'Alice' });

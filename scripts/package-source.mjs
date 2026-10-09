@@ -8,9 +8,9 @@ import { fileURLToPath } from 'node:url';
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const output = resolve(process.argv[2] ?? join(root, 'artifacts/source'));
 const project = 'four-in-a-row';
-const roots = ['assets', 'e2e', 'public', 'references', 'scripts', 'server', 'src'];
+const roots = ['assets', 'deploy', 'e2e', 'public', 'references', 'scripts', 'server', 'src'];
 const files = ['.gitignore', '.prettierrc.json', 'eslint.config.js',
-  'index.html', 'package-lock.json', 'package.json', 'playwright.config.ts', 'README.md',
+  'index.html', 'package-lock.json', 'package.json', 'playwright.config.ts', 'playwright.offline.config.ts', 'README.md',
   'THIRD_PARTY_NOTICES.md', 'tsconfig.json', 'vite.config.ts'];
 const blockedDirectories = new Set(['build', 'node_modules', '.idea', '.cache']);
 const entries = [];
