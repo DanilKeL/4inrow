@@ -678,8 +678,12 @@ export const useGame = create<Store>((set, get) => ({
   menu: () => {
     onlineClient.leave();
     cancelPending();
+    const current = get();
+    if (current.phase !== 'menu' && current.mode !== 'online' && !current.archiveId)
+      removeSavedGame(current.recordId);
     set({
       phase: 'menu',
+      hasSavedGame: Boolean(readSavedGame()),
       mode: 'local',
       levelId: null,
       dailyChallenge: null,

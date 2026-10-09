@@ -180,6 +180,46 @@ test('declining the resume banner clears its save and keeps the ranked menu butt
   await expect(page.getByRole('dialog', { name: 'Новая игра' })).toBeVisible();
 });
 
+test('returning to the menu never offers to resume an explicitly abandoned game', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto('/');
+  await ready(page);
+  const banner = page.getByRole('dialog', { name: 'Продолжить партию?' });
+  for (const interrupted of [false, true]) {
+    await page.getByRole('button', { name: 'Вдвоём', exact: true }).click();
+    await page.getByRole('button', { name: 'Начать игру', exact: true }).click();
+    if (!interrupted) await page.getByRole('button', { name: 'Начать', exact: true }).click();
+    const board = (await page.locator('canvas').boundingBox())!;
+    await page.mouse.click(board.x + board.width / 2, board.y + board.height / 2);
+    await expect(page.getByTestId('move-count')).toHaveText('1 / 125');
+    if (interrupted) {
+      await page.reload();
+      await expect(banner).toBeVisible();
+      await banner.getByRole('button', { name: 'Продолжить', exact: true }).click();
+      await expect(page.getByTestId('move-count')).toHaveText('1 / 125');
+    }
+    await page.getByRole('button', { name: 'FOUR³ — главное меню', exact: true }).click();
+    const leave = page.getByRole('dialog', { name: 'Завершить текущую партию?' });
+    await expect(leave).toBeVisible();
+    // Cancelling the exit must preserve the game and its recovery save.
+    await leave.getByRole('button', { name: 'Остаться в игре', exact: true }).click();
+    await expect(page.getByTestId('move-count')).toHaveText('1 / 125');
+    expect(
+      await page.evaluate(() => localStorage.getItem('four-cubed-active-game-v1')),
+    ).not.toBeNull();
+    await page.getByRole('button', { name: 'FOUR³ — главное меню', exact: true }).click();
+    await leave.getByRole('button', { name: 'Выйти в меню', exact: true }).click();
+    await expect(page.getByRole('region', { name: 'Режимы игры' })).toBeVisible();
+    await expect(banner).toBeHidden();
+    expect(await page.evaluate(() => localStorage.getItem('four-cubed-active-game-v1'))).toBeNull();
+    await page.reload();
+    await expect(page.getByTestId('loading-screen')).toBeHidden();
+    await expect(banner).toBeHidden();
+  }
+});
+
 test('offline account level win survives reload and syncs to its account', async ({
   page,
   context,

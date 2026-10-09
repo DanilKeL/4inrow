@@ -98,7 +98,7 @@ describe('input and animation coordination', () => {
       DAILY_BOT_OPTIONS,
     );
     const played = state().game;
-    state().menu();
+    useGame.setState({ phase: 'menu' });
     state().resumeSavedGame();
     expect(state().mode).toBe('daily');
     expect(state().dailyChallenge).toEqual(challenge);
@@ -416,7 +416,7 @@ describe('clock and replay', () => {
     const old = pendingBot();
     await beginBotTurn();
     expect(readSavedGame()?.restored.currentPlayer).toBe(2);
-    state().menu();
+    useGame.setState({ phase: 'menu' });
     state().resumeSavedGame();
     expect(state().phase).toBe('ai-thinking');
     old.resolve({ x: 4, y: 4 });
@@ -428,7 +428,7 @@ describe('clock and replay', () => {
     useAccount.setState({ username: 'Alice' });
     state().start('local');
     state().place(2, 2);
-    state().menu();
+    useGame.setState({ phase: 'menu' });
     useAccount.setState({ username: 'Bob' });
     state().resumeSavedGame();
     expect(state().phase).toBe('menu');
@@ -439,7 +439,7 @@ describe('clock and replay', () => {
     state().start('local');
     state().place(2, 2);
     const id = state().recordId;
-    state().menu();
+    useGame.setState({ phase: 'menu' });
     state().discardSavedGame(id);
     expect(readSavedGame()).toBeNull();
     expect(state().hasSavedGame).toBe(false);
@@ -454,12 +454,33 @@ describe('clock and replay', () => {
     const id = state().recordId;
     state().discardSavedGame(id);
     expect(readSavedGame()?.recordId).toBe(id);
-    state().menu();
+    useGame.setState({ phase: 'menu' });
     state().discardSavedGame('older-record');
     expect(readSavedGame()?.recordId).toBe(id);
     useAccount.setState({ username: 'Bob' });
     state().discardSavedGame(id);
     expect(readSavedGame()?.recordId).toBe(id);
     useAccount.setState({ username: null });
+  });
+  it('clears an explicitly abandoned game and does not recreate it when closing the menu', () => {
+    useAccount.setState({ username: null });
+    state().start('local');
+    state().place(2, 2);
+    expect(readSavedGame()?.restored.history).toHaveLength(1);
+    state().pause();
+    state().menu();
+    expect(readSavedGame()).toBeNull();
+    expect(state().hasSavedGame).toBe(false);
+    window.dispatchEvent(new Event('pagehide'));
+    expect(readSavedGame()).toBeNull();
+  });
+  it('preserves an interrupted game when opening levels from the initial menu', () => {
+    useAccount.setState({ username: null });
+    state().startLevel(9);
+    const id = state().recordId;
+    useGame.setState({ phase: 'menu' });
+    state().menu();
+    expect(readSavedGame()?.recordId).toBe(id);
+    expect(state().hasSavedGame).toBe(true);
   });
 });

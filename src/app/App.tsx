@@ -125,7 +125,9 @@ export default function App() {
   const username = useAccount((account) => account.username);
   const identityReady = useAccount((account) => account.identityReady);
   const saved = state.hasSavedGame ? readSavedGame() : null;
-  const canContinue = saved && saved.accountAtStart === username;
+  const [resumeRecordId, setResumeRecordId] = useState(() => readSavedGame()?.recordId ?? null);
+  const canContinue =
+    saved && saved.recordId === resumeRecordId && saved.accountAtStart === username;
   useEffect(() => {
     const sync = () => {
       if (!navigator.onLine) return;
@@ -212,6 +214,7 @@ export default function App() {
   const savedRecordId = saved?.recordId;
   const discardSaved = useCallback(() => {
     if (savedRecordId) useGame.getState().discardSavedGame(savedRecordId);
+    setResumeRecordId(null);
   }, [savedRecordId]);
   const demo = useMemo(demoGame, []);
   const shown = useMemo(() => (isMenu ? demo : displayedGame(state)), [isMenu, demo, state]);
@@ -649,7 +652,13 @@ export default function App() {
         {showResumeBanner && (
           <Dialog title="Продолжить партию?" onClose={discardSaved}>
             <div className={styles.dialogActions}>
-              <button className={styles.primary} onClick={state.resumeSavedGame}>
+              <button
+                className={styles.primary}
+                onClick={() => {
+                  setResumeRecordId(null);
+                  state.resumeSavedGame();
+                }}
+              >
                 <Play size={18} /> Продолжить
               </button>
               <button className={styles.secondary} onClick={discardSaved}>
@@ -823,11 +832,7 @@ export default function App() {
             title={overlay === 'leave' ? 'Завершить текущую партию?' : 'Начать партию заново?'}
             onClose={closeOverlay}
           >
-            <p className={styles.muted}>
-              {overlay === 'leave'
-                ? 'Партия сохранится. Продолжить её можно из главного меню.'
-                : 'Текущие ходы будут потеряны.'}
-            </p>
+            {overlay === 'restart' && <p className={styles.muted}>Текущие ходы будут потеряны.</p>}
             <div className={styles.dialogActions}>
               <button
                 className={styles.primary}
