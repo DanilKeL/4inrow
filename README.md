@@ -28,6 +28,18 @@ Preview открывается на **http://localhost:4173/** и поддерж
 
 Шаблоны: `deploy/four-game.service`, `deploy/nginx-domain-http.conf`, `deploy/nginx-domain.conf`. Скрипт `scripts/provision-server.sh` предназначен для первичной установки на Ubuntu с установленными Node.js 24, Nginx и Certbot; ожидает архив `/root/four-migration-release.tgz` и закрытые файлы `/root/four-migration-admin.env`, `/root/four-migration-mail.env`. Перед изменениями сохраняет конфигурацию в `/srv/four-game-backups`.
 
+### Почасовые бэкапы базы на Яндекс Диск
+
+Установка на сервере: `sudo sh /srv/four-game/scripts/install-yandex-backup.sh`. Подключение: `sudo python3 /usr/local/lib/four-game/setup-yandex-backup.py`; вводятся логин Яндекса и отдельный пароль приложения **«Файлы WebDAV»**. Пароль вводится скрыто, не передаётся в аргументах команд и не хранится в репозитории. Конфигурация находится в `/etc/four-game/yandex-rclone.conf` с правами `root:root 0600`, служба получает её через systemd `LoadCredential`.
+
+После первой успешной загрузки включается `four-game-backup.timer`: запуск каждый час, в начале часа по времени сервера. `Persistent=true` запускает пропущенную проверку после перезагрузки. В папке **`4inrow-backups/database`** на Диске хранятся последние **24** архива; в первые сутки копии постепенно накапливаются. При недоступности Диска предыдущие облачные копии сохраняются, а ошибка записывается в журнал; следующая попытка выполняется в следующий час. Пропущенные снимки задним числом не создаются.
+
+Архив содержит `accounts.json`, согласованный снимок `statistics.sqlite` и `manifest.json` с SHA-256. Копирование SQLite выполняется через online backup API с учётом WAL без остановки игры, целостность снимка и архива проверяется до загрузки. Если аккаунты изменились за время копирования, снимок повторяется. Загруженный архив считывается с Диска и сравнивается по SHA-256; только затем удаляются старые собственные архивы по точному шаблону имени. Сторонние файлы в папке не удаляются. На сервере дополнительно сохраняются последние 24 локальных архива в `/var/lib/four-game-backup/archives`, права каталога `0700`.
+
+Проверка: `systemctl list-timers four-game-backup.timer`, `journalctl -u four-game-backup.service -n 30 --no-pager`, `sudo cat /var/lib/four-game-backup/status.json`. Ручной запуск: `sudo systemctl start four-game-backup.service`. Проверка локального снимка без Диска: `sudo -u fourgame python3 /usr/local/lib/four-game/backup-database.py --snapshot-only`. Тесты: `python3 -m unittest discover -s scripts -p test_backup_database.py -v`.
+
+Для восстановления скачайте нужный архив, проверьте SHA-256 файлов по `manifest.json` и `PRAGMA integrity_check` у SQLite. Остановите `four-game`, сохраните текущую папку данных отдельно, замените **оба** файла в `/srv/four-game-data`, удалите старые `statistics.sqlite-wal` и `statistics.sqlite-shm`, установите владельца `fourgame:fourgame` и права `0600`, затем запустите службу и проверьте `/health`. Исходники, SMTP и административные настройки в эти архивы не входят.
+
 ## Уровни
 
 Отдельный одиночный режим **«Уровни»** содержит 40 подготовленных позиций в пяти группах. Все уровни доступны сразу. Вы играете первыми из уже заполненной позиции; задача — победить бота. Можно повторить уровень или после победы перейти к следующему.

@@ -17,3 +17,4 @@ four-game.tar.gz
 !.env.example
 *.pem
 *.key
+__pycache__/

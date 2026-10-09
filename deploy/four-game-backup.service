@@ -1,0 +1,24 @@
+[Unit]
+Description=Verified FOUR database backup to Yandex Disk
+Wants=network-online.target
+After=network-online.target
+ConditionPathExists=/etc/four-game/yandex-rclone.conf
+
+[Service]
+Type=oneshot
+User=fourgame
+Group=fourgame
+LoadCredential=yandex-rclone.conf:/etc/four-game/yandex-rclone.conf
+ExecStart=/usr/bin/python3 /usr/local/lib/four-game/backup-database.py
+StateDirectory=four-game-backup
+StateDirectoryMode=0700
+UMask=0077
+TimeoutStartSec=15min
+Nice=10
+IOSchedulingClass=idle
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadOnlyPaths=/srv/four-game-data
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6

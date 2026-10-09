@@ -1,0 +1,11 @@
+[Unit]
+Description=Hourly FOUR database backups (24 copies on Yandex Disk)
+
+[Timer]
+OnCalendar=*-*-* *:00:00
+Persistent=true
+AccuracySec=1min
+Unit=four-game-backup.service
+
+[Install]
+WantedBy=timers.target
