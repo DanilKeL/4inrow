@@ -19,7 +19,7 @@ enum Player {
 
 enum GameStatus { playing, won, draw }
 
-enum GameMode { local, ai, online, level }
+enum GameMode { local, ai, online, level, daily }
 
 enum GamePhase {
   menu,

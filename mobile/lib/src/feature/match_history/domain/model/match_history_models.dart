@@ -111,3 +111,74 @@ final class MatchHistorySnapshot extends Equatable {
   @override
   List<Object> get props => [username, matches, statistics, rating];
 }
+
+final class PendingMatch extends Equatable {
+  const new({
+    required this.owner,
+    required this.id,
+    required this.names,
+    required this.mode,
+    required this.elapsed,
+    required this.game,
+  });
+
+  factory fromJson(Map<String, dynamic> json) {
+    final String owner = json['owner']?.toString() ?? '';
+    final String id = json['id']?.toString() ?? '';
+    final String mode = json['mode']?.toString() ?? '';
+    final List<String> names = (json['names'] as List? ?? const <Object>[])
+        .map((value) => value.toString())
+        .toList(growable: false);
+    final GameSnapshot game = GameEngine.deserialize(
+      json['game']?.toString() ?? '',
+    );
+    final int elapsed = (json['elapsed'] as num?)?.toInt() ?? -1;
+    if (!RegExp(r'^[a-zA-Z0-9_]{3,24}$').hasMatch(owner) ||
+        id.isEmpty ||
+        id.length > 160 ||
+        !<String>{'local', 'ai'}.contains(mode) ||
+        names.length != 2 ||
+        names.any((name) => name.length > 100) ||
+        elapsed < 0 ||
+        elapsed > 365 * 86400 ||
+        game.status == GameStatus.playing) {
+      throw const FormatException('Invalid pending match');
+    }
+    return PendingMatch(
+      owner: owner,
+      id: id,
+      names: names,
+      mode: mode,
+      elapsed: elapsed,
+      game: game,
+    );
+  }
+
+  final String owner;
+  final String id;
+  final List<String> names;
+  final String mode;
+  final int elapsed;
+  final GameSnapshot game;
+
+  Map<String, Object> toJson() => <String, Object>{
+    'owner': owner,
+    'id': id,
+    'names': names,
+    'mode': mode,
+    'elapsed': elapsed,
+    'game': GameEngine.serialize(game),
+  };
+
+  Map<String, Object> toRequest() => <String, Object>{
+    'owner': owner,
+    'id': id,
+    'names': names,
+    'mode': mode,
+    'elapsed': elapsed,
+    'game': GameEngine.serialize(game),
+  };
+
+  @override
+  List<Object> get props => <Object>[owner, id, names, mode, elapsed, game];
+}

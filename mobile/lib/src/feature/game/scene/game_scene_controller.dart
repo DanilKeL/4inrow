@@ -3,6 +3,7 @@ import 'dart:typed_data';
 
 import 'package:flutter_scene/scene.dart' as fs;
 import 'package:four3/src/feature/game/model/game_models.dart';
+import 'package:four3/src/feature/game/service/game_engine.dart';
 import 'package:vector_math/vector_math.dart' as vm;
 
 final class GameSceneController {
@@ -15,6 +16,8 @@ final class GameSceneController {
   final List<fs.Node> _pickNodes = [];
   _PieceVisual? _ghost;
   int? _ghostColumn;
+  fs.Node? _invalidColumnRoot;
+  ({int x, int y})? _invalidColumn;
   late final fs.MeshGeometry _pieceGeometry;
   GameSnapshot? _snapshot;
   List<int> _layers = const [0, 1, 2, 3, 4];
@@ -24,6 +27,7 @@ final class GameSceneController {
   bool _ready = false;
 
   bool get ready => _ready;
+  ({int x, int y})? get invalidColumn => _invalidColumn;
 
   Future<void> initialize() async {
     await fs.Scene.initializeStaticResources();
@@ -176,6 +180,72 @@ final class GameSceneController {
     if (visual != null) scene.remove(visual.root);
     _ghost = null;
     _ghostColumn = null;
+  }
+
+  void showInvalidColumn(int x, int y) {
+    final GameSnapshot? snapshot = _snapshot;
+    if (snapshot == null ||
+        !GameEngine.coordinate(x) ||
+        !GameEngine.coordinate(y) ||
+        snapshot.heights[y * GameEngine.size + x] < GameEngine.size) {
+      hideInvalidColumn();
+      return;
+    }
+    final ({int x, int y}) column = (x: x, y: y);
+    if (_invalidColumn == column && _invalidColumnRoot != null) return;
+    hideInvalidColumn();
+
+    final vm.Vector4 color = _linearColor(0xDB584B);
+    final fs.PhysicallyBasedMaterial baseMaterial =
+        _pbr(color.clone(), roughness: .36, metallic: .35)
+          ..emissiveFactor = color.clone()
+          ..emissiveStrength = .2;
+    final fs.UnlitMaterial topMaterial = fs.UnlitMaterial()
+      ..baseColorFactor = color.clone();
+    final fs.Node root = fs.Node(name: 'invalid_column_${x}_$y')
+      ..position = vm.Vector3((x - 2) * spacing, 0, (y - 2) * spacing);
+    final fs.Node base =
+        fs.Node(
+            mesh: fs.Mesh(
+              fs.TorusGeometry(
+                radius: .49,
+                tubeRadius: .01,
+                radialSegments: 64,
+                tubularSegments: 8,
+              ),
+              baseMaterial,
+            ),
+          )
+          ..position = vm.Vector3(0, .173, 0)
+          ..castsShadows = false;
+    final int height = snapshot.heights[y * GameEngine.size + x];
+    final fs.Node top =
+        fs.Node(
+            mesh: fs.Mesh(
+              fs.TorusGeometry(
+                radius: .42,
+                tubeRadius: .025,
+                radialSegments: 40,
+                tubularSegments: 8,
+              ),
+              topMaterial,
+            ),
+          )
+          ..position = vm.Vector3(0, .13 + height * step, 0)
+          ..castsShadows = false;
+    root
+      ..add(base)
+      ..add(top);
+    scene.add(root);
+    _invalidColumnRoot = root;
+    _invalidColumn = column;
+  }
+
+  void hideInvalidColumn() {
+    final fs.Node? root = _invalidColumnRoot;
+    if (root != null) scene.remove(root);
+    _invalidColumnRoot = null;
+    _invalidColumn = null;
   }
 
   vm.Vector3 winningTarget() {
@@ -388,7 +458,7 @@ final class GameSceneController {
           (y - 2) * spacing,
         )
         ..scale = vm.Vector3(1, pickHeight, 1);
-      node.raycastable = snapshot.heights[column] < 5;
+      node.raycastable = true;
     }
   }
 
@@ -527,6 +597,8 @@ final class GameSceneController {
 
   void dispose() {
     _ghost = null;
+    _invalidColumnRoot = null;
+    _invalidColumn = null;
     scene.removeAll();
   }
 }

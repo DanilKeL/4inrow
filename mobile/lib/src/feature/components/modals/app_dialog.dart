@@ -4,33 +4,55 @@ import 'package:flutter/material.dart';
 import 'package:four3/src/common/utils/build_context_extension.dart';
 import 'package:four3/src/feature/app_theme/utils/theme_context_extension.dart';
 
+typedef AppDialogBackBuilder = VoidCallback? Function(BuildContext context);
+
 Future<T?> showAppDialog<T>({
   required BuildContext context,
   required String Function(BuildContext context) titleBuilder,
   required WidgetBuilder builder,
   bool wide = false,
+  Listenable? listenable,
+  AppDialogBackBuilder? onBackBuilder,
 }) => showGeneralDialog<T>(
   context: context,
   barrierDismissible: true,
   barrierLabel: MaterialLocalizations.of(context).modalBarrierDismissLabel,
   barrierColor: const Color(0x4D323A33),
-  transitionDuration: const Duration(milliseconds: 150),
-  transitionBuilder: (context, animation, _, child) => FadeTransition(
-    opacity: animation,
-    child: ScaleTransition(
-      scale: Tween<double>(begin: .98, end: 1).animate(animation),
-      child: child,
-    ),
-  ),
-  pageBuilder: (context, _, _) => BackdropFilter(
-    filter: ImageFilter.blur(sigmaX: 9, sigmaY: 9),
-    child: SafeArea(
+  transitionBuilder: (context, animation, _, child) {
+    final Animation<double> curved = CurvedAnimation(
+      parent: animation,
+      curve: Curves.easeOutCubic,
+      reverseCurve: Curves.easeInCubic,
+    );
+    return AnimatedBuilder(
+      animation: curved,
+      child: FadeTransition(
+        opacity: curved,
+        child: ScaleTransition(
+          scale: Tween<double>(begin: .985, end: 1).animate(curved),
+          child: child,
+        ),
+      ),
+      builder: (context, child) => BackdropFilter(
+        filter: ImageFilter.blur(
+          sigmaX: 9 * curved.value,
+          sigmaY: 9 * curved.value,
+        ),
+        child: child,
+      ),
+    );
+  },
+  pageBuilder: (context, _, _) => ListenableBuilder(
+    listenable: listenable ?? const AlwaysStoppedAnimation<double>(1),
+    builder: (context, _) => SafeArea(
       child: LayoutBuilder(
         builder: (context, constraints) {
           final bool shortLandscape =
               constraints.maxWidth >= 651 && constraints.maxHeight <= 550;
           final bool compact = constraints.maxWidth <= 650 || shortLandscape;
           final double inset = compact ? 10 : 24;
+          final VoidCallback? onBack = onBackBuilder?.call(context);
+          final String title = titleBuilder(context);
           return Center(
             child: Container(
               width: double.infinity,
@@ -68,12 +90,36 @@ Future<T?> showAppDialog<T>({
                   children: [
                     Row(
                       children: [
+                        AnimatedSize(
+                          duration: const Duration(milliseconds: 180),
+                          curve: Curves.easeOutCubic,
+                          child: onBack == null
+                              ? const SizedBox.shrink()
+                              : IconButton(
+                                  tooltip: MaterialLocalizations.of(context)
+                                      .backButtonTooltip,
+                                  onPressed: onBack,
+                                  icon: const Icon(
+                                    Icons.arrow_back_rounded,
+                                    size: 20,
+                                  ),
+                                ),
+                        ),
                         Expanded(
-                          child: Text(
-                            titleBuilder(context),
-                            style: context.textStyle.title.copyWith(
-                              fontSize: compact ? 21 : 23,
-                              letterSpacing: -.6,
+                          child: AnimatedSwitcher(
+                            duration: const Duration(milliseconds: 180),
+                            switchInCurve: Curves.easeOutCubic,
+                            switchOutCurve: Curves.easeInCubic,
+                            child: Align(
+                              key: ValueKey<String>(title),
+                              alignment: Alignment.centerLeft,
+                              child: Text(
+                                title,
+                                style: context.textStyle.title.copyWith(
+                                  fontSize: compact ? 21 : 23,
+                                  letterSpacing: -.6,
+                                ),
+                              ),
                             ),
                           ),
                         ),
@@ -101,3 +147,30 @@ Future<T?> showAppDialog<T>({
     ),
   ),
 );
+
+class AppDialogPageTransition extends StatelessWidget {
+  const new({
+    required this.showSecond,
+    required this.firstChild,
+    required this.secondChild,
+    super.key,
+  });
+
+  final bool showSecond;
+  final Widget firstChild;
+  final Widget secondChild;
+
+  @override
+  Widget build(BuildContext context) => AnimatedCrossFade(
+    firstChild: firstChild,
+    secondChild: secondChild,
+    crossFadeState: showSecond
+        ? CrossFadeState.showSecond
+        : CrossFadeState.showFirst,
+    duration: const Duration(milliseconds: 260),
+    reverseDuration: const Duration(milliseconds: 260),
+    firstCurve: Curves.easeInOutCubic,
+    secondCurve: Curves.easeInOutCubic,
+    sizeCurve: Curves.easeInOutCubic,
+  );
+}

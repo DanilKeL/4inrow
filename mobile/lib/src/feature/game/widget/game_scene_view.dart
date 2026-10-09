@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:math' as math;
 import 'dart:ui' show FrameTiming, Size;
 
@@ -5,10 +6,12 @@ import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_scene/scene.dart' as fs;
 import 'package:four3/src/common/utils/build_context_extension.dart';
+import 'package:four3/src/feature/components/progress/app_circular_progress_indicator.dart';
 import 'package:four3/src/feature/game/model/game_models.dart';
 import 'package:four3/src/feature/game/model/game_view_data.dart';
 import 'package:four3/src/feature/game/scene/game_camera_orbit.dart';
 import 'package:four3/src/feature/game/scene/game_scene_controller.dart';
+import 'package:four3/src/feature/game/service/game_engine.dart';
 import 'package:four3/src/feature/settings/domain/model/app_settings.dart';
 import 'package:vector_math/vector_math.dart' as vm;
 
@@ -52,6 +55,7 @@ class _GameSceneViewState extends State<GameSceneView> {
   double _renderScale = 1;
   final List<double> _frameTimes = [];
   final ValueNotifier<int> _sceneRepaint = ValueNotifier<int>(0);
+  Timer? _invalidColumnTimer;
 
   @override
   void initState() {
@@ -203,7 +207,16 @@ class _GameSceneViewState extends State<GameSceneView> {
     final vm.Ray ray = _camera().screenPointToRay(details.localPosition, _size);
     final ({int x, int y})? column = _controller.pick(ray);
     _controller.hideGhost();
-    if (column != null) widget.onPlace(column.x, column.y);
+    if (column == null) return;
+    final int columnIndex = column.y * GameEngine.size + column.x;
+    if (widget.data.snapshot.heights[columnIndex] >= GameEngine.size) {
+      _controller.showInvalidColumn(column.x, column.y);
+      _invalidColumnTimer?.cancel();
+      _invalidColumnTimer = Timer(const Duration(milliseconds: 650), () {
+        _controller.hideInvalidColumn();
+      });
+    }
+    widget.onPlace(column.x, column.y);
   }
 
   void _onHover(PointerHoverEvent event) {
@@ -302,7 +315,7 @@ class _GameSceneViewState extends State<GameSceneView> {
     if (!_ready) {
       return const ColoredBox(
         color: Color(0xFFE8E5DF),
-        child: Center(child: CircularProgressIndicator()),
+        child: Center(child: AppCircularProgressIndicator()),
       );
     }
     return LayoutBuilder(
@@ -337,7 +350,7 @@ class _GameSceneViewState extends State<GameSceneView> {
                   onTick: _tick,
                   pixelRatio: dpr,
                   loadingBuilder: (_, progress) => Center(
-                    child: CircularProgressIndicator(
+                    child: AppCircularProgressIndicator(
                       value: progress == 0 ? null : progress,
                     ),
                   ),
@@ -365,6 +378,8 @@ class _GameSceneViewState extends State<GameSceneView> {
   @override
   void dispose() {
     WidgetsBinding.instance.removeTimingsCallback(_onTimings);
+    _invalidColumnTimer?.cancel();
+    _controller.hideInvalidColumn();
     _sceneRepaint.dispose();
     _controller.dispose();
     super.dispose();

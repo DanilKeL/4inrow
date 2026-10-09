@@ -24,9 +24,12 @@ final class AccountRepository$Api implements AccountRepository {
   @override
   Future<AccountProfile> load() async {
     try {
-      return _profileFromJson(await datasource.profile());
+      return await _profileFromJson(await datasource.profile());
     } on Object {
-      return AccountProfile(username: null, guestName: guestName);
+      return AccountProfile(
+        username: preferencesDatasource.cachedUsername,
+        guestName: guestName,
+      );
     }
   }
 
@@ -122,13 +125,15 @@ final class AccountRepository$Api implements AccountRepository {
   Future<AccountProfile> logout() async =>
       _profileFromJson(await datasource.logout());
 
-  AccountProfile _profileFromJson(Map<String, dynamic> json) {
+  Future<AccountProfile> _profileFromJson(Map<String, dynamic> json) async {
     final String? remoteGuest = json['guestName']?.toString();
+    final String? username = json['username']?.toString();
     if (remoteGuest != null && remoteGuest.isNotEmpty) {
-      preferencesDatasource.saveGuestName(remoteGuest).ignore();
+      await preferencesDatasource.saveGuestName(remoteGuest);
     }
+    await preferencesDatasource.saveCachedUsername(username);
     return AccountProfile(
-      username: json['username']?.toString(),
+      username: username,
       guestName: remoteGuest ?? guestName,
       email: json['email']?.toString(),
       emailVerified: json['emailVerified'] == true,

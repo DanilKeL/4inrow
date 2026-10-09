@@ -12,6 +12,10 @@ final class MatchHistoryEvent$Load extends MatchHistoryEvent {
   const new();
 }
 
+final class MatchHistoryEvent$Flush extends MatchHistoryEvent {
+  const new();
+}
+
 final class MatchHistoryEvent$Save extends MatchHistoryEvent {
   const new(this.data);
 

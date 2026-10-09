@@ -18,6 +18,17 @@ typedef OnlineSocketFactory = WebSocketChannel Function(
   Map<String, String>? headers,
 );
 
+abstract interface class OnlineTransportClient {
+  Stream<OnlineTransportEvent> get events;
+
+  Future<void> connect(Map<String, dynamic> command);
+  Future<bool> restore();
+  bool send(Map<String, dynamic> command);
+  Future<void> wake();
+  Future<void> leave();
+  Future<void> disconnect({bool clearPersistence = false});
+}
+
 final class OnlineTransportEvent$Status extends OnlineTransportEvent {
   const new(this.status);
   final String status;
@@ -34,7 +45,7 @@ final class OnlineTransportEvent$Failure extends OnlineTransportEvent {
   final OnlineTransportFailure? failure;
 }
 
-final class OnlineTransport {
+final class OnlineTransport implements OnlineTransportClient {
   new({
     required this._endpoint,
     required this.persistenceDatasource,
@@ -65,10 +76,12 @@ final class OnlineTransport {
   bool _acknowledged = false;
   bool _disposed = false;
 
+  @override
   Stream<OnlineTransportEvent> get events => _events.stream;
   bool get hasRestorableState =>
       _readSession() != null || _readSearch() != null;
 
+  @override
   Future<void> connect(Map<String, dynamic> command) async {
     await disconnect();
     if (command['type'] == 'quick_find') {
@@ -99,6 +112,7 @@ final class OnlineTransport {
     await _open();
   }
 
+  @override
   Future<bool> restore() async {
     final Map<String, dynamic>? session = _readSession();
     if (session != null) {
@@ -118,6 +132,7 @@ final class OnlineTransport {
     return false;
   }
 
+  @override
   bool send(Map<String, dynamic> command) {
     if (!_acknowledged || _socket == null) return false;
     try {
@@ -128,6 +143,7 @@ final class OnlineTransport {
     }
   }
 
+  @override
   Future<void> wake() async {
     if (_command == null || _disposed) return;
     _emitStatus('reconnecting');
@@ -137,6 +153,7 @@ final class OnlineTransport {
     await _open();
   }
 
+  @override
   Future<void> leave() async {
     send(const {'type': 'leave'});
     _session = null;
@@ -146,6 +163,7 @@ final class OnlineTransport {
     await disconnect();
   }
 
+  @override
   Future<void> disconnect({bool clearPersistence = false}) async {
     _generation++;
     _clearTimers();

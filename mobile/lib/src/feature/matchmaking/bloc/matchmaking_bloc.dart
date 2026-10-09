@@ -19,7 +19,7 @@ final class MatchmakingBloc extends Bloc<MatchmakingEvent, MatchmakingState> {
     );
   }
 
-  final OnlineTransport _transport;
+  final OnlineTransportClient _transport;
   late final StreamSubscription<OnlineTransportEvent> _subscription;
   Player? _player;
   OnlineMatchSnapshot? _snapshot;
@@ -251,9 +251,7 @@ final class MatchmakingBloc extends Bloc<MatchmakingEvent, MatchmakingState> {
             emit(
               MatchmakingState$Failure(
                 json['message']?.toString() ?? '',
-                failure: json['message'] == null
-                    ? MatchmakingFailure.lobbyClosed
-                    : null,
+                failure: MatchmakingFailure.lobbyClosed,
               ),
             );
         }

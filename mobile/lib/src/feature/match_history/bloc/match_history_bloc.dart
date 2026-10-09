@@ -24,6 +24,8 @@ final class MatchHistoryBloc
     switch (event) {
       case MatchHistoryEvent$Load():
         await _load(emit);
+      case MatchHistoryEvent$Flush():
+        await _flush(emit);
       case MatchHistoryEvent$Save(:final data):
         await _save(emit, data);
       case MatchHistoryEvent$Rename(:final id, :final title):
@@ -39,25 +41,42 @@ final class MatchHistoryBloc
       return;
     }
     emit(const MatchHistoryState$Loading());
-    await _mutate(emit, _repository.load);
+    await _mutate(emit, () => _repository.load(_owner()!));
   }
 
   Future<void> _save(Emitter<MatchHistoryState> emit, GameViewData data) async {
-    final String? owner = _owner();
+    final String? owner = data.accountAtStart;
     if (owner == null ||
+        owner != _owner() ||
         data.mode == GameMode.online ||
         data.mode == GameMode.level ||
+        data.mode == GameMode.daily ||
         data.snapshot.status == GameStatus.playing) {
       return;
     }
-    final signature =
-        '${data.mode.name}-${data.snapshot.history.map((m) => '${m.x}${m.y}').join()}';
-    if (!_saved.add(signature)) return;
-    final id = 'local-${DateTime.now().millisecondsSinceEpoch}';
+    final String id = data.recordId.isEmpty
+        ? 'local-${DateTime.now().millisecondsSinceEpoch}'
+        : data.recordId;
+    if (!_saved.add(id)) return;
     try {
-      emit(MatchHistoryState$Ready(await _repository.save(owner, id, data)));
+      final MatchHistorySnapshot? snapshot = await _repository.save(
+        owner,
+        _owner(),
+        id,
+        data,
+      );
+      if (snapshot != null) emit(MatchHistoryState$Ready(snapshot));
     } on Exception {
-      _saved.remove(signature);
+      _saved.remove(id);
+    }
+  }
+
+  Future<void> _flush(Emitter<MatchHistoryState> emit) async {
+    try {
+      final MatchHistorySnapshot? snapshot = await _repository.flush(_owner());
+      if (snapshot != null) emit(MatchHistoryState$Ready(snapshot));
+    } on Exception {
+      // The durable outbox remains available for the next retry.
     }
   }
 

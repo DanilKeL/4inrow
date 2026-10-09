@@ -3,6 +3,7 @@ import 'package:four3/l10n/generated/app_localizations.dart';
 import 'package:four3/src/common/utils/build_context_extension.dart';
 import 'package:four3/src/feature/app_theme/utils/app_theme.dart';
 import 'package:four3/src/feature/app_theme/utils/theme_context_extension.dart';
+import 'package:four3/src/feature/components/progress/app_circular_progress_indicator.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:video_player/video_player.dart';
 
@@ -348,7 +349,7 @@ class _TutorialMedia extends StatelessWidget {
                               aspectRatio: video!.value.aspectRatio,
                               child: VideoPlayer(video!),
                             )
-                          : const CircularProgressIndicator(),
+                          : const AppCircularProgressIndicator(),
                     ),
                   ),
                 ),

@@ -13,6 +13,13 @@ import 'package:four3/src/feature/account/widget/account_view.dart';
 import 'package:four3/src/feature/app_theme/utils/app_theme.dart';
 import 'package:four3/src/feature/app_theme/utils/theme_context_extension.dart';
 import 'package:four3/src/feature/components/modals/app_dialog.dart';
+import 'package:four3/src/feature/components/progress/app_circular_progress_indicator.dart';
+import 'package:four3/src/feature/daily/bloc/daily_bloc.dart';
+import 'package:four3/src/feature/daily/bloc/daily_event.dart';
+import 'package:four3/src/feature/daily/bloc/daily_state.dart';
+import 'package:four3/src/feature/daily/domain/repository/daily_repository.dart';
+import 'package:four3/src/feature/daily/widget/daily_challenge_view.dart';
+import 'package:four3/src/feature/daily/widget/daily_root_scope.dart';
 import 'package:four3/src/feature/game/bloc/game_bloc.dart';
 import 'package:four3/src/feature/game/bloc/game_event.dart';
 import 'package:four3/src/feature/game/bloc/game_state.dart';
@@ -68,7 +75,9 @@ class GameShell extends StatelessWidget {
           GameState$Failure(:final message) => Scaffold(
             body: Center(child: Text(message)),
           ),
-          _ => const Scaffold(body: Center(child: CircularProgressIndicator())),
+          _ => const Scaffold(
+            body: Center(child: AppCircularProgressIndicator()),
+          ),
         },
       ),
     );
@@ -118,11 +127,10 @@ class _GameShellBody extends StatelessWidget {
                             settings: settings,
                             demo: isMenu,
                             onPlace: (x, y) {
+                              gameBloc.add(GameEvent$MakeMove(x, y));
                               if (data.mode == GameMode.online) {
                                 MatchmakingRootScope.of(context)
                                     .add(MatchmakingEvent$Move(x, y));
-                              } else {
-                                gameBloc.add(GameEvent$MakeMove(x, y));
                               }
                             },
                           );
@@ -194,6 +202,8 @@ class _GameShellBody extends StatelessWidget {
                               constraints.maxWidth > constraints.maxHeight;
                           final Widget menu = _MenuHero(
                             compact: landscape,
+                            hasSavedGame: data.hasSavedGame,
+                            savedOwner: data.accountAtStart,
                             onMode: (mode) => _openSetup(context, mode),
                             onRated: () => _openRated(context),
                           );
@@ -376,31 +386,35 @@ class _Header extends StatelessWidget {
     );
   }
 
-  Future<void> _openAccount(BuildContext context) async {
-    var openHistory = false;
-    await showAppDialog<void>(
-      context: context,
-      titleBuilder: (context) => context.l10n.account,
-      wide: true,
-      builder: (_) => AccountView(
-        onHistory: () {
-          openHistory = true;
-          Navigator.pop(context);
-        },
-      ),
+  void _openAccount(BuildContext context) {
+    final ValueNotifier<_AccountDialogPage> page = ValueNotifier(
+      _AccountDialogPage.account,
     );
-    if (openHistory && context.mounted) {
-      await showAppDialog<void>(
-        context: context,
-        titleBuilder: (context) => context.l10n.matchHistory,
-        builder: (_) => SizedBox(
-          height: math.min(560, MediaQuery.sizeOf(context).height - 180),
+    showAppDialog<void>(
+      context: context,
+      listenable: page,
+      onBackBuilder: (_) => page.value == _AccountDialogPage.history
+          ? () => page.value = _AccountDialogPage.account
+          : null,
+      titleBuilder: (context) => page.value == _AccountDialogPage.account
+          ? context.l10n.account
+          : context.l10n.matchHistory,
+      wide: true,
+      builder: (dialogContext) => AppDialogPageTransition(
+        showSecond: page.value == _AccountDialogPage.history,
+        firstChild: AccountView(
+          onHistory: () => page.value = _AccountDialogPage.history,
+        ),
+        secondChild: SizedBox(
+          height: math.min(560, MediaQuery.sizeOf(dialogContext).height - 180),
           child: const MatchHistoryView(),
         ),
-      );
-    }
+      ),
+    ).whenComplete(page.dispose);
   }
 }
+
+enum _AccountDialogPage { account, history }
 
 class _HeaderAction extends StatelessWidget {
   const new({
@@ -508,10 +522,14 @@ class _MenuHero extends StatelessWidget {
     required this.onMode,
     required this.onRated,
     required this.compact,
+    required this.hasSavedGame,
+    required this.savedOwner,
   });
   final void Function(GameMode mode) onMode;
   final VoidCallback onRated;
   final bool compact;
+  final bool hasSavedGame;
+  final String? savedOwner;
 
   @override
   Widget build(BuildContext context) => Container(
@@ -526,6 +544,9 @@ class _MenuHero extends StatelessWidget {
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
+        if (hasSavedGame) ...<Widget>[
+          _SavedGamePrompt(compact: compact, savedOwner: savedOwner),
+        ],
         Text(
           context.l10n.gameName,
           style: TextStyle(
@@ -616,32 +637,146 @@ class _MenuHero extends StatelessWidget {
         ),
         SizedBox(height: compact ? 4 : 5),
         SizedBox(
-          height: compact ? 30 : 32,
-          child: TextButton(
-            onPressed: () => showAppDialog<void>(
-              context: context,
-              titleBuilder: (context) => context.l10n.playerRating,
-              wide: true,
-              builder: (_) => const LeaderboardView(),
-            ),
-            style: TextButton.styleFrom(
-              padding: const EdgeInsets.symmetric(horizontal: 4),
-              foregroundColor: const Color(0xFF697163),
-              textStyle: context.textStyle.buttonSmall,
-            ),
-            child: Row(
-              children: [
-                const Icon(LucideIcons.trophy, size: 16),
-                const SizedBox(width: 9),
-                Text(context.l10n.playerRating),
-                const Spacer(),
-                const Icon(LucideIcons.arrowRight, size: 14),
-              ],
-            ),
+          height: compact ? 32 : 35,
+          child: Row(
+            children: <Widget>[
+              Expanded(
+                child: _MenuLink(
+                  icon: LucideIcons.calendarDays,
+                  label: context.l10n.dailyChallenge,
+                  onTap: () => showAppDialog<void>(
+                    context: context,
+                    titleBuilder: (context) => context.l10n.dailyChallenge,
+                    builder: (_) => const DailyChallengeView(),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 6),
+              Expanded(
+                child: _MenuLink(
+                  icon: LucideIcons.trophy,
+                  label: context.l10n.playerRating,
+                  onTap: () => showAppDialog<void>(
+                    context: context,
+                    titleBuilder: (context) => context.l10n.playerRating,
+                    wide: true,
+                    builder: (_) => const LeaderboardView(),
+                  ),
+                ),
+              ),
+            ],
           ),
         ),
       ],
     ),
+  );
+}
+
+class _SavedGamePrompt extends StatelessWidget {
+  const new({required this.compact, required this.savedOwner});
+
+  final bool compact;
+  final String? savedOwner;
+
+  @override
+  Widget build(BuildContext context) {
+    final AccountBloc bloc = AccountRootScope.of(context);
+    return BlocBuilder<AccountBloc, AccountState>(
+      bloc: bloc,
+      builder: (context, state) {
+        final bool identityReady = switch (state) {
+          AccountState$Initial() => false,
+          AccountState$Loading(:final profile) when profile == null => false,
+          _ => true,
+        };
+        return identityReady && bloc.profile?.username == savedOwner
+            ? Column(
+                children: <Widget>[
+                  _ResumeBanner(compact: compact),
+                  SizedBox(height: compact ? 7 : 10),
+                ],
+              )
+            : const SizedBox.shrink();
+      },
+    );
+  }
+}
+
+class _ResumeBanner extends StatelessWidget {
+  const new({required this.compact});
+
+  final bool compact;
+
+  @override
+  Widget build(BuildContext context) {
+    final GameBloc bloc = GameRootScope.of(context);
+    return Container(
+      padding: EdgeInsets.all(compact ? 8 : 10),
+      decoration: BoxDecoration(
+        color: const Color(0xFFE8EDFE),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: const Color(0xFF9FB2F4)),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: <Widget>[
+          Row(
+            children: <Widget>[
+              const Icon(
+                LucideIcons.history,
+                size: 17,
+                color: AppColors.accent,
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  context.l10n.continueGameQuestion,
+                  style: context.textStyle.buttonSmall,
+                ),
+              ),
+            ],
+          ),
+          SizedBox(height: compact ? 4 : 6),
+          Row(
+            children: <Widget>[
+              Expanded(
+                child: TextButton(
+                  onPressed: () => bloc.add(const GameEvent$DiscardSaved()),
+                  child: Text(context.l10n.decline),
+                ),
+              ),
+              const SizedBox(width: 6),
+              Expanded(
+                child: FilledButton(
+                  onPressed: () => bloc.add(const GameEvent$ResumeSaved()),
+                  child: Text(context.l10n.continueAction),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _MenuLink extends StatelessWidget {
+  const new({required this.icon, required this.label, required this.onTap});
+
+  final IconData icon;
+  final String label;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) => TextButton.icon(
+    onPressed: onTap,
+    style: TextButton.styleFrom(
+      padding: const EdgeInsets.symmetric(horizontal: 4),
+      foregroundColor: const Color(0xFF697163),
+      textStyle: context.textStyle.buttonSmall,
+    ),
+    icon: Icon(icon, size: 16),
+    label: Text(label, maxLines: 1, overflow: TextOverflow.ellipsis),
   );
 }
 
@@ -699,7 +834,7 @@ class _TurnStatusState extends State<_TurnStatus> {
   String _text(BuildContext context) {
     final GameViewData data = widget.data;
     if (data.phase == GamePhase.aiThinking) {
-      return data.mode == GameMode.level
+      return data.mode == GameMode.level || data.mode == GameMode.daily
           ? context.l10n.botMoving
           : context.l10n.aiThinking;
     }
@@ -722,7 +857,9 @@ class _TurnStatusState extends State<_TurnStatus> {
           ? context.l10n.yourTurn
           : context.l10n.opponentTurn;
     }
-    if (data.mode == GameMode.level) return context.l10n.yourTurn;
+    if (data.mode == GameMode.level || data.mode == GameMode.daily) {
+      return context.l10n.yourTurn;
+    }
     return context.l10n.playerTurn(
       data.names[data.snapshot.currentPlayer.index],
     );
@@ -980,8 +1117,12 @@ class _PortraitGameBoard extends StatelessWidget {
               padding: const EdgeInsets.symmetric(horizontal: 7),
               child: Row(
                 children: [
-                  Flexible(child: _TurnStatus(data: data)),
-                  const Spacer(),
+                  Expanded(
+                    child: Align(
+                      alignment: Alignment.centerLeft,
+                      child: _TurnStatus(data: data),
+                    ),
+                  ),
                   IconButton(
                     tooltip: context.l10n.pause,
                     onPressed: () => _showPauseDialog(context, data),
@@ -1027,16 +1168,40 @@ class _PlayerStrip extends StatelessWidget {
             style: const TextStyle(fontSize: 9),
           ),
         ),
-        Text(
-          data.mode == GameMode.level
-              ? context.l10n.moves(data.levelMoves)
-              : context.l10n.moves(
-                  data.phase == GamePhase.replay
-                      ? data.replayIndex
-                      : data.snapshot.history.length,
-                ),
-          style: const TextStyle(fontSize: 9),
-        ),
+        if (data.mode == GameMode.daily)
+          BlocBuilder<DailyBloc, DailyState>(
+            bloc: DailyRootScope.of(context),
+            builder: (context, state) {
+              final int? best =
+                  state.snapshot?.challenge.id == data.dailyChallenge?.id
+                  ? state.snapshot?.ownBest
+                  : null;
+              return Column(
+                mainAxisSize: MainAxisSize.min,
+                children: <Widget>[
+                  Text(
+                    context.l10n.moves(data.challengeMoves),
+                    style: const TextStyle(fontSize: 9),
+                  ),
+                  Text(
+                    '${context.l10n.dailyPersonalBest}: ${best ?? '—'}',
+                    style: const TextStyle(color: AppColors.muted, fontSize: 8),
+                  ),
+                ],
+              );
+            },
+          )
+        else
+          Text(
+            data.mode == GameMode.level
+                ? context.l10n.moves(data.challengeMoves)
+                : context.l10n.moves(
+                    data.phase == GamePhase.replay
+                        ? data.replayIndex
+                        : data.snapshot.history.length,
+                  ),
+            style: const TextStyle(fontSize: 9),
+          ),
         Expanded(
           child: Text(
             '○ ${data.names[1]}',
@@ -1061,7 +1226,7 @@ class _ToolBar extends StatelessWidget {
     final GameBloc bloc = GameRootScope.of(context);
     return Row(
       children: [
-        if (data.mode != GameMode.level)
+        if (data.mode != GameMode.level && data.mode != GameMode.daily)
           _Tool(
             icon: LucideIcons.rotateCcw,
             label: labels ? context.l10n.undo : '',
@@ -1095,18 +1260,17 @@ class _GameMessage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Positioned(
-    left: 24,
-    right: 24,
+    left: 0,
+    right: 0,
     bottom: bottom,
-    child: Material(
-      color: const Color(0xEE9A3F35),
-      borderRadius: BorderRadius.circular(12),
+    child: IgnorePointer(
       child: Padding(
-        padding: const EdgeInsets.all(10),
+        padding: const EdgeInsets.all(8),
         child: Text(
           message,
           textAlign: TextAlign.center,
-          style: const TextStyle(color: Colors.white, fontSize: 11),
+          overflow: TextOverflow.visible,
+          style: const TextStyle(color: Color(0xFFB75C3B), fontSize: 11),
         ),
       ),
     ),
@@ -1857,147 +2021,154 @@ void _confirmOnlineLeave(BuildContext context, GameViewData data) {
   });
 }
 
-void _showPauseDialog(BuildContext context, GameViewData data) {
-  final GameBloc bloc = GameRootScope.of(context);
+void _showPauseDialog(BuildContext appContext, GameViewData data) {
+  final GameBloc bloc = GameRootScope.of(appContext);
+  final ValueNotifier<_PauseDialogPage> page = ValueNotifier(
+    _PauseDialogPage.pause,
+  );
   void afterClose(FutureOr<void> Function() action) {
-    Navigator.pop(context);
+    Navigator.pop(appContext);
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (context.mounted) unawaited(Future<void>.sync(action));
+      if (appContext.mounted) unawaited(Future<void>.sync(action));
     });
   }
 
   if (data.mode == GameMode.online) {
     showAppDialog<void>(
-      context: context,
-      titleBuilder: (context) => context.l10n.pause,
-      builder: (context) => Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Text(context.l10n.onlineContinuesInMenu),
-          const SizedBox(height: 14),
-          FilledButton(
-            onPressed: data.onlineSnapshot?.pause?.used == true
-                ? null
-                : () {
-                    afterClose(
-                      () =>
-                          MatchmakingRootScope.of(context)
-                              .add(const MatchmakingEvent$Pause()),
-                    );
-                  },
-            child: Text(
-              data.onlineSnapshot?.pause?.used == true
-                  ? context.l10n.pauseUsed
-                  : context.l10n.offerPause,
-            ),
-          ),
-          const SizedBox(height: 6),
-          FilledButton.icon(
-            onPressed: () => Navigator.pop(context),
-            iconAlignment: IconAlignment.end,
-            icon: const Icon(LucideIcons.arrowRight, size: 18),
-            label: Text(context.l10n.continueAction),
-          ),
-          const SizedBox(height: 8),
-          OutlinedButton.icon(
-            onPressed: () => afterClose(
-              () => showAppDialog<void>(
-                context: context,
-                titleBuilder: (context) => context.l10n.settings,
-                builder: (_) => const SettingsView(),
+      context: appContext,
+      listenable: page,
+      onBackBuilder: (_) => page.value == _PauseDialogPage.settings
+          ? () => page.value = _PauseDialogPage.pause
+          : null,
+      titleBuilder: (context) => page.value == _PauseDialogPage.pause
+          ? context.l10n.pause
+          : context.l10n.settings,
+      builder: (context) => AppDialogPageTransition(
+        showSecond: page.value == _PauseDialogPage.settings,
+        firstChild: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text(context.l10n.onlineContinuesInMenu),
+            const SizedBox(height: 14),
+            FilledButton(
+              onPressed: data.onlineSnapshot?.pause?.used == true
+                  ? null
+                  : () {
+                      afterClose(
+                        () =>
+                            MatchmakingRootScope.of(appContext)
+                                .add(const MatchmakingEvent$Pause()),
+                      );
+                    },
+              child: Text(
+                data.onlineSnapshot?.pause?.used == true
+                    ? context.l10n.pauseUsed
+                    : context.l10n.offerPause,
               ),
             ),
-            icon: const Icon(LucideIcons.settings2),
-            label: Text(context.l10n.settings),
-          ),
-          TextButton.icon(
-            onPressed: () => afterClose(() => _requestGameMenu(context, data)),
-            icon: const Icon(LucideIcons.home),
-            label: Text(context.l10n.mainMenu),
-          ),
-        ],
+            const SizedBox(height: 6),
+            FilledButton.icon(
+              onPressed: () => Navigator.pop(context),
+              iconAlignment: IconAlignment.end,
+              icon: const Icon(LucideIcons.arrowRight, size: 18),
+              label: Text(context.l10n.continueAction),
+            ),
+            const SizedBox(height: 8),
+            OutlinedButton.icon(
+              onPressed: () => page.value = _PauseDialogPage.settings,
+              icon: const Icon(LucideIcons.settings2),
+              label: Text(context.l10n.settings),
+            ),
+            TextButton.icon(
+              onPressed: () =>
+                  afterClose(() => _requestGameMenu(appContext, data)),
+              icon: const Icon(LucideIcons.home),
+              label: Text(context.l10n.mainMenu),
+            ),
+          ],
+        ),
+        secondChild: const SettingsView(),
       ),
-    );
+    ).whenComplete(page.dispose);
     return;
   }
   bloc.add(const GameEvent$Pause());
   var resumeAfterDismiss = true;
   showAppDialog<void>(
-    context: context,
-    titleBuilder: (context) => context.l10n.pause,
-    builder: (context) => Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        Text(context.l10n.timeStopped),
-        const SizedBox(height: 16),
-        FilledButton.icon(
-          onPressed: () {
-            resumeAfterDismiss = false;
-            Navigator.pop(context);
-            bloc.add(const GameEvent$Resume());
-          },
-          iconAlignment: IconAlignment.end,
-          icon: const Icon(LucideIcons.arrowRight, size: 18),
-          label: Text(context.l10n.continueAction),
-        ),
-        const SizedBox(height: 6),
-        OutlinedButton.icon(
-          onPressed: () {
-            resumeAfterDismiss = false;
-            afterClose(() => _requestRestart(context, data));
-          },
-          icon: const Icon(LucideIcons.rotateCcw),
-          label: Text(context.l10n.restart),
-        ),
-        const SizedBox(height: 8),
-        OutlinedButton.icon(
-          onPressed: () {
-            resumeAfterDismiss = false;
-            afterClose(() async {
-              await showAppDialog<void>(
-                context: context,
-                titleBuilder: (context) => context.l10n.settings,
-                builder: (_) => const SettingsView(),
-              );
-              if (bloc.data?.phase == GamePhase.paused) {
-                bloc.add(const GameEvent$Resume());
-              }
-            });
-          },
-          icon: const Icon(LucideIcons.settings2),
-          label: Text(context.l10n.settings),
-        ),
-        if (data.mode == GameMode.level) ...[
-          const SizedBox(height: 8),
+    context: appContext,
+    listenable: page,
+    onBackBuilder: (_) => page.value == _PauseDialogPage.settings
+        ? () => page.value = _PauseDialogPage.pause
+        : null,
+    titleBuilder: (context) => page.value == _PauseDialogPage.pause
+        ? context.l10n.pause
+        : context.l10n.settings,
+    builder: (context) => AppDialogPageTransition(
+      showSecond: page.value == _PauseDialogPage.settings,
+      firstChild: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Text(context.l10n.timeStopped),
+          const SizedBox(height: 16),
+          FilledButton.icon(
+            onPressed: () {
+              resumeAfterDismiss = false;
+              Navigator.pop(context);
+              bloc.add(const GameEvent$Resume());
+            },
+            iconAlignment: IconAlignment.end,
+            icon: const Icon(LucideIcons.arrowRight, size: 18),
+            label: Text(context.l10n.continueAction),
+          ),
+          const SizedBox(height: 6),
           OutlinedButton.icon(
             onPressed: () {
               resumeAfterDismiss = false;
-              final int initialId = data.levelId ?? 1;
-              bloc.add(const GameEvent$Menu());
-              afterClose(
-                () => showAppDialog<void>(
-                  context: context,
-                  titleBuilder: (context) => context.l10n.levels,
-                  wide: true,
-                  builder: (_) => LevelsView(initialId: initialId),
-                ),
-              );
+              afterClose(() => _requestRestart(appContext, data));
             },
-            icon: const Icon(LucideIcons.puzzle),
-            label: Text(context.l10n.backToLevels),
+            icon: const Icon(LucideIcons.rotateCcw),
+            label: Text(context.l10n.restart),
+          ),
+          const SizedBox(height: 8),
+          OutlinedButton.icon(
+            onPressed: () => page.value = _PauseDialogPage.settings,
+            icon: const Icon(LucideIcons.settings2),
+            label: Text(context.l10n.settings),
+          ),
+          if (data.mode == GameMode.level) ...[
+            const SizedBox(height: 8),
+            OutlinedButton.icon(
+              onPressed: () {
+                resumeAfterDismiss = false;
+                final int initialId = data.levelId ?? 1;
+                bloc.add(const GameEvent$Menu());
+                afterClose(
+                  () => showAppDialog<void>(
+                    context: appContext,
+                    titleBuilder: (context) => context.l10n.levels,
+                    wide: true,
+                    builder: (_) => LevelsView(initialId: initialId),
+                  ),
+                );
+              },
+              icon: const Icon(LucideIcons.puzzle),
+              label: Text(context.l10n.backToLevels),
+            ),
+          ],
+          TextButton.icon(
+            onPressed: () {
+              resumeAfterDismiss = false;
+              afterClose(() => _requestGameMenu(appContext, data));
+            },
+            icon: const Icon(LucideIcons.home),
+            label: Text(context.l10n.mainMenu),
           ),
         ],
-        TextButton.icon(
-          onPressed: () {
-            resumeAfterDismiss = false;
-            afterClose(() => _requestGameMenu(context, data));
-          },
-          icon: const Icon(LucideIcons.home),
-          label: Text(context.l10n.mainMenu),
-        ),
-      ],
+      ),
+      secondChild: const SettingsView(),
     ),
   ).whenComplete(() {
+    page.dispose();
     // Pause and resume stay ordered in the bloc even if the dialog is
     // dismissed before the pause event has been reduced.
     if (resumeAfterDismiss) {
@@ -2005,6 +2176,8 @@ void _showPauseDialog(BuildContext context, GameViewData data) {
     }
   });
 }
+
+enum _PauseDialogPage { pause, settings }
 
 class _GamePanel extends StatelessWidget {
   const new({required this.data});
@@ -2038,7 +2211,19 @@ class _GamePanel extends StatelessWidget {
       );
     }
 
-    final String title = data.mode == GameMode.level
+    void openDailyResults() => showAppDialog<void>(
+      context: context,
+      titleBuilder: (context) => context.l10n.dailyChallenge,
+      builder: (_) => const DailyChallengeView(initialResults: true),
+    );
+
+    final String title = data.mode == GameMode.daily
+        ? winner == Player.one
+              ? context.l10n.dailySolved
+              : winner == null
+              ? context.l10n.draw
+              : context.l10n.loss
+        : data.mode == GameMode.level
         ? completedLevel
               ? context.l10n.levelCompleted
               : winner == null
@@ -2144,8 +2329,34 @@ class _GamePanel extends StatelessWidget {
                       fontSize: 11,
                     ),
                   ),
+                if (data.mode == GameMode.daily && winner == Player.one)
+                  _DailyGameResult(data: data),
                 const SizedBox(height: 4),
-                if (data.mode == GameMode.level) ...[
+                if (data.mode == GameMode.daily) ...[
+                  Row(
+                    children: <Widget>[
+                      Expanded(
+                        child: FilledButton.icon(
+                          onPressed: () => bloc.add(const GameEvent$Restart()),
+                          icon: const Icon(LucideIcons.rotateCcw, size: 16),
+                          label: Text(context.l10n.dailyRetryChallenge),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: OutlinedButton.icon(
+                          onPressed: openDailyResults,
+                          icon: const Icon(LucideIcons.trophy, size: 16),
+                          label: Text(context.l10n.dailyResultsTitle),
+                        ),
+                      ),
+                    ],
+                  ),
+                  TextButton(
+                    onPressed: () => bloc.add(const GameEvent$Menu()),
+                    child: Text(context.l10n.mainMenu),
+                  ),
+                ] else if (data.mode == GameMode.level) ...[
                   Row(
                     children: [
                       if (hasNextLevel) ...[
@@ -2245,6 +2456,53 @@ class _GamePanel extends StatelessWidget {
                 ],
               ],
             ),
+    );
+  }
+}
+
+class _DailyGameResult extends StatelessWidget {
+  const new({required this.data});
+
+  final GameViewData data;
+
+  @override
+  Widget build(BuildContext context) {
+    final DailyBloc bloc = DailyRootScope.of(context);
+    return BlocBuilder<DailyBloc, DailyState>(
+      bloc: bloc,
+      builder: (context, state) {
+        final DailySubmission? submission =
+            state.submission?.id == data.recordId ? state.submission : null;
+        final String status = switch (submission?.status) {
+          DailySubmissionStatus.verified => context.l10n.dailyVerifiedResult,
+          DailySubmissionStatus.guest => context.l10n.dailyGuestResult,
+          DailySubmissionStatus.failed =>
+            submission!.message.isEmpty
+                ? context.l10n.dailyFailedResult
+                : submission.message,
+          _ => context.l10n.dailyPendingResult,
+        };
+        return Padding(
+          padding: const EdgeInsets.only(top: 2, bottom: 8),
+          child: Column(
+            children: <Widget>[
+              Text(
+                '${context.l10n.moves(data.challengeMoves)} · $status',
+                textAlign: TextAlign.center,
+                style: const TextStyle(color: AppColors.muted, fontSize: 11),
+              ),
+              if (submission case DailySubmission(
+                status: DailySubmissionStatus.failed,
+                retryable: true,
+              ))
+                TextButton(
+                  onPressed: () => bloc.add(const DailyEvent$Flush()),
+                  child: Text(context.l10n.dailyRetrySubmit),
+                ),
+            ],
+          ),
+        );
+      },
     );
   }
 }

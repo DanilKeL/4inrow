@@ -1,10 +1,15 @@
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:four3/src/common/preferences/preferences_datasource_tool.dart';
 import 'package:four3/src/common/rest_client/rest_client.dart';
+import 'package:four3/src/common/services/analytics/analytics_service.dart';
+import 'package:four3/src/common/services/analytics/server_analytics.dart';
 import 'package:four3/src/feature/account/data/datasource/account_datasource_rest_client.dart';
 import 'package:four3/src/feature/account/data/datasource/account_preferences_datasource.dart';
 import 'package:four3/src/feature/account/data/repository/account_repository.dart';
 import 'package:four3/src/feature/audio/service/audio_service.dart';
+import 'package:four3/src/feature/daily/data/datasource/daily_datasource.dart';
+import 'package:four3/src/feature/daily/data/datasource/daily_preferences_datasource.dart';
+import 'package:four3/src/feature/daily/data/repository/daily_repository.dart';
 import 'package:four3/src/feature/game/data/datasource/game_storage_datasource_preferences.dart';
 import 'package:four3/src/feature/game/data/repository/game_storage_repository.dart';
 import 'package:four3/src/feature/initialization/domain/model/dependencies_container.dart';
@@ -18,6 +23,7 @@ import 'package:four3/src/feature/levels/data/datasource/level_preferences_datas
 import 'package:four3/src/feature/levels/data/repository/level_repository.dart';
 import 'package:four3/src/feature/localization/data/datasource/app_locale_datasource.dart';
 import 'package:four3/src/feature/match_history/data/datasource/match_history_datasource_rest_client.dart';
+import 'package:four3/src/feature/match_history/data/datasource/match_history_preferences_datasource.dart';
 import 'package:four3/src/feature/match_history/data/repository/match_history_repository.dart';
 import 'package:four3/src/feature/matchmaking/data/datasource/online_session_datasource.dart';
 import 'package:four3/src/feature/matchmaking/service/online_transport.dart';
@@ -41,6 +47,13 @@ final class CompositionRoot {
       baseUrl: config.apiBaseUrl,
       cookieStorage: cookieStorage,
     );
+    final AnalyticsService analyticsService = const AnalyticsServiceFactory()
+        .create(
+          buildMode: AnalyticsBuildMode.current,
+          restClient: restClient,
+          preferences: preferencesDatasourceTool,
+        );
+    await analyticsService.initialize();
     final DeepLinkService deepLinkService = DeepLinkService();
     await deepLinkService.start();
     final AccountRepository$Api accountRepository = AccountRepository$Api(
@@ -76,6 +89,12 @@ final class CompositionRoot {
           preferencesDatasourceTool: preferencesDatasourceTool,
         ),
       ),
+      dailyRepository: DailyRepository$Api(
+        remote: DailyRemoteDatasource$RestClient(restClient: restClient),
+        preferences: DailyPreferencesDatasource$Preferences(
+          preferencesDatasourceTool: preferencesDatasourceTool,
+        ),
+      ),
       levelRepository: LevelRepository$Local(
         assetDatasource: LevelAssetDatasource$Bundle(),
         preferencesDatasource: LevelPreferencesDatasource$Preferences(
@@ -90,11 +109,15 @@ final class CompositionRoot {
       onlineTransport: onlineTransport,
       matchHistoryRepository: MatchHistoryRepository$Api(
         datasource: MatchHistoryDatasource$RestClient(restClient: restClient),
+        preferences: MatchHistoryPreferencesDatasource$Preferences(
+          preferencesDatasourceTool: preferencesDatasourceTool,
+        ),
       ),
       leaderboardRepository: LeaderboardRepository$Api(
         datasource: LeaderboardDatasource$RestClient(restClient: restClient),
       ),
       audioService: audioService,
+      analyticsService: analyticsService,
     );
   }
 }

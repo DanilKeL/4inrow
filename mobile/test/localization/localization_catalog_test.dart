@@ -55,7 +55,7 @@ void main() {
         .map((key) => '$key\u0000${catalog[key]}\u0000')
         .join();
 
-    expect(_fnv1a32(utf8.encode(normalized)), 0xa1175c9d);
+    expect(_fnv1a32(utf8.encode(normalized)), 0xd3ec25e2);
   });
 
   test('the app exposes exactly the six requested locales', () {

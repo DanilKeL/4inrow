@@ -81,6 +81,52 @@ void main() {
       y: 2,
     ));
   });
+
+  testWidgets('a full column remains pickable and can be highlighted', (
+    _,
+  ) async {
+    final controller = GameSceneController();
+    addTearDown(controller.dispose);
+    await controller.initialize();
+    final GameSnapshot snapshot = GameEngine.replay(const <MoveCandidate>[
+      MoveCandidate(2, 2),
+      MoveCandidate(2, 2),
+      MoveCandidate(2, 2),
+      MoveCandidate(2, 2),
+      MoveCandidate(2, 2),
+      MoveCandidate(3, 2),
+      MoveCandidate(3, 2),
+      MoveCandidate(3, 2),
+      MoveCandidate(3, 2),
+      MoveCandidate(3, 2),
+    ]);
+    controller.sync(
+      snapshot: snapshot,
+      xray: false,
+      layers: const <int>[0, 1, 2, 3, 4],
+      animations: false,
+    );
+
+    const Size viewport = Size(390, 620);
+    for (final CameraView view in CameraView.values) {
+      final fs.PerspectiveCamera camera = _camera(view, viewport);
+      final Offset top = camera.worldToScreen(
+        vm.Vector3(0, .13 + GameEngine.size * GameSceneController.step, 0),
+        viewport,
+      )!;
+      expect(controller.pick(camera.screenPointToRay(top, viewport)), (
+        x: 2,
+        y: 2,
+      ), reason: '$view must pick the full column');
+    }
+
+    controller.showInvalidColumn(2, 2);
+    expect(controller.invalidColumn, (x: 2, y: 2));
+    controller.showInvalidColumn(3, 2);
+    expect(controller.invalidColumn, (x: 3, y: 2));
+    controller.hideInvalidColumn();
+    expect(controller.invalidColumn, isNull);
+  });
 }
 
 fs.PerspectiveCamera _camera(CameraView view, Size size) {

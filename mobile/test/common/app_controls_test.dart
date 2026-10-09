@@ -5,6 +5,7 @@ import 'package:flutter/semantics.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:four3/src/feature/app_theme/utils/app_theme.dart';
 import 'package:four3/src/feature/components/fields/app_text_field.dart';
+import 'package:four3/src/feature/components/progress/app_circular_progress_indicator.dart';
 import 'package:four3/src/feature/components/selectors/app_segmented_control.dart';
 import 'package:four3/src/feature/components/selectors/app_toggle.dart';
 
@@ -104,5 +105,48 @@ void main() {
     expect(find.text('Email'), findsOneWidget);
     await tester.enterText(find.byType(TextField), 'mail@example.com');
     expect(controller.text, 'mail@example.com');
+  });
+
+  testWidgets('circular progress uses the compact app appearance', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: AppTheme.light,
+        home: const Material(
+          child: Center(child: AppCircularProgressIndicator()),
+        ),
+      ),
+    );
+
+    expect(
+      tester.getSize(find.byType(AppCircularProgressIndicator)),
+      const Size.square(28),
+    );
+    final CircularProgressIndicator indicator = tester.widget(
+      find.byType(CircularProgressIndicator),
+    );
+    expect(indicator.value, isNull);
+    expect(indicator.backgroundColor, Colors.transparent);
+    expect(indicator.color, AppColors.accent);
+    expect(indicator.strokeWidth, 2.5);
+    expect(indicator.strokeAlign, CircularProgressIndicator.strokeAlignInside);
+    expect(indicator.strokeCap, StrokeCap.round);
+  });
+
+  testWidgets('circular progress forwards a determinate value', (tester) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: AppTheme.light,
+        home: const Material(
+          child: Center(child: AppCircularProgressIndicator(value: .42)),
+        ),
+      ),
+    );
+
+    final CircularProgressIndicator indicator = tester.widget(
+      find.byType(CircularProgressIndicator),
+    );
+    expect(indicator.value, .42);
   });
 }

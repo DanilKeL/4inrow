@@ -6,6 +6,7 @@ import 'package:four3/src/feature/game/bloc/game_bloc.dart';
 import 'package:four3/src/feature/game/bloc/game_event.dart';
 import 'package:four3/src/feature/game/model/game_models.dart';
 import 'package:four3/src/feature/game/widget/game_root_scope.dart';
+import 'package:four3/src/feature/initialization/domain/model/dependencies_container.dart';
 import 'package:four3/src/feature/initialization/widget/root_scope.dart';
 import 'package:four3/src/feature/matchmaking/bloc/matchmaking_bloc.dart';
 import 'package:four3/src/feature/matchmaking/bloc/matchmaking_event.dart';
@@ -31,7 +32,8 @@ class _MatchmakingRootScopeState extends State<MatchmakingRootScope>
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
-    _bloc = MatchmakingBloc(transport: RootScope.of(context).onlineTransport)
+    final RootDependenciesContainer root = RootScope.of(context);
+    _bloc = MatchmakingBloc(transport: root.onlineTransport)
       ..add(const MatchmakingEvent$Load());
   }
 
@@ -73,6 +75,9 @@ class _MatchmakingRootScopeState extends State<MatchmakingRootScope>
                 game.add(
                   GameEvent$OnlineFailure(
                     _failureText(context, message, failure),
+                    connectionError:
+                        failure == MatchmakingFailure.connectionLost ||
+                        failure == MatchmakingFailure.lobbyClosed,
                   ),
                 );
               }

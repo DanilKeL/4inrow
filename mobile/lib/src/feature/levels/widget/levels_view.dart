@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:four3/src/common/utils/build_context_extension.dart';
 import 'package:four3/src/feature/account/widget/account_root_scope.dart';
 import 'package:four3/src/feature/app_theme/utils/app_theme.dart';
+import 'package:four3/src/feature/components/progress/app_circular_progress_indicator.dart';
 import 'package:four3/src/feature/game/bloc/game_event.dart';
 import 'package:four3/src/feature/game/widget/game_root_scope.dart';
 import 'package:four3/src/feature/initialization/widget/root_scope.dart';
@@ -34,11 +35,11 @@ class _LevelsViewState extends State<LevelsView> {
     String? owner,
   ) async {
     final List<GameLevel> levels = await repository.load();
-    if (owner == null) return (levels, await repository.best(), '');
+    if (owner == null) return (levels, await repository.best(null), '');
     try {
       return (levels, await repository.sync(owner), '');
     } on Exception {
-      return (levels, await repository.best(), 'offline');
+      return (levels, await repository.best(owner), 'offline');
     }
   }
 
@@ -49,7 +50,7 @@ class _LevelsViewState extends State<LevelsView> {
     future: _future,
     builder: (context, snapshot) {
       if (!snapshot.hasData) {
-        return const Center(child: CircularProgressIndicator());
+        return const Center(child: AppCircularProgressIndicator());
       }
       final (List<GameLevel>, Map<int, int>, String) value = snapshot.data!;
       final (List<GameLevel> levels, Map<int, int> best, String syncError) =

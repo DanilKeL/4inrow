@@ -1,8 +1,10 @@
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:four3/src/common/preferences/preferences_datasource_tool.dart';
 import 'package:four3/src/common/rest_client/rest_client.dart';
+import 'package:four3/src/common/services/analytics/analytics_service.dart';
 import 'package:four3/src/feature/account/domain/repository/account_repository.dart';
 import 'package:four3/src/feature/audio/service/audio_service.dart';
+import 'package:four3/src/feature/daily/domain/repository/daily_repository.dart';
 import 'package:four3/src/feature/game/domain/repository/game_storage_repository.dart';
 import 'package:four3/src/feature/initialization/model/app_config.dart';
 import 'package:four3/src/feature/initialization/service/deep_link_service.dart';
@@ -23,6 +25,7 @@ final class RootDependenciesContainer {
     required this.cookieStorage,
     required this.settingsRepository,
     required this.gameStorageRepository,
+    required this.dailyRepository,
     required this.levelRepository,
     required this.deepLinkService,
     required this.accountRepository,
@@ -30,6 +33,7 @@ final class RootDependenciesContainer {
     required this.matchHistoryRepository,
     required this.leaderboardRepository,
     required this.audioService,
+    required this.analyticsService,
   });
 
   final AppConfig config;
@@ -40,6 +44,7 @@ final class RootDependenciesContainer {
   final SessionCookieStorage cookieStorage;
   final SettingsRepository settingsRepository;
   final GameStorageRepository gameStorageRepository;
+  final DailyRepository dailyRepository;
   final LevelRepository levelRepository;
   final DeepLinkService deepLinkService;
   final AccountRepository accountRepository;
@@ -47,11 +52,13 @@ final class RootDependenciesContainer {
   final MatchHistoryRepository matchHistoryRepository;
   final LeaderboardRepository leaderboardRepository;
   final AudioService audioService;
+  final AnalyticsService analyticsService;
 
   Future<void> dispose() async {
     await deepLinkService.dispose();
     await onlineTransport.dispose();
     await audioService.dispose();
+    await analyticsService.dispose();
     restClient.dispose();
   }
 }

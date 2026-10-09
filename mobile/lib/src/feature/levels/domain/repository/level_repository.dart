@@ -6,8 +6,9 @@ abstract interface class LevelRepository {
 
   Future<List<GameLevel>> load();
   Future<GameLevel?> get(int id);
-  Future<Map<int, int>> best();
-  Future<void> record(GameLevel level, GameSnapshot snapshot);
+  Future<Map<int, int>> best(String? owner);
+  Future<void> record(GameLevel level, GameSnapshot snapshot, String? owner);
+  bool needsSync(String owner);
   Future<Map<int, int>> sync(String owner);
   GameSnapshot position(GameLevel level);
 }

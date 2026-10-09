@@ -12,6 +12,7 @@ import 'package:four3/src/feature/account/widget/account_root_scope.dart';
 import 'package:four3/src/feature/app_theme/utils/app_theme.dart';
 import 'package:four3/src/feature/app_theme/utils/theme_context_extension.dart';
 import 'package:four3/src/feature/components/fields/app_text_field.dart';
+import 'package:four3/src/feature/components/progress/app_circular_progress_indicator.dart';
 import 'package:four3/src/feature/components/selectors/app_segmented_control.dart';
 import 'package:four3/src/feature/match_history/bloc/match_history_bloc.dart';
 import 'package:four3/src/feature/match_history/bloc/match_history_event.dart';
@@ -762,7 +763,7 @@ class _AccountOverviewCards extends StatelessWidget {
         return const Center(
           child: Padding(
             padding: EdgeInsets.all(12),
-            child: CircularProgressIndicator(),
+            child: AppCircularProgressIndicator(),
           ),
         );
       },

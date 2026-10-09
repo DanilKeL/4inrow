@@ -63,6 +63,36 @@ void main() {
     expect(profile.createdAt, 42);
   });
 
+  test('account repository keeps the owner hint for offline launch', () async {
+    SharedPreferences.setMockInitialValues(<String, Object>{});
+    final SharedPreferences preferences = await SharedPreferences.getInstance();
+    final AccountPreferencesDatasource$Preferences accountPreferences =
+        AccountPreferencesDatasource$Preferences(
+          preferencesDatasourceTool: PreferencesDatasourceTool$Shared(
+            sharedPreferences: preferences,
+          ),
+        );
+    final _FakeAccountDatasource datasource = _FakeAccountDatasource()
+      ..profileResponse = <String, dynamic>{
+        'username': 'cube',
+        'guestName': 'Guest_123456',
+      };
+    final AccountRepository$Api repository = AccountRepository$Api(
+      datasource: datasource,
+      preferencesDatasource: accountPreferences,
+    );
+
+    await repository.load();
+    datasource.profileError = const RestClientException(
+      '',
+      failure: RestClientFailure.network,
+    );
+    final AccountProfile offline = await repository.load();
+
+    expect(offline.username, 'cube');
+    expect(offline.guestName, 'Guest_123456');
+  });
+
   test(
     'account repository preserves registration feedback from web API',
     () async {
@@ -186,9 +216,13 @@ final class _FakeAccountDatasource implements AccountDatasource {
   Map<String, dynamic> profileResponse = <String, dynamic>{};
   Map<String, dynamic> registerResponse = <String, dynamic>{};
   RestClientException? registerError;
+  RestClientException? profileError;
 
   @override
-  Future<Map<String, dynamic>> profile() async => profileResponse;
+  Future<Map<String, dynamic>> profile() async {
+    if (profileError case final error?) throw error;
+    return profileResponse;
+  }
 
   @override
   Future<Map<String, dynamic>> login({

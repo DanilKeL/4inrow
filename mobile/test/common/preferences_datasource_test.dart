@@ -14,9 +14,14 @@ void main() {
     );
 
     await datasource.saveGuestName('Guest_123456');
+    await datasource.saveCachedUsername('cube_player');
 
     expect(datasource.guestName, 'Guest_123456');
-    expect(tool.values, hasLength(1));
+    expect(datasource.cachedUsername, 'cube_player');
+    expect(tool.values, hasLength(2));
+
+    await datasource.saveCachedUsername(null);
+    expect(datasource.cachedUsername, isNull);
   });
 
   test(

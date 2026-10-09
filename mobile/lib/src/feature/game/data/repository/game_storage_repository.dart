@@ -1,6 +1,6 @@
 import 'package:four3/src/feature/game/data/datasource/game_storage_datasource.dart';
 import 'package:four3/src/feature/game/domain/repository/game_storage_repository.dart';
-import 'package:four3/src/feature/game/model/game_models.dart';
+import 'package:four3/src/feature/game/model/saved_game.dart';
 
 final class GameStorageRepository$Local implements GameStorageRepository {
   const new({required this.datasource});
@@ -8,10 +8,10 @@ final class GameStorageRepository$Local implements GameStorageRepository {
   final GameStorageDatasource datasource;
 
   @override
-  GameSnapshot? load() => datasource.load();
+  SavedGame? load() => datasource.load();
 
   @override
-  Future<void> save(GameSnapshot snapshot) => datasource.save(snapshot);
+  Future<void> save(SavedGame game) => datasource.save(game);
 
   @override
   Future<void> clear() => datasource.clear();

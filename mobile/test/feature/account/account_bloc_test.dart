@@ -139,7 +139,10 @@ final class _AccountDatasource implements AccountDatasource {
   Future<Map<String, dynamic>> login({
     required String username,
     required String password,
-  }) async => {'ok': true};
+  }) async {
+    signedIn = true;
+    return {'ok': true};
+  }
 
   @override
   Future<Map<String, dynamic>> logout() async => {'guestName': 'Guest_123456'};
@@ -152,7 +155,8 @@ final class _AccountDatasource implements AccountDatasource {
   }) async => registrationResponse;
 
   @override
-  Future<Map<String, dynamic>> verifyEmail({required String token}) async => {
-    'ok': true,
-  };
+  Future<Map<String, dynamic>> verifyEmail({required String token}) async {
+    signedIn = true;
+    return {'ok': true};
+  }
 }

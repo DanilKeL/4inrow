@@ -1,4 +1,5 @@
 import 'package:equatable/equatable.dart';
+import 'package:four3/src/feature/daily/domain/model/daily_models.dart';
 import 'package:four3/src/feature/game/model/game_models.dart';
 import 'package:four3/src/feature/matchmaking/model/online_models.dart';
 
@@ -35,6 +36,27 @@ final class GameEvent$StartLevel extends GameEvent {
 
   @override
   List<Object> get props => [id];
+}
+
+final class GameEvent$StartDaily extends GameEvent {
+  const new(this.challenge);
+
+  final DailyChallenge challenge;
+
+  @override
+  List<Object> get props => <Object>[challenge];
+}
+
+final class GameEvent$ResumeSaved extends GameEvent {
+  const new();
+}
+
+final class GameEvent$DiscardSaved extends GameEvent {
+  const new();
+}
+
+final class GameEvent$Persist extends GameEvent {
+  const new();
 }
 
 final class GameEvent$MakeMove extends GameEvent {
@@ -155,10 +177,11 @@ final class GameEvent$OnlineSnapshot extends GameEvent {
 }
 
 final class GameEvent$OnlineFailure extends GameEvent {
-  const new(this.message);
+  const new(this.message, {this.connectionError = false});
 
   final String message;
+  final bool connectionError;
 
   @override
-  List<Object> get props => [message];
+  List<Object> get props => [message, connectionError];
 }

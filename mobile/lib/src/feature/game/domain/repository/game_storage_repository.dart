@@ -1,9 +1,9 @@
-import 'package:four3/src/feature/game/model/game_models.dart';
+import 'package:four3/src/feature/game/model/saved_game.dart';
 
 abstract interface class GameStorageRepository {
   const new();
 
-  GameSnapshot? load();
-  Future<void> save(GameSnapshot snapshot);
+  SavedGame? load();
+  Future<void> save(SavedGame game);
   Future<void> clear();
 }
