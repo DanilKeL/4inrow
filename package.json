@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "node scripts/dev.mjs",
     "dev:server": "tsx server/index.ts",
-    "build": "tsc --noEmit && vite build && esbuild server/index.ts --bundle --platform=node --format=esm --packages=external --outfile=dist-server/index.js && node scripts/build-offline.mjs",
+    "build": "tsc --noEmit && vite build && esbuild server/index.ts server/daily.worker.ts --bundle --platform=node --format=esm --packages=external --outdir=dist-server && node scripts/build-offline.mjs",
     "build:icons": "node scripts/build-icons.mjs",
     "admin:credentials": "node scripts/create-admin-credentials.mjs",
     "start": "node dist-server/index.js",

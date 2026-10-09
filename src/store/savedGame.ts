@@ -1,11 +1,13 @@
 import { deserialize, serialize, type GameState } from '../game/core';
 import { getLevel } from '../game/levels';
 import type { Difficulty } from '../game/ai';
+import { isDailyChallenge, type DailyChallenge } from '../game/daily';
 
 const KEY = 'four-cubed-active-game-v1';
 export interface SavedGame {
   version: 1;
-  mode: 'local' | 'ai' | 'level';
+  mode: 'local' | 'ai' | 'level' | 'daily';
+  dailyChallenge?: DailyChallenge | null;
   game: string;
   difficulty: Difficulty;
   names: [string, string];
@@ -24,7 +26,7 @@ export function readSavedGame(): (SavedGame & { restored: GameState }) | null {
     if (
       !saved ||
       saved.version !== 1 ||
-      !['local', 'ai', 'level'].includes(saved.mode) ||
+      !['local', 'ai', 'level', 'daily'].includes(saved.mode) ||
       !['easy', 'medium', 'hard'].includes(saved.difficulty) ||
       !Array.isArray(saved.names) ||
       saved.names.length !== 2 ||
@@ -49,6 +51,18 @@ export function readSavedGame(): (SavedGame & { restored: GameState }) | null {
       return null;
     const restored = deserialize(saved.game);
     if (restored.status !== 'playing') return null;
+    if (saved.mode === 'daily') {
+      const challenge = saved.dailyChallenge;
+      if (
+        !isDailyChallenge(challenge) ||
+        restored.history.length < challenge.preset.length ||
+        challenge.preset.some(
+          (move, i) => move.x !== restored.history[i].x || move.y !== restored.history[i].y,
+        ) ||
+        saved.levelId !== null
+      )
+        return null;
+    } else if (saved.dailyChallenge) return null;
     if (saved.mode === 'level') {
       const level = getLevel(saved.levelId);
       if (

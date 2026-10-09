@@ -12,6 +12,7 @@ import { AuthError } from './auth.ts';
 import { ratingDelta } from './rating.ts';
 import { getLevel } from '../src/game/levels/index.ts';
 import { AnalyticsStore } from './analytics.ts';
+import type { DailyChallenge, DailyStanding } from '../src/game/daily.ts';
 
 type Result = { owner: string; player: Player };
 export class StatisticsStore {
@@ -41,6 +42,15 @@ export class StatisticsStore {
       CREATE TABLE IF NOT EXISTS rated_rounds (id TEXT PRIMARY KEY, a TEXT NOT NULL, b TEXT NOT NULL,
         delta INTEGER NOT NULL, created INTEGER NOT NULL);
       CREATE INDEX IF NOT EXISTS rated_pair ON rated_rounds(a,b,created);
+      CREATE TABLE IF NOT EXISTS daily_challenges (
+        date TEXT PRIMARY KEY, id TEXT NOT NULL UNIQUE, challenge TEXT NOT NULL
+      );
+      CREATE TABLE IF NOT EXISTS daily_results (
+        date TEXT NOT NULL, owner TEXT NOT NULL, moves INTEGER NOT NULL,
+        completed_at INTEGER NOT NULL, sequence TEXT NOT NULL,
+        PRIMARY KEY(date, owner)
+      );
+      CREATE INDEX IF NOT EXISTS daily_results_ranking ON daily_results(date,moves,completed_at);
     `);
     if (
       !this.db
@@ -60,6 +70,58 @@ export class StatisticsStore {
       if (getLevel(Number(row.level))) best[Number(row.level)] = Number(row.moves);
     }
     return { username: owner, best };
+  }
+
+  dailyChallenge(date: string): DailyChallenge | null {
+    const row = this.db.prepare('SELECT challenge FROM daily_challenges WHERE date=?').get(date);
+    return row ? (JSON.parse(String(row.challenge)) as DailyChallenge) : null;
+  }
+
+  saveDailyChallenge(challenge: DailyChallenge): DailyChallenge {
+    this.db
+      .prepare('INSERT OR IGNORE INTO daily_challenges(date,id,challenge) VALUES(?,?,?)')
+      .run(challenge.date, challenge.id, JSON.stringify(challenge));
+    return this.dailyChallenge(challenge.date)!;
+  }
+
+  dailyBest(date: string, owner: string | null): number | null {
+    if (!owner) return null;
+    const row = this.db
+      .prepare('SELECT moves FROM daily_results WHERE date=? AND owner=?')
+      .get(date, owner);
+    return row ? Number(row.moves) : null;
+  }
+
+  dailyStandings(date: string, usernames: string[]): DailyStanding[] {
+    const visible = new Set(usernames);
+    return this.db
+      .prepare(
+        'SELECT owner,moves,completed_at FROM daily_results WHERE date=? ORDER BY moves,completed_at,owner COLLATE NOCASE',
+      )
+      .all(date)
+      .filter((row) => visible.has(String(row.owner)))
+      .map((row, index) => ({
+        rank: index + 1,
+        username: String(row.owner),
+        moves: Number(row.moves),
+        completedAt: Number(row.completed_at),
+      }));
+  }
+
+  saveDailyResult(
+    date: string,
+    owner: string,
+    moves: number,
+    completedAt: number,
+    sequence: Array<{ x: number; y: number }>,
+  ) {
+    this.db
+      .prepare(
+        `INSERT INTO daily_results(date,owner,moves,completed_at,sequence) VALUES(?,?,?,?,?)
+      ON CONFLICT(date,owner) DO UPDATE SET moves=excluded.moves,completed_at=excluded.completed_at,sequence=excluded.sequence
+      WHERE excluded.moves < daily_results.moves`,
+      )
+      .run(date, owner, moves, completedAt, JSON.stringify(sequence));
   }
 
   mergeLevelProgress(owner: string, best: unknown) {
@@ -151,6 +213,7 @@ export class StatisticsStore {
       this.db.prepare('UPDATE matches SET owner=? WHERE owner=?').run(next, previous);
       this.db.prepare('UPDATE ratings SET owner=? WHERE owner=?').run(next, previous);
       this.db.prepare('UPDATE level_progress SET owner=? WHERE owner=?').run(next, previous);
+      this.db.prepare('UPDATE daily_results SET owner=? WHERE owner=?').run(next, previous);
       this.db.prepare('UPDATE rated_rounds SET a=? WHERE a=?').run(next, previous);
       this.db.prepare('UPDATE rated_rounds SET b=? WHERE b=?').run(next, previous);
       this.analytics.renameOwner(previous, next);
@@ -168,6 +231,7 @@ export class StatisticsStore {
         .run(owner);
       this.db.prepare('DELETE FROM ratings WHERE owner=?').run(owner);
       this.db.prepare('DELETE FROM level_progress WHERE owner=?').run(owner);
+      this.db.prepare('DELETE FROM daily_results WHERE owner=?').run(owner);
       this.db.prepare('DELETE FROM rated_rounds WHERE a=? OR b=?').run(owner, owner);
       this.analytics.deleteOwner(owner);
       this.db.exec('COMMIT');

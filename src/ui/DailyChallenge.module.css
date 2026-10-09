@@ -1,0 +1,146 @@
+.root {
+  display: grid;
+  gap: 20px;
+  min-width: 0;
+}
+.tabs {
+  display: flex;
+  gap: 6px;
+  padding: 4px;
+  background: #eff1eb;
+  border-radius: 10px;
+}
+.tabs button {
+  flex: 1;
+  border: 0;
+  border-radius: 7px;
+  padding: 10px;
+  background: transparent;
+  color: var(--muted);
+  font: inherit;
+  font-size: 13px;
+}
+.tabs button[aria-pressed='true'] {
+  color: var(--text);
+  background: #fff;
+  box-shadow: 0 2px 8px #26331a09;
+}
+.heading,
+.summary,
+.record {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.heading > span,
+.summary > span {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+}
+.heading small {
+  color: var(--muted);
+  font-size: 11px;
+  white-space: nowrap;
+}
+.goal {
+  font-size: clamp(19px, 4vw, 25px);
+  font-weight: 650;
+  letter-spacing: -0.5px;
+}
+.record {
+  padding: 18px;
+  background: #f3f5ef;
+  border: 1px solid #e1e5da;
+  border-radius: 12px;
+  font-size: 13px;
+}
+.record > span {
+  color: var(--muted);
+}
+.record strong {
+  font-size: 22px;
+  font-variant-numeric: tabular-nums;
+}
+.summary button {
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border: 1px solid #dce0d4;
+  border-radius: 8px;
+  background: transparent;
+}
+.scroll {
+  max-height: min(350px, 46dvh);
+  overflow: auto;
+  border: 1px solid #e0e3da;
+  border-radius: 10px;
+}
+.scroll table {
+  width: 100%;
+  border-collapse: collapse;
+  text-align: left;
+  font-size: 13px;
+}
+.scroll th,
+.scroll td {
+  padding: 13px 14px;
+  border-bottom: 1px solid #e8ebe2;
+}
+.scroll thead {
+  position: sticky;
+  top: 0;
+  background: #f4f6ef;
+  color: var(--muted);
+  font-size: 11px;
+}
+.scroll tbody th {
+  max-width: 180px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.scroll td:last-child {
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+.self {
+  background: #eef2ff;
+}
+.empty,
+.error {
+  color: var(--muted);
+  font-size: 13px;
+}
+@media (max-width: 650px) {
+  .root {
+    gap: 14px;
+  }
+  .heading {
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  .record {
+    padding: 14px;
+  }
+  .scroll th,
+  .scroll td {
+    padding: 11px 10px;
+  }
+}
+@media (orientation: landscape) and (max-height: 500px) {
+  .root {
+    gap: 8px;
+  }
+  .record {
+    padding: 8px 14px;
+  }
+  .goal {
+    font-size: 18px;
+  }
+  .tabs button {
+    padding: 6px;
+  }
+}

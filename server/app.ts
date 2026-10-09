@@ -12,6 +12,7 @@ import { ResendMailer, type Mailer } from './email.ts';
 import { StatisticsStore } from './statistics.ts';
 import { onlineElapsed } from '../src/network/matchTime.ts';
 import type { AnalyticsFilter } from '../src/network/analyticsTypes.ts';
+import { DailyService, type DailyServiceOptions } from './dailyService.ts';
 
 interface Seat {
   account: string | null;
@@ -77,6 +78,7 @@ export interface OnlineServerOptions {
   adminPasswordHash?: string | null;
   /** Transactional email provider. Omit to use Resend from the environment; null disables email. */
   mailer?: Mailer | null;
+  daily?: DailyServiceOptions;
 }
 
 const mime: Record<string, string> = {
@@ -177,6 +179,8 @@ export function createOnlineServer(options: OnlineServerOptions = {}) {
     options.statsFile === undefined && options.authFile === null ? null : options.statsFile,
   );
   const admin = new AdminAccess(options.adminPasswordHash);
+  const daily = new DailyService(statistics, options.daily);
+  if (options.authFile !== null || options.daily) daily.start();
   const rooms = new Map<string, Room>();
   const memberships = new WeakMap<WebSocket, { room: Room; player: Player }>();
   const socketNames = new WeakMap<WebSocket, string>();
@@ -191,6 +195,7 @@ export function createOnlineServer(options: OnlineServerOptions = {}) {
   const mailAttempts = new Map<string, { count: number; until: number }>();
   const adminAttempts = new Map<string, { count: number; until: number }>();
   const telemetryAttempts = new Map<string, { count: number; until: number }>();
+  const dailyAttempts = new Map<string, { count: number; until: number }>();
   const staticRoot = options.staticDir === null ? null : resolve(options.staticDir ?? 'dist');
   const graceMs = options.disconnectGraceMs ?? 5 * 60_000;
   const idleMs = options.idleTimeoutMs ?? 2 * 60 * 60_000;
@@ -200,6 +205,96 @@ export function createOnlineServer(options: OnlineServerOptions = {}) {
     void (async () => {
       const requestUrl = new URL(req.url ?? '/', 'http://localhost');
       const pathname = decodeURIComponent(requestUrl.pathname);
+      if (pathname === '/daily' || pathname === '/daily/results') {
+        res.setHeader('Content-Type', 'application/json; charset=utf-8');
+        res.setHeader('Cache-Control', 'no-store');
+        res.setHeader('X-Content-Type-Options', 'nosniff');
+        const respond = (status: number, body: object) =>
+          res.writeHead(status).end(JSON.stringify(body));
+        const localProxy = ['127.0.0.1', '::1', '::ffff:127.0.0.1'].includes(
+          req.socket.remoteAddress ?? '',
+        );
+        const address =
+          localProxy && typeof req.headers['x-real-ip'] === 'string'
+            ? req.headers['x-real-ip']
+            : (req.socket.remoteAddress ?? 'unknown');
+        const rate = (key: string, limit: number) => {
+          const now = Date.now();
+          const previous = dailyAttempts.get(key);
+          const attempt =
+            previous && previous.until > now
+              ? { count: previous.count + 1, until: previous.until }
+              : { count: 1, until: now + 60_000 };
+          dailyAttempts.set(key, attempt);
+          if (attempt.count > limit)
+            throw new AuthError(429, 'Слишком много попыток. Подождите минуту.');
+        };
+        try {
+          if (pathname === '/daily' && req.method === 'GET') {
+            rate(`read:${address}`, 120);
+            respond(
+              200,
+              await daily.read(auth.username(req.headers.cookie), auth.leaderboardUsernames()),
+            );
+            return;
+          }
+          if (pathname !== '/daily/results' || req.method !== 'POST') {
+            res.setHeader('Allow', pathname === '/daily' ? 'GET' : 'POST');
+            throw new AuthError(405, 'Метод не поддерживается.');
+          }
+          const owner = auth.username(req.headers.cookie);
+          if (!owner) throw new AuthError(401, 'Войдите в аккаунт, чтобы сохранить результат.');
+          if (req.headers.origin) {
+            let allowed = false;
+            try {
+              const origin = new URL(req.headers.origin);
+              const dev =
+                process.env.NODE_ENV !== 'production' &&
+                localProxy &&
+                origin.port === '5173' &&
+                ['localhost', '127.0.0.1'].includes(origin.hostname);
+              allowed = origin.host === req.headers.host || dev;
+            } catch {
+              /* Invalid origin is rejected below. */
+            }
+            if (!allowed) throw new AuthError(403, 'Запрос с другого сайта отклонён.');
+          }
+          rate(`submit:${address}`, 30);
+          rate(`account:${owner}`, 20);
+          if (!req.headers['content-type']?.startsWith('application/json'))
+            throw new AuthError(415, 'Ожидается JSON-запрос.');
+          const chunks: Buffer[] = [];
+          let size = 0;
+          for await (const chunk of req) {
+            size += chunk.length;
+            if (size > 8192) throw new AuthError(413, 'Слишком большой запрос.');
+            chunks.push(Buffer.from(chunk));
+          }
+          let body: unknown;
+          try {
+            body = JSON.parse(Buffer.concat(chunks).toString('utf8'));
+          } catch {
+            throw new AuthError(400, 'Некорректный JSON.');
+          }
+          respond(
+            200,
+            await daily.submit(
+              owner,
+              auth.leaderboardUsernames(),
+              body,
+              () => auth.username(req.headers.cookie) === owner,
+            ),
+          );
+        } catch (error) {
+          respond(error instanceof AuthError ? error.status : 500, {
+            error:
+              error instanceof AuthError
+                ? error.message
+                : 'Не удалось загрузить задачу дня. Попробуйте снова.',
+          });
+        }
+        return;
+      }
       if (pathname === '/telemetry') {
         res.setHeader('Cache-Control', 'no-store');
         res.setHeader('Content-Type', 'application/json; charset=utf-8');
@@ -1717,7 +1812,7 @@ export function createOnlineServer(options: OnlineServerOptions = {}) {
     for (const room of rooms.values()) persistRoom(room);
     for (const [address, attempt] of authAttempts)
       if (attempt.until <= Date.now()) authAttempts.delete(address);
-    for (const attempts of [telemetryAttempts, adminAttempts, mailAttempts])
+    for (const attempts of [telemetryAttempts, adminAttempts, mailAttempts, dailyAttempts])
       for (const [address, attempt] of attempts)
         if (attempt.until <= Date.now()) attempts.delete(address);
     for (const room of rooms.values())
@@ -1757,6 +1852,7 @@ export function createOnlineServer(options: OnlineServerOptions = {}) {
       await new Promise<void>((resolveClose, reject) =>
         httpServer.close((err) => (err ? reject(err) : resolveClose())),
       );
+    await daily.close();
     statistics.close();
   }
   return { httpServer, wss, close };

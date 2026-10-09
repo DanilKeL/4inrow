@@ -2386,6 +2386,21 @@
 .leaderboardButton > svg:last-child {
   margin-left: auto;
 }
+.menuLinks {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.2fr);
+  gap: 8px;
+  margin-top: 16px;
+}
+.menuLinks .leaderboardButton {
+  margin: 0;
+  gap: 7px;
+  font-size: 11px;
+  white-space: nowrap;
+}
+.menuLinks .leaderboardButton svg {
+  flex-shrink: 0;
+}
 .offlineStatus {
   min-height: 14px;
   display: flex;

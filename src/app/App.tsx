@@ -30,6 +30,7 @@ import {
   Puzzle,
   Play,
   Trophy,
+  CalendarDays,
 } from 'lucide-react';
 import { MotionConfig, useReducedMotion } from 'motion/react';
 import { createGame, type GameState, type Move } from '../game/core';
@@ -64,6 +65,9 @@ import {
 import styles from '../ui/UI.module.css';
 import { useOffline, applyOfflineUpdate } from '../network/offline';
 import { readSavedGame } from '../store/savedGame';
+import { DailyChallenge } from '../ui/DailyChallenge';
+import { useDaily } from '../store/dailyStore';
+import { dailyMoveCount } from '../game/daily';
 
 const GameScene = lazy(() => import('../scene/GameScene'));
 type Overlay =
@@ -80,6 +84,7 @@ type Overlay =
   | 'account'
   | 'levels'
   | 'leaderboard'
+  | 'daily'
   | null;
 
 function demoGame(): GameState {
@@ -130,10 +135,16 @@ export default function App() {
         .then(() => {
           void useLevelProgress.getState().refresh();
           void useMatchHistory.getState().refresh();
+          void useDaily.getState().flush();
         });
     };
     const retry = () => {
-      if (useLevelProgress.getState().dirty || useMatchHistory.getState().pending.length) sync();
+      if (
+        useLevelProgress.getState().dirty ||
+        useMatchHistory.getState().pending.length ||
+        useDaily.getState().pending.length
+      )
+        sync();
     };
     window.addEventListener('online', sync);
     window.addEventListener('focus', sync);
@@ -175,7 +186,14 @@ export default function App() {
   const [viewMenu, setViewMenu] = useState(false);
   const [afterTutorial, setAfterTutorial] = useState(false);
   const [selectedLevel, setSelectedLevel] = useState(1);
+  const [dailyResults, setDailyResults] = useState(false);
   const level = getLevel(state.levelId);
+  const dailyChallenge = state.mode === 'daily' ? state.dailyChallenge : null;
+  const openDaily = (results = false) => {
+    state.pause();
+    setDailyResults(results);
+    setOverlay('daily');
+  };
   const openLevels = () => {
     if (state.levelId) setSelectedLevel(state.levelId);
     state.menu();
@@ -264,7 +282,7 @@ export default function App() {
 
   const turnText =
     state.phase === 'ai-thinking'
-      ? level
+      ? level || dailyChallenge
         ? 'Ход бота…'
         : 'AI обдумывает ход…'
       : state.phase === 'animating'
@@ -285,7 +303,7 @@ export default function App() {
                       : state.online?.player === state.game.currentPlayer
                         ? 'Ваш ход'
                         : 'Ход соперника'
-                : level
+                : level || dailyChallenge
                   ? 'Ваш ход'
                   : `Ходит ${state.names[state.game.currentPlayer - 1]}`;
 
@@ -388,15 +406,24 @@ export default function App() {
                   <ArrowRight size={16} />
                 </button>
               </div>
-              <button
-                className={styles.leaderboardButton}
-                disabled={!offline.online}
-                onClick={() => setOverlay('leaderboard')}
-              >
-                <Trophy size={18} />
-                <span>Рейтинг игроков</span>
-                <ArrowRight size={16} />
-              </button>
+              <div className={styles.menuLinks}>
+                <button
+                  className={styles.leaderboardButton}
+                  disabled={!offline.online}
+                  onClick={() => openDaily()}
+                >
+                  <CalendarDays size={17} />
+                  <span>Задача дня</span>
+                </button>
+                <button
+                  className={styles.leaderboardButton}
+                  disabled={!offline.online}
+                  onClick={() => setOverlay('leaderboard')}
+                >
+                  <Trophy size={17} />
+                  <span>Рейтинг игроков</span>
+                </button>
+              </div>
               {offline.online && offline.update && (
                 <div className={styles.offlineStatus}>
                   <button onClick={applyOfflineUpdate}>Обновить игру</button>
@@ -404,7 +431,11 @@ export default function App() {
               )}
             </section>
           ) : (
-            <GamePanel onMenu={requestMenu} onLevels={openLevels} />
+            <GamePanel
+              onMenu={requestMenu}
+              onLevels={openLevels}
+              onDailyResults={() => openDaily(true)}
+            />
           )}
 
           <section className={styles.boardArea} aria-label="Игровое поле">
@@ -479,7 +510,9 @@ export default function App() {
                 <strong>
                   {level
                     ? moveLabel(levelMoveCount(state.game, level))
-                    : `${state.phase === 'replay' ? state.replayIndex : state.game.history.length} ходов`}
+                    : dailyChallenge
+                      ? moveLabel(dailyMoveCount(state.game, dailyChallenge))
+                      : `${state.phase === 'replay' ? state.replayIndex : state.game.history.length} ходов`}
                 </strong>
                 <span>○ {state.names[1]}</span>
               </div>
@@ -491,7 +524,7 @@ export default function App() {
             )}
             <div className={styles.boardBottom}>
               <div className={styles.boardTools}>
-                {!isMenu && !level && (
+                {!isMenu && !level && !dailyChallenge && (
                   <button
                     aria-label="Отменить ход"
                     title="Отменить ход"
@@ -633,6 +666,17 @@ export default function App() {
         {overlay === 'leaderboard' && (
           <Dialog title="Рейтинг игроков" onClose={closeOverlay} wide>
             <Leaderboard />
+          </Dialog>
+        )}
+        {overlay === 'daily' && (
+          <Dialog title="Задача дня" onClose={closeOverlay}>
+            <DailyChallenge
+              results={dailyResults}
+              onStart={(challenge) => {
+                state.startDaily(challenge);
+                setOverlay(null);
+              }}
+            />
           </Dialog>
         )}
         {overlay === 'levels' && (

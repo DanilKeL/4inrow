@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it } from 'vitest';
 import { replay } from '../game/core';
 import { levelPosition, getLevel } from '../game/levels';
 import { readSavedGame, removeSavedGame, writeSavedGame } from './savedGame';
+import { dailyExpiresAt } from '../game/daily';
 
 const data = () => ({
   mode: 'ai' as const,
@@ -61,6 +62,26 @@ describe('unfinished offline games', () => {
     removeSavedGame('another-game');
     expect(readSavedGame()).not.toBeNull();
     removeSavedGame('local-one');
+    expect(readSavedGame()).toBeNull();
+  });
+  it('restores the exact daily position and rejects a mismatched saved preset', () => {
+    const dailyChallenge = {
+      id: 'daily-1-2026-10-09',
+      date: '2026-10-09',
+      version: 1 as const,
+      preset: getLevel(37)!.preset,
+      expiresAt: dailyExpiresAt('2026-10-09'),
+    };
+    writeSavedGame({
+      ...data(),
+      mode: 'daily',
+      dailyChallenge,
+      game: levelPosition(getLevel(37)!),
+    });
+    expect(readSavedGame()?.dailyChallenge).toEqual(dailyChallenge);
+    const saved = JSON.parse(localStorage.getItem('four-cubed-active-game-v1')!);
+    saved.dailyChallenge.preset[0].x = (saved.dailyChallenge.preset[0].x + 1) % 5;
+    localStorage.setItem('four-cubed-active-game-v1', JSON.stringify(saved));
     expect(readSavedGame()).toBeNull();
   });
 });

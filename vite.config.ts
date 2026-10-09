@@ -10,6 +10,7 @@ export default defineConfig({
       '/auth': 'http://127.0.0.1:3001',
       '/admin-api': 'http://127.0.0.1:3001',
       '/telemetry': 'http://127.0.0.1:3001',
+      '/daily': 'http://127.0.0.1:3001',
     },
   },
   test: { include: ['src/**/*.test.{ts,tsx}', 'server/**/*.test.ts'], environment: 'node' },

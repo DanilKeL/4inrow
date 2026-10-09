@@ -9,6 +9,7 @@ import { useLevelProgress } from './levelStore';
 import { useMatchHistory } from './matchHistory';
 import { readSavedGame } from './savedGame';
 import { useAccount } from './accountStore';
+import { DAILY_BOT_OPTIONS, dailyExpiresAt } from '../game/daily';
 
 const mocked = vi.hoisted(() => ({
   bot: vi.fn(),
@@ -70,6 +71,43 @@ afterEach(() => {
 });
 
 describe('input and animation coordination', () => {
+  it('uses the fixed daily bot, resumes its preset and restarts without allowing undo', async () => {
+    useAccount.setState({ username: null });
+    const preset = getLevel(37)!;
+    const challenge = {
+      id: 'daily-1-2026-10-09',
+      date: '2026-10-09',
+      version: 1 as const,
+      preset: preset.preset,
+      expiresAt: dailyExpiresAt('2026-10-09'),
+    };
+    mocked.bot.mockImplementation((game) =>
+      Promise.resolve(chooseMove(game, 'medium', DAILY_BOT_OPTIONS)),
+    );
+    state().startDaily(challenge);
+    const original = state().game;
+    state().undoMove();
+    expect(state().game).toBe(original);
+    const first = solutions.find((level) => level.id === 37)!.solution[0];
+    state().place(first.x, first.y);
+    await vi.advanceTimersByTimeAsync(1000);
+    expect(mocked.bot).toHaveBeenCalledWith(
+      expect.anything(),
+      'medium',
+      expect.anything(),
+      DAILY_BOT_OPTIONS,
+    );
+    const played = state().game;
+    state().menu();
+    state().resumeSavedGame();
+    expect(state().mode).toBe('daily');
+    expect(state().dailyChallenge).toEqual(challenge);
+    expect(state().game).toEqual(played);
+    state().undoMove();
+    expect(state().game).toEqual(played);
+    state().restart();
+    expect(state().game).toEqual(original);
+  });
   it('plays a preset with deterministic replies and saves only human moves as a separate record', async () => {
     mocked.settings.animations = false;
     useLevelProgress.setState({ best: {}, guestBest: {}, accounts: {} });

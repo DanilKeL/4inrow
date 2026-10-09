@@ -21,6 +21,13 @@ import { prepareMatchAlerts, notifyMatchFound, clearMatchAlert } from '../networ
 import { getLevel, levelPosition, levelMoveCount, LEVEL_BOT_OPTIONS } from '../game/levels';
 import { useLevelProgress } from './levelStore';
 import { readSavedGame, writeSavedGame, removeSavedGame } from './savedGame';
+import {
+  dailyPosition,
+  DAILY_BOT_DIFFICULTY,
+  DAILY_BOT_OPTIONS,
+  type DailyChallenge,
+} from '../game/daily';
+import { useDaily } from './dailyStore';
 
 export type Phase =
   | 'menu'
@@ -33,7 +40,7 @@ export type Phase =
   | 'replay'
   | 'waiting'
   | 'sending';
-export type Mode = 'local' | 'ai' | 'online' | 'level';
+export type Mode = 'local' | 'ai' | 'online' | 'level' | 'daily';
 interface OnlineSession {
   player: Player;
   snapshot: LobbySnapshot;
@@ -60,6 +67,8 @@ interface Store {
   hasSavedGame: boolean;
   resumeSavedGame: () => void;
   discardSavedGame: (recordId: string) => void;
+  dailyChallenge: DailyChallenge | null;
+  startDaily: (challenge: DailyChallenge) => void;
   levelId: number | null;
   levelBestBefore: number | null;
   startLevel: (id: number) => void;
@@ -138,6 +147,7 @@ function receiveOnline(snapshot: LobbySnapshot, player?: Player) {
   useGame.setState({
     mode: 'online',
     levelId: null,
+    dailyChallenge: null,
     onlineKind: snapshot.kind === 'quick' ? 'quick' : 'lobby',
     quickMatch: null,
     archiveId: null,
@@ -300,6 +310,12 @@ function commit(x: number, y: number) {
 function saveFinishedMatch() {
   const { game, names, mode, elapsed, recordId, archiveId, accountAtStart } = useGame.getState();
   if (archiveId || game.status === 'playing') return;
+  if (mode === 'daily') {
+    const challenge = useGame.getState().dailyChallenge;
+    if (challenge && game.winner === 1)
+      useDaily.getState().saveWin(recordId, challenge, game, accountAtStart);
+    return;
+  }
   if (mode === 'level') {
     const level = getLevel(useGame.getState().levelId);
     if (level && game.winner === 1 && accountAtStart === useAccount.getState().username)
@@ -317,6 +333,17 @@ function saveFinishedMatch() {
 }
 
 export const useGame = create<Store>((set, get) => ({
+  dailyChallenge: null,
+  startDaily: (challenge) => {
+    get().start('ai', DAILY_BOT_DIFFICULTY, [currentPlayerName(), 'FOUR AI']);
+    set({
+      mode: 'daily',
+      dailyChallenge: challenge,
+      game: dailyPosition(challenge),
+      names: [currentPlayerName(), 'FOUR AI'],
+    });
+    get().settle();
+  },
   hasSavedGame: Boolean(readSavedGame()),
   discardSavedGame: (recordId) => {
     const saved = readSavedGame();
@@ -344,6 +371,7 @@ export const useGame = create<Store>((set, get) => ({
       accountAtStart,
       levelId,
       levelBestBefore,
+      dailyChallenge,
       xray,
       layers,
       cameraView,
@@ -357,6 +385,7 @@ export const useGame = create<Store>((set, get) => ({
       accountAtStart,
       levelId,
       levelBestBefore,
+      dailyChallenge: dailyChallenge ?? null,
       xray,
       layers,
       cameraView,
@@ -371,6 +400,7 @@ export const useGame = create<Store>((set, get) => ({
       cameraReset: get().cameraReset + 1,
       matchId: get().matchId + 1,
     });
+    if (saved.mode === 'daily' && navigator.onLine) void useDaily.getState().load();
     get().settle();
   },
   levelId: null,
@@ -419,6 +449,7 @@ export const useGame = create<Store>((set, get) => ({
       elapsed: match.elapsed,
       mode: 'local',
       levelId: null,
+      dailyChallenge: null,
       phase: 'replay',
       replayIndex: game.history.length,
       archiveId: match.id,
@@ -480,7 +511,7 @@ export const useGame = create<Store>((set, get) => ({
     difficulty = get().difficulty,
     names = [currentPlayerName(), secondGuestName()],
   ) => {
-    if (mode === 'online' || mode === 'level') return;
+    if (mode === 'online' || mode === 'level' || mode === 'daily') return;
     onlineClient.leave();
     cancelPending();
     set({
@@ -489,6 +520,7 @@ export const useGame = create<Store>((set, get) => ({
       mode,
       levelId: null,
       levelBestBefore: null,
+      dailyChallenge: null,
       recordId: `local-${Date.now()}-${Math.random().toString(36).slice(2)}`,
       accountAtStart: useAccount.getState().username,
       archiveId: null,
@@ -531,7 +563,7 @@ export const useGame = create<Store>((set, get) => ({
     }
     if (
       get().phase !== 'playing' ||
-      (['ai', 'level'].includes(get().mode) && get().game.currentPlayer === 2)
+      (['ai', 'level', 'daily'].includes(get().mode) && get().game.currentPlayer === 2)
     )
       return;
     commit(x, y);
@@ -549,7 +581,7 @@ export const useGame = create<Store>((set, get) => ({
       set({ phase: game.status === 'won' ? 'victory' : 'draw' });
       return;
     }
-    if (!['ai', 'level'].includes(mode) || game.currentPlayer !== 2) {
+    if (!['ai', 'level', 'daily'].includes(mode) || game.currentPlayer !== 2) {
       set({ phase: 'playing' });
       return;
     }
@@ -562,9 +594,9 @@ export const useGame = create<Store>((set, get) => ({
     void Promise.all([
       requestBotMove(
         game,
-        mode === 'level' ? 'medium' : difficulty,
+        mode === 'daily' ? DAILY_BOT_DIFFICULTY : mode === 'level' ? 'medium' : difficulty,
         controller.signal,
-        mode === 'level' ? LEVEL_BOT_OPTIONS : undefined,
+        mode === 'daily' ? DAILY_BOT_OPTIONS : mode === 'level' ? LEVEL_BOT_OPTIONS : undefined,
       ),
       delay,
     ])
@@ -619,7 +651,7 @@ export const useGame = create<Store>((set, get) => ({
     if (get().phase === 'paused') get().settle();
   },
   undoMove: () => {
-    if (get().mode === 'online' || get().mode === 'level') return;
+    if (['online', 'level', 'daily'].includes(get().mode)) return;
     if (get().phase !== 'playing' || get().game.history.length === 0) return;
     cancelPending();
     let game = undo(get().game);
@@ -628,6 +660,10 @@ export const useGame = create<Store>((set, get) => ({
     get().settle();
   },
   restart: () => {
+    if (get().mode === 'daily' && get().dailyChallenge) {
+      get().startDaily(get().dailyChallenge!);
+      return;
+    }
     if (get().mode === 'level' && get().levelId !== null) {
       get().startLevel(get().levelId!);
       return;
@@ -646,6 +682,7 @@ export const useGame = create<Store>((set, get) => ({
       phase: 'menu',
       mode: 'local',
       levelId: null,
+      dailyChallenge: null,
       archiveId: null,
 
       message: '',
@@ -717,6 +754,7 @@ function persistActiveGame() {
       accountAtStart,
       levelId,
       levelBestBefore,
+      dailyChallenge,
       xray,
       layers,
       cameraView,
@@ -731,6 +769,7 @@ function persistActiveGame() {
       accountAtStart,
       levelId,
       levelBestBefore,
+      dailyChallenge,
       xray,
       layers,
       cameraView,

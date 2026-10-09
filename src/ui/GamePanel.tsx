@@ -11,6 +11,8 @@ import { useGame } from '../store/gameStore';
 import styles from './UI.module.css';
 import { getLevel, LEVELS, levelMoveCount, moveLabel } from '../game/levels';
 import { useLevelProgress } from '../store/levelStore';
+import { useDaily } from '../store/dailyStore';
+import { dailyMoveCount } from '../game/daily';
 
 export function timeLabel(seconds: number) {
   return `${Math.floor(seconds / 60)
@@ -18,23 +20,40 @@ export function timeLabel(seconds: number) {
     .padStart(2, '0')}:${(seconds % 60).toString().padStart(2, '0')}`;
 }
 
-export function GamePanel({ onMenu, onLevels }: { onMenu: () => void; onLevels: () => void }) {
+export function GamePanel({
+  onMenu,
+  onLevels,
+  onDailyResults,
+}: {
+  onMenu: () => void;
+  onLevels: () => void;
+  onDailyResults: () => void;
+}) {
   const state = useGame();
   const { game, phase } = state;
   const finished = game.status !== 'playing';
   const level = getLevel(state.levelId);
+  const daily = useDaily();
+  const challenge = state.mode === 'daily' ? state.dailyChallenge : null;
   const best = useLevelProgress((s) => (level ? s.best[level.id] : undefined));
-  const moves = level ? levelMoveCount(game, level) : 0;
+  const moves = challenge
+    ? dailyMoveCount(game, challenge)
+    : level
+      ? levelMoveCount(game, level)
+      : 0;
+  const result = daily.result?.id === state.recordId ? daily.result : null;
   return (
     <aside className={styles.gamePanel}>
       <div className={styles.panelEyebrow}>
-        {level
-          ? `УРОВЕНЬ ${level.id} / ${LEVELS.length}`
-          : state.mode === 'ai'
-            ? 'ПРОТИВ AI'
-            : state.mode === 'online'
-              ? 'ОНЛАЙН'
-              : 'ВДВОЁМ'}
+        {challenge
+          ? 'ЗАДАЧА ДНЯ'
+          : level
+            ? `УРОВЕНЬ ${level.id} / ${LEVELS.length}`
+            : state.mode === 'ai'
+              ? 'ПРОТИВ AI'
+              : state.mode === 'online'
+                ? 'ОНЛАЙН'
+                : 'ВДВОЁМ'}
       </div>
       {phase === 'replay' ? (
         <>
@@ -44,15 +63,21 @@ export function GamePanel({ onMenu, onLevels }: { onMenu: () => void; onLevels: 
         <>
           <Trophy size={30} className={styles.trophy} />
           <h2>
-            {level
+            {challenge
               ? game.winner === 1
-                ? 'Уровень пройден'
+                ? 'Задача решена'
                 : game.status === 'draw'
                   ? 'Ничья'
                   : 'Поражение'
-              : game.status === 'won'
-                ? `Победа: ${state.names[game.winner! - 1]}`
-                : 'Ничья'}
+              : level
+                ? game.winner === 1
+                  ? 'Уровень пройден'
+                  : game.status === 'draw'
+                    ? 'Ничья'
+                    : 'Поражение'
+                : game.status === 'won'
+                  ? `Победа: ${state.names[game.winner! - 1]}`
+                  : 'Ничья'}
           </h2>
           {level && game.winner === 1 && (
             <p className={`${styles.muted} ${styles.levelResult}`} data-testid="level-result">
@@ -62,13 +87,31 @@ export function GamePanel({ onMenu, onLevels }: { onMenu: () => void; onLevels: 
               · {moveLabel(moves)}
             </p>
           )}
+          {challenge && game.winner === 1 && (
+            <div className={`${styles.muted} ${styles.levelResult}`} data-testid="daily-result">
+              {moveLabel(moves)} ·{' '}
+              {result?.status === 'verified'
+                ? 'Результат подтверждён'
+                : result?.status === 'guest'
+                  ? 'Для таблицы результатов нужен аккаунт.'
+                  : result?.status === 'failed'
+                    ? result.error
+                    : 'Проверяем результат…'}
+              {result?.status === 'failed' &&
+                daily.pending.some((item) => item.id === state.recordId) && (
+                  <button className={styles.textButton} onClick={() => void daily.flush()}>
+                    Повторить отправку
+                  </button>
+                )}
+            </div>
+          )}
           {state.online?.snapshot.endReason && (
             <p className={styles.muted}>{state.online.snapshot.endReason}</p>
           )}
         </>
       ) : (
         <>
-          <h2>{level ? level.chapter : 'Текущая партия'}</h2>
+          <h2>{challenge ? 'Задача дня' : level ? level.chapter : 'Текущая партия'}</h2>
         </>
       )}
       <div className={styles.players}>
@@ -90,15 +133,27 @@ export function GamePanel({ onMenu, onLevels }: { onMenu: () => void; onLevels: 
       </div>
       <div className={styles.stats}>
         <div>
-          <small>{level ? 'ВАШИ ХОДЫ' : 'ХОДЫ'}</small>
+          <small>{level || challenge ? 'ВАШИ ХОДЫ' : 'ХОДЫ'}</small>
           <strong data-testid="move-count">
-            {level ? moves : phase === 'replay' ? state.replayIndex : game.history.length}
-            {!level && <span> / 125</span>}
+            {level || challenge
+              ? moves
+              : phase === 'replay'
+                ? state.replayIndex
+                : game.history.length}
+            {!level && !challenge && <span> / 125</span>}
           </strong>
         </div>
         <div>
-          <small>{level ? 'ЛИЧНЫЙ РЕКОРД' : 'ВРЕМЯ'}</small>
-          <strong>{level ? (best ?? '—') : timeLabel(state.elapsed)}</strong>
+          <small>{level || challenge ? 'ЛИЧНЫЙ РЕКОРД' : 'ВРЕМЯ'}</small>
+          <strong>
+            {challenge
+              ? daily.challenge?.id === challenge.id
+                ? (daily.ownBest ?? '—')
+                : '—'
+              : level
+                ? (best ?? '—')
+                : timeLabel(state.elapsed)}
+          </strong>
         </div>
       </div>
       {phase === 'replay' ? (
@@ -138,6 +193,18 @@ export function GamePanel({ onMenu, onLevels }: { onMenu: () => void; onLevels: 
           </p>
           <button className={styles.secondary} onClick={state.closeReplay}>
             Завершить просмотр
+          </button>
+        </>
+      ) : finished && challenge ? (
+        <>
+          <button className={styles.primary} onClick={state.restart}>
+            <RotateCcw size={17} /> Повторить задачу
+          </button>
+          <button className={styles.secondary} onClick={onDailyResults}>
+            <Trophy size={17} /> Результаты дня
+          </button>
+          <button className={styles.textButton} onClick={onMenu}>
+            Главное меню
           </button>
         </>
       ) : finished && level ? (
