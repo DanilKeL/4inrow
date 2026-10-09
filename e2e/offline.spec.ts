@@ -7,8 +7,25 @@ import { strict as assert } from 'node:assert';
 
 async function ready(page: Page) {
   await expect(page.getByTestId('loading-screen')).toBeHidden();
-  await expect(page.getByTestId('offline-status')).toContainText('Доступно без интернета');
   await page.waitForFunction(() => Boolean(navigator.serviceWorker.controller));
+  await page.waitForFunction(
+    () =>
+      new Promise<boolean>((resolve) => {
+        const channel = new MessageChannel();
+        const timer = setTimeout(() => {
+          channel.port1.close();
+          resolve(false);
+        }, 2000);
+        channel.port1.onmessage = (event) => {
+          clearTimeout(timer);
+          channel.port1.close();
+          resolve(Boolean(event.data?.ready));
+        };
+        navigator.serviceWorker.controller!.postMessage({ type: 'offline-status' }, [
+          channel.port2,
+        ]);
+      }),
+  );
 }
 async function topView(page: Page) {
   await page.getByRole('button', { name: 'Вид', exact: true }).click();
@@ -68,7 +85,7 @@ for (const viewport of [
       const navigation = await page.goto(baseURL!);
       expect(navigation?.fromServiceWorker()).toBe(true);
       await expect(page.getByTestId('loading-screen')).toBeHidden();
-      await expect(page.getByTestId('offline-status')).toContainText('Без интернета');
+      await expect(page.getByText('Доступно без интернета', { exact: true })).toHaveCount(0);
       expect(
         await page.evaluate(() => document.documentElement.scrollHeight - innerHeight),
       ).toBeLessThanOrEqual(1);

@@ -62,7 +62,7 @@ import {
   tutorialMediaSnapshot,
 } from '../network/tutorialMedia';
 import styles from '../ui/UI.module.css';
-import { useOffline, applyOfflineUpdate, retryOffline } from '../network/offline';
+import { useOffline, applyOfflineUpdate } from '../network/offline';
 import { readSavedGame } from '../store/savedGame';
 
 const GameScene = lazy(() => import('../scene/GameScene'));
@@ -397,25 +397,11 @@ export default function App() {
                 <span>Рейтинг игроков</span>
                 <ArrowRight size={16} />
               </button>
-              <div className={styles.offlineStatus} role="status" data-testid="offline-status">
-                {!offline.online
-                  ? offline.ready
-                    ? 'Без интернета · боты и уровни доступны'
-                    : 'Без интернета'
-                  : offline.error && !offline.ready
-                    ? 'Не удалось сохранить игру для офлайна'
-                    : offline.saving && !offline.ready
-                      ? `Сохраняем для офлайна${offline.total ? ` · ${Math.round((offline.loaded / offline.total) * 100)}%` : '…'}`
-                      : offline.ready
-                        ? 'Доступно без интернета'
-                        : null}
-                {offline.online && offline.error && !offline.ready && (
-                  <button onClick={retryOffline}>Повторить</button>
-                )}
-                {offline.online && offline.update && (
+              {offline.online && offline.update && (
+                <div className={styles.offlineStatus}>
                   <button onClick={applyOfflineUpdate}>Обновить игру</button>
-                )}
-              </div>
+                </div>
+              )}
             </section>
           ) : (
             <GamePanel onMenu={requestMenu} onLevels={openLevels} />
