@@ -2,18 +2,25 @@
 """Enter a dedicated WebDAV app password on the server, never in command history."""
 import configparser
 import getpass
+import json
 import os
 import subprocess
+import sys
 import tempfile
 from pathlib import Path
 
 
-def main():
+def main(from_stdin=False):
     if os.geteuid() != 0:
         raise SystemExit("Run with sudo")
     os.umask(0o077)
-    login = input("Yandex login: ").strip()
-    password = getpass.getpass("WebDAV app password (hidden): ").strip()
+    if from_stdin:
+        credentials = json.load(sys.stdin)
+        login = credentials.get("login", "").strip()
+        password = credentials.get("password", "").strip()
+    else:
+        login = input("Yandex login: ").strip()
+        password = getpass.getpass("WebDAV app password (hidden): ").strip()
     if not login or not password or any(c in login + password for c in "\r\n\x00"):
         raise SystemExit("Login and app password are required")
     encoded = subprocess.run(["/usr/bin/rclone", "obscure", "-"], input=password,
@@ -44,4 +51,7 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    import argparse
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--stdin", action="store_true", help="Read login/password JSON from private standard input")
+    main(from_stdin=parser.parse_args().stdin)
