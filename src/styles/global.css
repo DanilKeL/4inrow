@@ -86,8 +86,11 @@ input {
   min-width: 0;
 }
 #root {
-  height: 100dvh;
+  height: var(--four-viewport-height, 100dvh);
   min-height: 0;
+}
+html[data-telegram] body {
+  overscroll-behavior: none;
 }
 #status-bar-background {
   display: none;

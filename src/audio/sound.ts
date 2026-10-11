@@ -1,4 +1,5 @@
 import { useSettings } from '../store/settingsStore';
+import { telegramHaptic } from '../telegram/bridge';
 
 let context: AudioContext | undefined;
 let master: GainNode | undefined;
@@ -20,6 +21,7 @@ export function unlockAudio() {
 }
 
 export function playSound(kind: 'place' | 'invalid' | 'win' | 'click' | 'match') {
+  telegramHaptic(kind);
   if (
     !context ||
     context.state !== 'running' ||

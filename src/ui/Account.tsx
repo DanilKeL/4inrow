@@ -19,6 +19,7 @@ import { useMatchHistory } from '../store/matchHistory';
 import type { SavedMatch } from '../network/statistics';
 import accountStyles from './Account.module.css';
 import styles from './UI.module.css';
+import { TelegramLogin } from './TelegramLogin';
 
 type View = 'login' | 'register' | 'forgot' | 'reset';
 type SignedView = 'overview' | 'security';
@@ -52,6 +53,9 @@ export function Account({ onOpenHistory }: { onOpenHistory?: () => void }) {
     email: profileEmail,
     emailVerified,
     createdAt,
+    hasPassword,
+    telegramLinked,
+    telegramUsername,
     loading,
     error,
     notice,
@@ -385,25 +389,37 @@ export function Account({ onOpenHistory }: { onOpenHistory?: () => void }) {
               </dl>
             </section>
             <section className={accountStyles.passwordCard}>
+              <div className={accountStyles.telegramSection}>
+                {telegramLinked ? (
+                  <span className={accountStyles.telegramLinked}>
+                    <CheckCircle2 size={17} /> Telegram
+                    {telegramUsername ? ` · @${telegramUsername}` : ''}
+                  </span>
+                ) : (
+                  <TelegramLogin purpose="link" />
+                )}
+              </div>
               <div className={accountStyles.passwordHeading}>
                 <LockKeyhole size={20} />
                 <div>
-                  <span>СМЕНА ПАРОЛЯ</span>
+                  <span>{hasPassword ? 'СМЕНА ПАРОЛЯ' : 'СОЗДАНИЕ ПАРОЛЯ'}</span>
                   <strong>Обновите данные входа</strong>
                 </div>
               </div>
               <form onSubmit={(event) => void submitPassword(event)}>
-                <label>
-                  Текущий пароль
-                  <input
-                    name="currentPassword"
-                    type="password"
-                    autoComplete="current-password"
-                    value={currentPassword}
-                    onChange={(event) => setCurrentPassword(event.target.value)}
-                    required
-                  />
-                </label>
+                {hasPassword && (
+                  <label>
+                    Текущий пароль
+                    <input
+                      name="currentPassword"
+                      type="password"
+                      autoComplete="current-password"
+                      value={currentPassword}
+                      onChange={(event) => setCurrentPassword(event.target.value)}
+                      required
+                    />
+                  </label>
+                )}
                 <label>
                   Новый пароль
                   <input
@@ -442,7 +458,8 @@ export function Account({ onOpenHistory }: { onOpenHistory?: () => void }) {
                   </p>
                 )}
                 <button className={styles.primary} disabled={loading} type="submit">
-                  <KeyRound size={17} /> {loading ? 'Сохраняем…' : 'Изменить пароль'}
+                  <KeyRound size={17} />{' '}
+                  {loading ? 'Сохраняем…' : hasPassword ? 'Изменить пароль' : 'Создать пароль'}
                 </button>
               </form>
             </section>
@@ -551,6 +568,7 @@ export function Account({ onOpenHistory }: { onOpenHistory?: () => void }) {
           Вход
         </button>
       </div>
+      <TelegramLogin />
       <form onSubmit={(event) => void submit(event)}>
         <label>
           Имя пользователя

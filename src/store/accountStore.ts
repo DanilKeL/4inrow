@@ -36,6 +36,9 @@ interface AccountState {
   email: string | null;
   emailVerified: boolean;
   createdAt: number | null;
+  hasPassword: boolean;
+  telegramLinked: boolean;
+  telegramUsername: string | null;
   identityReady: boolean;
   loading: boolean;
   error: string;
@@ -48,6 +51,7 @@ interface AccountState {
   completePasswordReset: (token: string, password: string) => Promise<boolean>;
   refreshProfile: () => Promise<void>;
   changePassword: (currentPassword: string, newPassword: string) => Promise<boolean>;
+  telegramLogin: (body: { nonce: string; initData?: string; idToken?: string }) => Promise<boolean>;
   clearMessages: () => void;
   logout: () => Promise<void>;
 }
@@ -68,6 +72,9 @@ export const useAccount = create<AccountState>((set) => ({
   email: null,
   emailVerified: false,
   createdAt: null,
+  hasPassword: true,
+  telegramLinked: false,
+  telegramUsername: null,
   identityReady: false,
   loading: false,
   error: '',
@@ -88,6 +95,9 @@ export const useAccount = create<AccountState>((set) => ({
             email?: string | null;
             emailVerified?: boolean;
             createdAt?: number | null;
+            hasPassword?: boolean;
+            telegramLinked?: boolean;
+            telegramUsername?: string | null;
           };
           if (data.guestName) saveGuestName(data.guestName);
           set({
@@ -95,6 +105,9 @@ export const useAccount = create<AccountState>((set) => ({
             email: data.email ?? null,
             emailVerified: Boolean(data.emailVerified),
             createdAt: data.createdAt ?? null,
+            hasPassword: data.hasPassword !== false,
+            telegramLinked: Boolean(data.telegramLinked),
+            telegramUsername: data.telegramUsername ?? null,
             ...(data.guestName ? { guestName: data.guestName } : {}),
           });
         } catch {
@@ -201,12 +214,18 @@ export const useAccount = create<AccountState>((set) => ({
         email?: string | null;
         emailVerified?: boolean;
         createdAt?: number | null;
+        hasPassword?: boolean;
+        telegramLinked?: boolean;
+        telegramUsername?: string | null;
       };
       set({
         username: data.username,
         email: data.email ?? null,
         emailVerified: Boolean(data.emailVerified),
         createdAt: data.createdAt ?? null,
+        hasPassword: data.hasPassword !== false,
+        telegramLinked: Boolean(data.telegramLinked),
+        telegramUsername: data.telegramUsername ?? null,
       });
     } catch {
       /* The cached profile remains usable while temporarily offline. */
@@ -225,8 +244,50 @@ export const useAccount = create<AccountState>((set) => ({
         throw new Error(data.error ?? 'Не удалось изменить пароль.');
       set({
         username: data.username,
+        hasPassword: true,
         notice: data.message ?? 'Пароль изменён.',
         error: '',
+      });
+      return true;
+    } catch (error) {
+      set({ error: error instanceof Error ? error.message : 'Нет связи с сервером.' });
+      return false;
+    } finally {
+      set({ loading: false });
+    }
+  },
+  telegramLogin: async (body) => {
+    set({ loading: true, error: '', notice: '' });
+    try {
+      const response = await fetch('/auth/telegram/complete', {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+        signal: AbortSignal.timeout(15000),
+      });
+      const data = (await response.json()) as {
+        username?: string;
+        email?: string | null;
+        emailVerified?: boolean;
+        createdAt?: number;
+        hasPassword?: boolean;
+        telegramLinked?: boolean;
+        telegramUsername?: string | null;
+        linked?: boolean;
+        error?: string;
+      };
+      if (!response.ok || !data.username)
+        throw new Error(data.error ?? 'Не удалось войти через Telegram.');
+      set({
+        username: data.username,
+        email: data.email ?? null,
+        emailVerified: Boolean(data.emailVerified),
+        createdAt: data.createdAt ?? null,
+        hasPassword: data.hasPassword !== false,
+        telegramLinked: Boolean(data.telegramLinked),
+        telegramUsername: data.telegramUsername ?? null,
+        notice: data.linked ? 'Telegram привязан.' : '',
       });
       return true;
     } catch (error) {
@@ -250,6 +311,9 @@ export const useAccount = create<AccountState>((set) => ({
         email: null,
         emailVerified: false,
         createdAt: null,
+        hasPassword: true,
+        telegramLinked: false,
+        telegramUsername: null,
       });
     } catch (error) {
       set({ error: error instanceof Error ? error.message : 'Не удалось выйти из аккаунта.' });

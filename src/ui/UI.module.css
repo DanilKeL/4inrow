@@ -3,7 +3,7 @@
   margin: 0 auto;
   padding: var(--safe-area-inset-top, env(safe-area-inset-top, 0px)) 64px
     var(--safe-area-inset-bottom, env(safe-area-inset-bottom, 0px));
-  min-height: 100dvh;
+  min-height: var(--four-viewport-height, 100dvh);
   display: flex;
   flex-direction: column;
 }
@@ -1077,7 +1077,7 @@
    Dialogs retain overflow as an accessibility fallback for zoom/keyboards. */
 @media (max-width: 650px), (max-width: 1000px) and (max-height: 550px) and (pointer: coarse) {
   .app {
-    height: 100dvh;
+    height: var(--four-viewport-height, 100dvh);
     min-height: 0;
     padding: var(--safe-area-inset-top, env(safe-area-inset-top, 0px))
       max(12px, var(--safe-area-inset-right, env(safe-area-inset-right, 0px)))
@@ -1379,12 +1379,15 @@
     font-size: 11px;
   }
   .backdrop {
-    padding: max(8px, env(safe-area-inset-top, 0px)) 10px max(8px, env(safe-area-inset-bottom, 0px));
+    padding: max(8px, var(--safe-area-inset-top, env(safe-area-inset-top, 0px))) 10px
+      max(8px, var(--safe-area-inset-bottom, env(safe-area-inset-bottom, 0px)));
   }
   .dialog {
     padding: 14px;
     max-height: calc(
-      100dvh - 16px - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px)
+      var(--four-viewport-height, 100dvh) - 16px -
+        var(--safe-area-inset-top, env(safe-area-inset-top, 0px)) -
+        var(--safe-area-inset-bottom, env(safe-area-inset-bottom, 0px))
     );
   }
   .dialogHeader {
@@ -1638,7 +1641,7 @@
 
 /* Application layout. The board consumes remaining space, never sets page height. */
 .app {
-  height: 100dvh;
+  height: var(--four-viewport-height, 100dvh);
   min-height: 0;
   max-width: 1760px;
   padding-inline: clamp(16px, 3vw, 48px);

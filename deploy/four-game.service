@@ -15,6 +15,7 @@ Environment=FOUR_STATS_FILE=/srv/four-game-data/statistics.sqlite
 Environment=FOUR_PUBLIC_URL=https://4inrow.ru
 EnvironmentFile=/etc/four-game/admin.env
 EnvironmentFile=/etc/four-game/mail.env
+EnvironmentFile=-/etc/four-game/telegram.env
 ExecStart=/usr/bin/node /srv/four-game/dist-server/index.js
 Restart=on-failure
 RestartSec=3

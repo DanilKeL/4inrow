@@ -39,6 +39,14 @@ try {
   const errors = [];
   page.on('pageerror', (error) => errors.push(error.message));
   page.on('console', (message) => {
+    // Ignore only Chromium's software-renderer ReadPixels performance notice.
+    if (
+      message.type() === 'warning' &&
+      /^\[\.WebGL-[^\]]+\]GL Driver Message \(OpenGL, Performance, GL_CLOSE_PATH_NV, High\): GPU stall due to ReadPixels/.test(
+        message.text(),
+      )
+    )
+      return;
     if (['error', 'warning'].includes(message.type())) errors.push(message.text());
   });
   await page.goto(baseURL);

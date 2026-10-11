@@ -68,6 +68,15 @@ export function collectErrors(page: Page): string[] {
   const errors: string[] = [];
   page.on('pageerror', (error) => errors.push(error.message));
   page.on('console', (message) => {
+    // Chromium's software WebGL driver emits this performance diagnostic during
+    // screenshots. Keep actual JS/WebGL errors and every other warning visible.
+    if (
+      message.type() === 'warning' &&
+      /^\[\.WebGL-[^\]]+\]GL Driver Message \(OpenGL, Performance, GL_CLOSE_PATH_NV, High\): GPU stall due to ReadPixels/.test(
+        message.text(),
+      )
+    )
+      return;
     if (message.type() === 'error' || message.type() === 'warning') errors.push(message.text());
   });
   return errors;

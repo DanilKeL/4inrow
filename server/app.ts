@@ -14,6 +14,7 @@ import { onlineElapsed } from '../src/network/matchTime.ts';
 import type { AnalyticsFilter } from '../src/network/analyticsTypes.ts';
 import { DailyService, type DailyServiceOptions } from './dailyService.ts';
 import { waitingPairs } from './matchmaking.ts';
+import { TelegramAuth, type TelegramAuthOptions } from './telegramAuth.ts';
 
 interface Seat {
   account: string | null;
@@ -86,6 +87,7 @@ export interface OnlineServerOptions {
   /** Transactional email provider. Omit to use Resend from the environment; null disables email. */
   mailer?: Mailer | null;
   daily?: DailyServiceOptions;
+  telegram?: TelegramAuthOptions | null;
 }
 
 const mime: Record<string, string> = {
@@ -181,6 +183,7 @@ function parseCommand(raw: string): ClientCommand | null {
 
 export function createOnlineServer(options: OnlineServerOptions = {}) {
   const auth = new AuthStore(options.authFile);
+  const telegram = new TelegramAuth(options.telegram);
   const mailer = options.mailer === undefined ? ResendMailer.fromEnv() : options.mailer;
   const statistics = new StatisticsStore(
     options.statsFile === undefined && options.authFile === null ? null : options.statsFile,
@@ -588,7 +591,8 @@ export function createOnlineServer(options: OnlineServerOptions = {}) {
           let body = '';
           for await (const chunk of req) {
             body += chunk;
-            if (body.length > 4096) throw new AuthError(413, 'Слишком большой запрос.');
+            if (body.length > (pathname.startsWith('/auth/telegram/') ? 16000 : 4096))
+              throw new AuthError(413, 'Слишком большой запрос.');
           }
           try {
             const data: unknown = JSON.parse(body);
@@ -598,6 +602,10 @@ export function createOnlineServer(options: OnlineServerOptions = {}) {
             throw new AuthError(400, 'Некорректный JSON.');
           }
         };
+        if (req.method === 'POST' && req.headers['sec-fetch-site'] === 'cross-site') {
+          respond(403, { error: 'Запрос с другого сайта отклонён.' });
+          return;
+        }
         if (req.method === 'POST' && req.headers.origin) {
           try {
             const origin = new URL(req.headers.origin);
@@ -614,6 +622,48 @@ export function createOnlineServer(options: OnlineServerOptions = {}) {
             respond(403, { error: 'Запрос с другого сайта отклонён.' });
             return;
           }
+        }
+        if (pathname.startsWith('/auth/telegram/')) {
+          try {
+            if (pathname === '/auth/telegram/config' && req.method === 'GET') {
+              respond(200, telegram.config());
+              return;
+            }
+            if (req.method !== 'POST') throw new AuthError(405, 'Метод не поддерживается.');
+            checkRate(authAttempts, 30);
+            const data = await readAuthJson();
+            const owner = auth.username(req.headers.cookie);
+            if (pathname === '/auth/telegram/begin') {
+              const result = telegram.begin(data.purpose, owner);
+              res.setHeader('Set-Cookie', telegram.cookie(result.token, secure));
+              respond(200, {
+                nonce: result.nonce,
+                clientId: result.clientId,
+                miniApp: result.miniApp,
+              });
+            } else if (pathname === '/auth/telegram/complete') {
+              const verified = await telegram.complete(req.headers.cookie, data, owner);
+              // Linking and creating an account only accept identities verified on the server.
+              const result = await auth.telegramLogin(verified.user, verified.linkOwner);
+              res.setHeader('Set-Cookie', [
+                auth.cookie(result.token, secure),
+                telegram.cookie(null, secure),
+              ]);
+              respond(200, {
+                authenticated: true,
+                ...auth.profile(`four_session=${result.token}`),
+                linked: Boolean(verified.linkOwner),
+              });
+            } else throw new AuthError(404, 'Адрес не найден.');
+          } catch (error) {
+            respond(error instanceof AuthError ? error.status : 500, {
+              error:
+                error instanceof AuthError
+                  ? error.message
+                  : 'Вход через Telegram временно недоступен.',
+            });
+          }
+          return;
         }
         if (pathname === '/auth/levels') {
           try {

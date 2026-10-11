@@ -23,6 +23,8 @@ type Account = {
   email?: string;
   emailVerified?: boolean;
   disabled?: boolean;
+  passwordSet?: boolean;
+  telegram?: { id: string; username?: string };
 };
 type Session = { usernameKey?: string; guestName?: string; expires: number };
 type ActionToken = { usernameKey: string; expires: number };
@@ -177,7 +179,7 @@ export class AuthStore {
     const salt = account?.salt ?? '00000000000000000000000000000000';
     const expected = Buffer.from(account?.hash ?? '00'.repeat(64), 'hex');
     const actual = (await scrypt(rawPassword, salt, 64)) as Buffer;
-    if (!account || !timingSafeEqual(actual, expected))
+    if (!account || account.passwordSet === false || !timingSafeEqual(actual, expected))
       throw new AuthError(401, 'Неверное имя пользователя или пароль.');
     if (account.disabled) throw new AuthError(403, 'Аккаунт заблокирован администратором.');
     if (account.email && !account.emailVerified)
@@ -198,6 +200,9 @@ export class AuthStore {
       username: account.username,
       email: account.email ?? null,
       emailVerified: Boolean(account.email && account.emailVerified),
+      hasPassword: account.passwordSet !== false,
+      telegramLinked: Boolean(account.telegram),
+      telegramUsername: account.telegram?.username ?? null,
       createdAt:
         typeof account.createdAt === 'number' && Number.isSafeInteger(account.createdAt)
           ? account.createdAt
@@ -217,16 +222,20 @@ export class AuthStore {
       throw new AuthError(401, 'Войдите в аккаунт заново.');
     const account = this.data.accounts[session.usernameKey];
     if (!account || account.disabled) throw new AuthError(401, 'Войдите в аккаунт заново.');
-    if (typeof rawCurrentPassword !== 'string') throw new AuthError(400, 'Введите текущий пароль.');
-    const expected = Buffer.from(account.hash, 'hex');
-    const actual = (await scrypt(rawCurrentPassword, account.salt, 64)) as Buffer;
-    if (!timingSafeEqual(actual, expected)) throw new AuthError(401, 'Текущий пароль неверен.');
+    if (account.passwordSet !== false) {
+      if (typeof rawCurrentPassword !== 'string')
+        throw new AuthError(400, 'Введите текущий пароль.');
+      const expected = Buffer.from(account.hash, 'hex');
+      const actual = (await scrypt(rawCurrentPassword, account.salt, 64)) as Buffer;
+      if (!timingSafeEqual(actual, expected)) throw new AuthError(401, 'Текущий пароль неверен.');
+    }
     const password = this.validatePassword(rawNewPassword);
     if (password === rawCurrentPassword)
       throw new AuthError(400, 'Новый пароль должен отличаться от текущего.');
     const salt = randomBytes(16).toString('hex');
     account.salt = salt;
     account.hash = ((await scrypt(password, salt, 64)) as Buffer).toString('hex');
+    account.passwordSet = true;
     this.invalidateAccount(session.usernameKey);
     const nextToken = this.newSession(session.usernameKey);
     await this.save();
@@ -238,6 +247,52 @@ export class AuthStore {
     const token = randomBytes(32).toString('hex');
     this.data.sessions[this.hashToken(token)] = { usernameKey, expires: Date.now() + SESSION_AGE };
     return token;
+  }
+
+  async telegramLogin(user: { id: string; username?: string }, linkOwner: string | null = null) {
+    const linked = Object.entries(this.data.accounts).find(
+      ([, account]) => account.telegram?.id === user.id,
+    );
+    let key: string;
+    if (linkOwner) {
+      key = this.key(linkOwner);
+      const account = this.data.accounts[key];
+      if (!account || account.disabled) throw new AuthError(401, 'Войдите в аккаунт заново.');
+      if (linked && linked[0] !== key)
+        throw new AuthError(409, 'Этот Telegram уже привязан к другому аккаунту.');
+      if (account.telegram && account.telegram.id !== user.id)
+        throw new AuthError(409, 'К аккаунту уже привязан другой Telegram.');
+      account.telegram = user;
+    } else if (linked) {
+      key = linked[0];
+      const account = linked[1];
+      if (account.disabled) throw new AuthError(403, 'Аккаунт заблокирован администратором.');
+      if (account.email && !account.emailVerified)
+        throw new AuthError(403, 'Подтвердите email по ссылке из письма.');
+      account.telegram = user;
+    } else {
+      const preferred =
+        user.username && /^[A-Za-z0-9_]{3,24}$/.test(user.username)
+          ? user.username
+          : `tg_${user.id}`;
+      let username = preferred;
+      if (this.data.accounts[this.key(username)]) username = `tg_${user.id}`;
+      while (this.data.accounts[this.key(username)])
+        username = `${preferred.slice(0, 15)}_${randomBytes(4).toString('hex')}`;
+      key = this.key(username);
+      // No fabricated email and no usable password. A password can be set after signing in.
+      this.data.accounts[key] = {
+        username,
+        salt: randomBytes(16).toString('hex'),
+        hash: randomBytes(64).toString('hex'),
+        passwordSet: false,
+        createdAt: Date.now(),
+        telegram: user,
+      };
+    }
+    const token = this.newSession(key);
+    await this.save();
+    return { username: this.data.accounts[key].username, token };
   }
 
   private issueToken(collection: Record<string, ActionToken>, usernameKey: string, age: number) {
@@ -305,6 +360,7 @@ export class AuthStore {
     const salt = randomBytes(16).toString('hex');
     account.salt = salt;
     account.hash = ((await scrypt(password, salt, 64)) as Buffer).toString('hex');
+    account.passwordSet = true;
     for (const [tokenHash, session] of Object.entries(this.data.sessions))
       if (session.usernameKey === usernameKey) delete this.data.sessions[tokenHash];
     const token = this.newSession(usernameKey);
@@ -370,6 +426,8 @@ export class AuthStore {
         email: account.email ?? '',
         emailVerified: Boolean(account.email && account.emailVerified),
         disabled: Boolean(account.disabled),
+        telegramLinked: Boolean(account.telegram),
+        telegramUsername: account.telegram?.username ?? null,
       }))
       .sort((a, b) => a.username.localeCompare(b.username, 'ru'));
   }
@@ -437,6 +495,7 @@ export class AuthStore {
     const salt = randomBytes(16).toString('hex');
     account.salt = salt;
     account.hash = ((await scrypt(password, salt, 64)) as Buffer).toString('hex');
+    account.passwordSet = true;
     this.invalidateAccount(key);
     await this.save();
   }

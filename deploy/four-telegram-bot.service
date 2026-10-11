@@ -1,0 +1,24 @@
+[Unit]
+Description=FOUR Telegram welcome bot
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=fourgame
+Group=fourgame
+WorkingDirectory=/srv/four-game
+EnvironmentFile=/etc/four-game/telegram.env
+Environment=TELEGRAM_STATE_FILE=/srv/four-game-data/telegram-state.json
+ExecStart=/usr/bin/node /srv/four-game/scripts/telegram-bot.mjs
+Restart=on-failure
+RestartSec=15
+UMask=0077
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/srv/four-game-data
+
+[Install]
+WantedBy=multi-user.target

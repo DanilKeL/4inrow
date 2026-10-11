@@ -428,6 +428,46 @@
   width: min(100%, 430px);
   margin: 0 auto;
 }
+.telegramSection {
+  display: grid;
+  gap: 8px;
+}
+.telegramButton {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 9px;
+  width: 100%;
+  min-height: 44px;
+  padding: 10px 14px;
+  border: 1px solid #d9e4eb;
+  border-radius: 10px;
+  background: #eff7fc;
+  color: #1675ad;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 750;
+  cursor: pointer;
+}
+.telegramButton:hover {
+  background: #e4f2fb;
+}
+.telegramButton:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+.telegramButton:focus-visible {
+  outline: 3px solid #2481b633;
+  outline-offset: 2px;
+}
+.telegramLinked {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: #1675ad;
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
 .guestIntro {
   display: flex;
   align-items: center;
@@ -516,6 +556,9 @@
 }
 
 @media (max-height: 650px) and (pointer: coarse), (max-height: 650px) and (max-width: 650px) {
+  .authPanel .guestIntro {
+    display: none;
+  }
   .profileHero,
   .recentCard,
   .securityInfo {

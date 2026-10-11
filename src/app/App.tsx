@@ -68,6 +68,7 @@ import { readSavedGame } from '../store/savedGame';
 import { DailyChallenge } from '../ui/DailyChallenge';
 import { useDaily } from '../store/dailyStore';
 import { dailyMoveCount } from '../game/daily';
+import { telegramApp } from '../telegram/bridge';
 
 const GameScene = lazy(() => import('../scene/GameScene'));
 type Overlay =
@@ -262,6 +263,51 @@ export default function App() {
       setOverlay(null);
     }
   };
+  useEffect(() => {
+    const app = telegramApp();
+    if (!app?.isVersionAtLeast('6.1')) return;
+    const back = () => {
+      if (overlay) closeOverlay();
+      else requestMenu();
+    };
+    if (overlay || !isMenu) app.BackButton.show();
+    else app.BackButton.hide();
+    app.BackButton.onClick(back);
+    return () => app.BackButton.offClick(back);
+  });
+  useEffect(() => {
+    const app = telegramApp();
+    if (!app) return;
+    if (app.isVersionAtLeast('6.2')) {
+      if (!isMenu && state.game.status === 'playing' && state.game.history.length > 0)
+        app.enableClosingConfirmation();
+      else app.disableClosingConfirmation();
+    }
+  }, [isMenu, state.game.status, state.game.history.length]);
+  useEffect(() => {
+    const app = telegramApp();
+    if (!app) return;
+    const deactivate = () => {
+      const game = useGame.getState();
+      if (game.mode !== 'online' && ['playing', 'ai-thinking', 'animating'].includes(game.phase)) {
+        game.pause();
+        setOverlay('pause');
+      }
+    };
+    const settings = () => {
+      useGame.getState().pause();
+      setOverlay('settings');
+    };
+    app.onEvent('deactivated', deactivate);
+    if (app.isVersionAtLeast('6.10')) {
+      app.SettingsButton?.show();
+      app.SettingsButton?.onClick(settings);
+    }
+    return () => {
+      app.offEvent('deactivated', deactivate);
+      app.SettingsButton?.offClick(settings);
+    };
+  }, []);
   useEffect(() => {
     void useAccount.getState().load();
     useGame.getState().restoreOnline();

@@ -4,6 +4,7 @@ import App from './app/App';
 import './styles/global.css';
 import { initializeAnalytics } from './network/analytics';
 import { initializeOffline } from './network/offline';
+import { initializeTelegram, loadTelegramSDK } from './telegram/bridge';
 
 const AdminApp = lazy(() => import('./admin/AdminApp'));
 // Home-screen Safari can omit version tokens and use navigator.standalone.
@@ -26,14 +27,19 @@ if (!window.location.pathname.startsWith('/admin')) {
   initializeAnalytics();
 }
 
-createRoot(document.getElementById('root')!).render(
-  <StrictMode>
-    {window.location.pathname.startsWith('/admin') ? (
-      <Suspense fallback={null}>
-        <AdminApp />
-      </Suspense>
-    ) : (
-      <App />
-    )}
-  </StrictMode>,
-);
+async function mount() {
+  await loadTelegramSDK();
+  initializeTelegram();
+  createRoot(document.getElementById('root')!).render(
+    <StrictMode>
+      {window.location.pathname.startsWith('/admin') ? (
+        <Suspense fallback={null}>
+          <AdminApp />
+        </Suspense>
+      ) : (
+        <App />
+      )}
+    </StrictMode>,
+  );
+}
+void mount();
