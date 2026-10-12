@@ -7,7 +7,7 @@ import { adminApi } from './api';
 import styles from './SkinsPanel.module.css';
 
 const GameScene = lazy(() => import('../scene/GameScene'));
-type Draft = { id: string | null; name: string; palette: SkinPalette };
+type Draft = { id: string | null; name: string; palette: SkinPalette; artwork?: Skin['artwork'] };
 const fields = [
   ['board', 'body', 'Поверхность доски'],
   ['board', 'rim', 'Ободки ячеек'],
@@ -51,6 +51,14 @@ function Swatch({ skin }: { skin: Skin }) {
       <rect width="200" height="105" rx="10" fill={skin.palette.room} />
       <rect x="15" y="19" width="170" height="72" rx="15" fill="#343b3b" />
       <rect x="15" y="15" width="170" height="72" rx="15" fill={skin.palette.board.body} />
+      {skin.artwork === 'nocturne' && (
+        <g fill="none" stroke={skin.palette.accent} strokeWidth="0.7">
+          <rect x="20" y="20" width="160" height="62" rx="11" />
+          <circle cx="100" cy="51" r="24" />
+          <ellipse cx="100" cy="51" rx="45" ry="20" transform="rotate(-25 100 51)" />
+          <path d="M25 73Q49 31 87 56T172 30M26 28L34 35L42 27M157 70L165 76L174 68" />
+        </g>
+      )}
       {[0, 1, 2, 3, 4].map((column) =>
         [0, 1, 2].map((row) => (
           <circle
@@ -93,7 +101,7 @@ export default function SkinsPanel({ onUnauthorized }: { onUnauthorized: () => v
   const game = useMemo(previewGame, []);
   const selected = catalog.skins.find((skin) => skin.id === selectedId) ?? activeSkin(catalog);
   const preview: Skin = draft
-    ? { ...selected, name: draft.name, palette: draft.palette }
+    ? { ...selected, name: draft.name, palette: draft.palette, artwork: draft.artwork }
     : selected;
   const request = useCallback(
     async (path: string, init?: RequestInit) => {
@@ -124,6 +132,7 @@ export default function SkinsPanel({ onUnauthorized }: { onUnauthorized: () => v
       id: copy ? null : selected.id,
       name: copy ? `${selected.name} — копия`.slice(0, 48) : selected.name,
       palette: structuredClone(selected.palette),
+      artwork: selected.artwork,
     });
     setNotice('');
     setError('');
@@ -177,7 +186,11 @@ export default function SkinsPanel({ onUnauthorized }: { onUnauthorized: () => v
                       <Check size={13} /> Активный
                     </>
                   ) : skin.builtin ? (
-                    'Готовый стиль'
+                    skin.artwork ? (
+                      'Авторский рисунок'
+                    ) : (
+                      'Готовый стиль'
+                    )
                   ) : (
                     'Свой стиль'
                   )}
@@ -224,6 +237,7 @@ export default function SkinsPanel({ onUnauthorized }: { onUnauthorized: () => v
                     body: JSON.stringify({
                       name: draft.name.trim(),
                       palette: draft.palette,
+                      artwork: draft.artwork,
                       expectedRevision: catalog.revision,
                     }),
                   },
@@ -256,6 +270,23 @@ export default function SkinsPanel({ onUnauthorized }: { onUnauthorized: () => v
                   disabled={busy}
                   onChange={(event) => setDraft({ ...draft, name: event.target.value })}
                 />
+              </label>
+              <label className={styles.name}>
+                Рисунок
+                <select
+                  aria-label="Рисунок стиля"
+                  value={draft.artwork ?? ''}
+                  disabled={busy}
+                  onChange={(event) =>
+                    setDraft({
+                      ...draft,
+                      artwork: event.target.value === 'nocturne' ? 'nocturne' : undefined,
+                    })
+                  }
+                >
+                  <option value="">Без рисунка</option>
+                  <option value="nocturne">Ноктюрн — небесный атлас</option>
+                </select>
               </label>
               <div className={styles.colors}>
                 {fieldGroups.map(([group, title]) => (

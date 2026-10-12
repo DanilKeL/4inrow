@@ -141,7 +141,8 @@
   font-size: 12px;
   font-weight: 650;
 }
-.name input {
+.name input,
+.name select {
   width: 100%;
   border: 1px solid #d8dbd2;
   border-radius: 8px;

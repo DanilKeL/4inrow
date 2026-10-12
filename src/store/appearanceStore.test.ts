@@ -44,17 +44,29 @@ it('preserves the selected style in old offline catalogs and caches the added ro
   const catalog = changed('coffee-pieces', 4);
   const legacy = {
     ...catalog,
-    skins: catalog.skins.map((skin) => {
-      const palette: Record<string, unknown> = { ...skin.palette };
-      delete palette.room;
-      return { ...skin, palette };
-    }),
+    skins: catalog.skins
+      .filter((skin) => !skin.artwork)
+      .map((skin) => {
+        const palette: Record<string, unknown> = { ...skin.palette };
+        delete palette.room;
+        return { ...skin, palette };
+      }),
   };
   useAppearance.getState().setCatalog(legacy);
   expect(useAppearance.getState().catalog).toEqual(catalog);
   expect(JSON.parse(localStorage.getItem('four-skins-v1')!).skins[2].palette.room).toBe(
     DEFAULT_ROOM_COLOR,
   );
+});
+it('adds a newly shipped template without resetting an old offline selection', () => {
+  const old = changed('coffee-pieces', 7);
+  const legacy = { ...old, skins: old.skins.filter((skin) => skin.id !== 'nocturne') };
+  useAppearance.getState().setCatalog(legacy);
+  expect(useAppearance.getState().catalog.activeSkinId).toBe('coffee-pieces');
+  expect(useAppearance.getState().catalog.revision).toBe(7);
+  expect(
+    useAppearance.getState().catalog.skins.find((skin) => skin.id === 'nocturne')?.artwork,
+  ).toBe('nocturne');
 });
 
 it('updates live, caches valid skins for offline play, and ignores malformed events', async () => {

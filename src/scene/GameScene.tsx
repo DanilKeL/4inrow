@@ -27,6 +27,12 @@ import type { GameState, Move, Position } from '../game/core';
 import { displayedHeight, visibleLineSegments } from './layers';
 import { activeSkin, type Skin } from '../skins/catalog';
 import { useAppearance } from '../store/appearanceStore';
+import {
+  disposeNocturneTextures,
+  makeNocturneTextures,
+  planarBoardGeometry,
+  type NocturneTextures,
+} from './nocturne';
 
 export interface GameSceneProps {
   game: GameState;
@@ -78,33 +84,68 @@ declare global {
   }
 }
 
-function BoardModel({ skin }: { skin: Skin }) {
+function BoardModel({ skin, artwork }: { skin: Skin; artwork: NocturneTextures | null }) {
   const { scene } = useGLTF('/models/four-board.glb');
-  const { model, materials } = useMemo(() => {
+  const { model, materials, geometries } = useMemo(() => {
     const model = scene.clone(true);
     const copies = new Map<Material, Material>();
+    const geometries: ReturnType<typeof planarBoardGeometry>[] = [];
     const copy = (material: Material) => {
       if (!copies.has(material)) copies.set(material, material.clone());
       return copies.get(material)!;
     };
     model.traverse((object) => {
-      if (object instanceof Mesh)
+      if (object instanceof Mesh) {
         object.material = Array.isArray(object.material)
           ? object.material.map(copy)
           : copy(object.material);
+        const surfaceMaterials = Array.isArray(object.material)
+          ? object.material
+          : [object.material];
+        if (surfaceMaterials.some((material) => material.name.startsWith('Porcelain'))) {
+          object.geometry = planarBoardGeometry(object.geometry);
+          geometries.push(object.geometry);
+        }
+      }
     });
-    return { model, materials: [...copies.values()] };
+    const materials = [...copies.values()];
+    return {
+      model,
+      materials: materials.map((material) => ({
+        material,
+        color: material instanceof MeshStandardMaterial ? material.color.clone() : null,
+        roughness: material instanceof MeshStandardMaterial ? material.roughness : 0,
+        metalness: material instanceof MeshStandardMaterial ? material.metalness : 0,
+      })),
+      geometries,
+    };
   }, [scene]);
   useLayoutEffect(() => {
-    for (const material of materials) {
+    for (const original of materials) {
+      const { material } = original;
       if (!(material instanceof MeshStandardMaterial)) continue;
-      if (material.name.startsWith('Porcelain')) material.color.set(skin.palette.board.body);
-      if (material.name === 'Satin champagne') material.color.set(skin.palette.board.rim);
+      const mapped = Boolean(material.map);
+      if (material.name.startsWith('Porcelain')) {
+        material.color.set(artwork ? '#ffffff' : skin.palette.board.body);
+        material.map = artwork?.board ?? null;
+        material.metalnessMap = artwork?.metal ?? null;
+        material.roughness = artwork ? 0.3 : original.roughness;
+        material.metalness = artwork ? 0.86 : original.metalness;
+      }
+      if (material.name === 'Satin champagne') {
+        material.color.set(skin.palette.board.rim);
+        material.metalness = artwork ? 0.85 : original.metalness;
+        material.roughness = artwork ? 0.26 : original.roughness;
+      }
+      if (material.name === 'Anodized graphite' && original.color)
+        material.color.copy(artwork ? original.color.clone().set('#101c23') : original.color);
       if (material.name === 'Cobalt enamel') material.color.set(skin.palette.accent);
+      if (mapped !== Boolean(material.map)) material.needsUpdate = true;
     }
-  }, [materials, skin.palette]);
-  useEffect(() => () => materials.forEach((material) => material.dispose()), [materials]);
-  // Geometry remains shared; each scene owns and disposes its material copies.
+  }, [materials, skin.palette, artwork]);
+  useEffect(() => () => materials.forEach(({ material }) => material.dispose()), [materials]);
+  useEffect(() => () => geometries.forEach((geometry) => geometry.dispose()), [geometries]);
+  // Only the shell owns a UV-mapped copy; the cached GLTF stays unchanged.
   return <primitive object={model} dispose={null} />;
 }
 
@@ -127,6 +168,11 @@ function makePieceGeometry() {
 }
 
 function setMaterialOpacity(material: MeshStandardMaterial, opacity: number) {
+  const mapped = Boolean(material.map);
+  if (material.userData.skinMapped !== mapped) {
+    material.userData.skinMapped = mapped;
+    material.needsUpdate = true;
+  }
   const transparent = opacity < 1;
   if (material.transparent !== transparent) {
     material.transparent = transparent;
@@ -149,6 +195,7 @@ function Piece({
   introduction,
   revealed = true,
   skin,
+  artwork,
 }: {
   move: Move;
   geometry: LatheGeometry;
@@ -161,6 +208,7 @@ function Piece({
   introduction?: number;
   revealed?: boolean;
   skin: Skin;
+  artwork: NocturneTextures | null;
 }) {
   const group = useRef<Group>(null);
   const bodyMaterial = useRef<MeshStandardMaterial>(null);
@@ -245,7 +293,8 @@ function Piece({
       <mesh geometry={geometry}>
         <meshStandardMaterial
           ref={bodyMaterial}
-          color={palette.body}
+          color={artwork ? '#ffffff' : palette.body}
+          map={artwork ? (dark ? artwork.darkBody : artwork.lightBody) : null}
           roughness={dark ? 0.34 : 0.48}
           metalness={dark ? 0.2 : 0.08}
           onUpdate={(material) => setMaterialOpacity(material, fade.current.value)}
@@ -255,12 +304,14 @@ function Piece({
         <cylinderGeometry args={[0.317, 0.317, 0.009, 40]} />
         <meshStandardMaterial
           ref={capMaterial}
-          color={palette.cap}
-          roughness={0.52}
+          color={artwork ? '#ffffff' : palette.cap}
+          map={artwork ? (dark ? artwork.darkCap : artwork.lightCap) : null}
+          roughness={artwork ? 0.48 : 0.52}
+          metalness={artwork ? 0.12 : 0}
           onUpdate={(material) => setMaterialOpacity(material, fade.current.value)}
         />
       </mesh>
-      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.258, 0]}>
+      <mesh visible={!artwork} rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.258, 0]}>
         {dark ? <circleGeometry args={[0.052, 24]} /> : <ringGeometry args={[0.067, 0.085, 32]} />}
         <meshBasicMaterial
           ref={symbolMaterial}
@@ -419,6 +470,11 @@ function Board({
     };
   }, [clearHover]);
   const pieceGeometry = useMemo(makePieceGeometry, []);
+  const artwork = useMemo(
+    () => (skin.artwork === 'nocturne' ? makeNocturneTextures(skin.palette) : null),
+    [skin.artwork, skin.palette],
+  );
+  useEffect(() => () => disposeNocturneTextures(artwork), [artwork]);
   useEffect(
     () => () => {
       if (invalidTimer.current) clearTimeout(invalidTimer.current);
@@ -463,7 +519,7 @@ function Board({
   };
   return (
     <group>
-      <BoardModel skin={skin} />
+      <BoardModel skin={skin} artwork={artwork} />
       {game.heights.map((height, i) => {
         const x = i % 5;
         const y = Math.floor(i / 5);
@@ -526,6 +582,7 @@ function Board({
           key={`${demo ? 'demo' : 'game'}-${move.index}-${move.x}-${move.y}`}
           move={move}
           skin={skin}
+          artwork={artwork}
           geometry={pieceGeometry}
           latest={!demo && last === move}
           winner={winners.has(`${move.x},${move.y},${move.z}`)}
@@ -551,6 +608,7 @@ function Board({
           <Piece
             key={`ghost-${hover}`}
             skin={skin}
+            artwork={artwork}
             move={{
               x: hover % 5,
               y: Math.floor(hover / 5),

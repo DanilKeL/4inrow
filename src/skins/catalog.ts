@@ -11,6 +11,7 @@ export type Skin = {
   name: string;
   builtin: boolean;
   palette: SkinPalette;
+  artwork?: 'nocturne';
 };
 export type SkinCatalog = {
   schemaVersion: 1;
@@ -43,6 +44,19 @@ export const BUILTIN_SKINS: readonly Skin[] = [
     name: 'Кофейные фишки',
     builtin: true,
     palette: { ...classic, light: { body: '#cbb394', cap: '#dcc4a3', mark: '#8f7b60' } },
+  },
+  {
+    id: 'nocturne',
+    name: 'Ноктюрн',
+    builtin: true,
+    artwork: 'nocturne',
+    palette: {
+      room: '#dce3e5',
+      board: { body: '#172d38', rim: '#c8a970', dot: '#e1c98f' },
+      dark: { body: '#122b35', cap: '#182f3a', mark: '#dec58a' },
+      light: { body: '#e3dac5', cap: '#f2ead8', mark: '#76532e' },
+      accent: '#d2b473',
+    },
   },
 ];
 export const DEFAULT_SKIN_ID = 'coffee-board';
@@ -89,6 +103,7 @@ export function isSkin(value: unknown): value is Skin {
     value.name.trim().length > 0 &&
     value.name.length <= 48 &&
     value.builtin === BUILTIN_SKINS.some((skin) => skin.id === value.id) &&
+    (value.artwork === undefined || value.artwork === 'nocturne') &&
     isPalette(value.palette)
   );
 }
@@ -120,5 +135,9 @@ export function normalizeCatalog(value: unknown): SkinCatalog | null {
       record(skin) ? { ...skin, palette: normalizePalette(skin.palette) } : skin,
     ),
   };
+  // New templates must not invalidate an existing offline selection.
+  for (const builtin of BUILTIN_SKINS)
+    if (!catalog.skins.some((skin) => record(skin) && skin.id === builtin.id))
+      catalog.skins.push(structuredClone(builtin));
   return isCatalog(catalog) ? catalog : null;
 }

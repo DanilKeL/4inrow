@@ -80,6 +80,7 @@ export class SkinsStore {
       name: data.name.trim(),
       builtin: false,
       palette: structuredClone(palette),
+      ...(data.artwork === undefined ? {} : { artwork: data.artwork as Skin['artwork'] }),
     };
     if (!isSkin(skin)) throw new AuthError(400, 'Некорректный стиль.');
     const catalog = this.change(data.expectedRevision, (saved) => {

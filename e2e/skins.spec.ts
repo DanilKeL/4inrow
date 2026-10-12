@@ -20,6 +20,84 @@ test.beforeAll(async () => {
     server.once('error', reject);
   });
 });
+
+test('Nocturne artwork renders, copies to a custom skin and survives offline play', async ({
+  browser,
+}, info) => {
+  test.setTimeout(90000);
+  const adminContext = await browser.newContext({ viewport: { width: 1440, height: 1000 } });
+  const players = await browser.newContext({ viewport: { width: 1440, height: 1000 } });
+  const admin = await adminContext.newPage(),
+    player = await players.newPage();
+  const errors: string[] = [];
+  for (const page of [admin, player]) page.on('pageerror', (error) => errors.push(error.message));
+  const appearance = () =>
+    player.evaluate(() => {
+      const catalog = JSON.parse(localStorage.getItem('four-skins-v1')!);
+      return catalog.skins.find((skin: { id: string }) => skin.id === catalog.activeSkinId);
+    });
+  try {
+    await player.goto(url);
+    await expect(player.getByTestId('loading-screen')).not.toBeVisible();
+    await admin.goto(url + '/admin');
+    await admin.getByLabel('Пароль').fill('skin-browser-test-123');
+    await admin.getByRole('button', { name: 'Войти', exact: true }).click();
+    await admin.getByRole('button', { name: 'Оформление', exact: true }).click();
+    await admin.getByRole('button', { name: /Ноктюрн/ }).click();
+    await admin.getByRole('button', { name: 'Применить для всех' }).click();
+    await expect.poll(async () => (await appearance()).artwork).toBe('nocturne');
+    await player.waitForTimeout(1500);
+    await player.screenshot({ path: info.outputPath('nocturne-desktop.png') });
+    await player
+      .getByTestId('game-canvas')
+      .screenshot({ path: info.outputPath('nocturne-detail.png') });
+    await admin.screenshot({ path: info.outputPath('nocturne-admin.png') });
+    await player.setViewportSize({ width: 390, height: 844 });
+    await player.waitForTimeout(800);
+    await player.screenshot({ path: info.outputPath('nocturne-mobile.png') });
+    await admin.getByRole('button', { name: 'Новый стиль', exact: true }).click();
+    await expect(admin.getByLabel('Рисунок стиля')).toHaveValue('nocturne');
+    await admin.getByLabel('Название стиля').fill('Атлас — копия');
+    await admin.getByRole('button', { name: 'Сохранить стиль', exact: true }).click();
+    await admin.getByRole('button', { name: 'Применить для всех' }).click();
+    await expect.poll(async () => (await appearance()).name).toBe('Атлас — копия');
+    await expect.poll(async () => (await appearance()).artwork).toBe('nocturne');
+    await players.setOffline(true);
+    await player.reload();
+    await expect(player.getByTestId('loading-screen')).not.toBeVisible();
+    expect((await appearance()).artwork).toBe('nocturne');
+    await players.setOffline(false);
+    await player.getByRole('button', { name: 'Вдвоём', exact: true }).click();
+    await player.getByRole('button', { name: 'Начать игру', exact: true }).click();
+    await player.getByRole('button', { name: /Начать/ }).click();
+    await player.waitForTimeout(1200);
+    const canvas = (await player.locator('canvas').boundingBox())!;
+    await player.mouse.click(canvas.x + canvas.width / 2, canvas.y + canvas.height / 2);
+    await expect(player.getByTestId('move-count')).toHaveText('1 / 125');
+    await player.getByRole('button', { name: 'Рентген', exact: true }).click();
+    await expect(player.getByRole('button', { name: 'Рентген', exact: true })).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    );
+    await player.getByRole('button', { name: 'Вид', exact: true }).click();
+    await player.getByRole('button', { name: 'Слой 2', exact: true }).click();
+    await player.getByRole('button', { name: 'Закрыть меню вида', exact: true }).click();
+    await player.screenshot({ path: info.outputPath('nocturne-xray-mobile.png') });
+    await admin.getByRole('button', { name: /Классика/ }).click();
+    await admin.getByRole('button', { name: 'Применить для всех' }).click();
+    await expect.poll(async () => (await appearance()).id).toBe('classic');
+    await expect(player.getByTestId('move-count')).toHaveText('1 / 125');
+    await player.screenshot({ path: info.outputPath('nocturne-restored-classic.png') });
+    await admin.getByRole('button', { name: /Кофейная доска/ }).click();
+    await admin.getByRole('button', { name: 'Применить для всех' }).click();
+    await admin.getByRole('button', { name: /Атлас — копия/ }).click();
+    await admin.getByRole('button', { name: 'Удалить', exact: true }).click();
+    expect(errors).toEqual([]);
+  } finally {
+    await players.close();
+    await adminContext.close();
+  }
+});
 test.afterAll(async () => {
   if (server?.exitCode === null)
     await new Promise<void>((resolve) => {
@@ -56,8 +134,8 @@ test('admin creates skins, previews without changing the game, applies live and 
         const canvas = document.createElement('canvas');
         canvas.width = canvas.height = 1;
         const context = canvas.getContext('2d')!;
-      // Stay inside the rounded viewport, away from the outer page background.
-      context.drawImage(image, 32, 32, 1, 1, 0, 0, 1, 1);
+        // Stay inside the rounded viewport, away from the outer page background.
+        context.drawImage(image, 32, 32, 1, 1, 0, 0, 1, 1);
         return Array.from(context.getImageData(0, 0, 1, 1).data).slice(0, 3);
       },
       `data:image/png;base64,${screenshot.toString('base64')}`,

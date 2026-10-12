@@ -2,7 +2,7 @@ import { afterEach, expect, it } from 'vitest';
 import type { AddressInfo } from 'node:net';
 import { createOnlineServer } from './app';
 import { createAdminPasswordHash } from './admin';
-import { defaultCatalog, type SkinCatalog } from '../src/skins/catalog';
+import { BUILTIN_SKINS, defaultCatalog, type SkinCatalog } from '../src/skins/catalog';
 
 let app: ReturnType<typeof createOnlineServer>;
 let url: string;
@@ -96,7 +96,7 @@ it('broadcasts a saved and activated custom style immediately to independent ope
       expectedRevision: 0,
     }),
   }).then((r) => r.json());
-  expect((await a()).skins).toHaveLength(4);
+  expect((await a()).skins).toHaveLength(BUILTIN_SKINS.length + 1);
   await b();
   const applied = await fetch(url + '/admin-api/skins', {
     method: 'PATCH',

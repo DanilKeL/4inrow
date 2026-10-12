@@ -4,7 +4,7 @@ import { mkdtempSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { SkinsStore } from './skins';
-import { defaultCatalog, DEFAULT_ROOM_COLOR, isCatalog } from '../src/skins/catalog';
+import { BUILTIN_SKINS, defaultCatalog, DEFAULT_ROOM_COLOR, isCatalog } from '../src/skins/catalog';
 
 const databases: DatabaseSync[] = [];
 const directories: string[] = [];
@@ -37,6 +37,21 @@ it('persists custom skins and the active selection in the backed-up SQLite datab
     saved.savedSkinId,
   );
   expect(updated.skins.find((skin) => skin.id === saved.savedSkinId)?.name).toBe('Камень');
+});
+it('keeps artwork when copying and restoring a template and rejects unknown renderers', () => {
+  const store = open();
+  const template = BUILTIN_SKINS.find((skin) => skin.id === 'nocturne')!;
+  const copy = store.save({
+    name: 'Мой атлас',
+    palette: template.palette,
+    artwork: template.artwork,
+    expectedRevision: 0,
+  });
+  expect(copy.skins.find((skin) => skin.id === copy.savedSkinId)?.artwork).toBe('nocturne');
+  expect(() =>
+    store.save({ name: 'bad', palette: template.palette, artwork: 'unknown', expectedRevision: 1 }),
+  ).toThrow();
+  expect(store.get()).toEqual({ ...copy, savedSkinId: undefined });
 });
 it('retains pre-room database styles and accepts old clients without discarding their colors', () => {
   const store = open();
@@ -84,6 +99,6 @@ it('protects the active skin, supports deleting inactive custom styles, and keep
   expect(() => store.remove(saved.savedSkinId, 2)).toThrow('другой стиль');
   store.activate('coffee-board', 2);
   const removed = store.remove(saved.savedSkinId, 3);
-  expect(removed.skins).toHaveLength(3);
+  expect(removed.skins).toHaveLength(BUILTIN_SKINS.length);
   expect(removed.activeSkinId).toBe('coffee-board');
 });
