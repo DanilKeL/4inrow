@@ -14,9 +14,41 @@ function LessonVideo({ id, title, autoPlay }: { id: string; title: string; autoP
   const [playing, setPlaying] = useState(false);
   const [ended, setEnded] = useState(false);
   const [failed, setFailed] = useState(false);
+  const [frameReady, setFrameReady] = useState(false);
   const [time, setTime] = useState(0);
   const [duration, setDuration] = useState(0);
   const frame = useRef<number | null>(null);
+  useEffect(() => {
+    const video = ref.current;
+    if (!video) return;
+    let cancelled = false;
+    let videoFrame: number | undefined;
+    let paintFrame: number | undefined;
+    const reveal = () => {
+      if (!cancelled) setFrameReady(true);
+    };
+    if (typeof video.requestVideoFrameCallback === 'function') {
+      // Playback events precede presentation: keep the cover until a frame reaches the compositor.
+      videoFrame = video.requestVideoFrameCallback(reveal);
+    }
+    const revealFallback = () => {
+      if (videoFrame !== undefined || video.readyState < 2) return;
+      if (paintFrame !== undefined) cancelAnimationFrame(paintFrame);
+      paintFrame = requestAnimationFrame(() => {
+        paintFrame = requestAnimationFrame(reveal);
+      });
+    };
+    video.addEventListener('loadeddata', revealFallback);
+    video.addEventListener('playing', revealFallback);
+    revealFallback();
+    return () => {
+      cancelled = true;
+      if (videoFrame !== undefined) video.cancelVideoFrameCallback(videoFrame);
+      if (paintFrame !== undefined) cancelAnimationFrame(paintFrame);
+      video.removeEventListener('loadeddata', revealFallback);
+      video.removeEventListener('playing', revealFallback);
+    };
+  }, []);
   const syncProgress = () => {
     const video = ref.current;
     if (!video) return;
@@ -60,41 +92,52 @@ function LessonVideo({ id, title, autoPlay }: { id: string; title: string; autoP
   const progress = duration > 0 ? Math.max(0, Math.min(100, (time / duration) * 100)) : 0;
   return (
     <div className={styles.media}>
-      {failed ? (
-        <img src={`/tutorial/${id}.webp`} alt={title} />
-      ) : (
-        <video
-          ref={ref}
-          src={source}
-          poster={`/tutorial/${id}.webp`}
-          aria-label={`Пример: ${title}`}
-          autoPlay={autoPlay}
-          muted
-          playsInline
-          preload={autoPlay ? 'auto' : 'none'}
-          onPlay={() => {
-            setPlaying(true);
-            setEnded(false);
-            animateProgress();
-          }}
-          onPause={() => {
-            stopProgress();
-            syncProgress();
-            setPlaying(false);
-          }}
-          onEnded={() => {
-            stopProgress();
-            syncProgress();
-            setPlaying(false);
-            setEnded(true);
-          }}
-          onError={() => setFailed(true)}
-          onLoadedMetadata={syncProgress}
-          onDurationChange={syncProgress}
-          onSeeked={syncProgress}
-        />
-      )}
-      {ended && id !== 'stacking' && <span className={styles.winner}>4 в ряд — победа</span>}
+      <div className={styles.videoStage}>
+        {failed ? (
+          <img src={`/tutorial/${id}.webp`} alt={title} />
+        ) : (
+          <video
+            ref={ref}
+            className={frameReady ? undefined : styles.pendingVideo}
+            src={source}
+            poster={`/tutorial/${id}.webp`}
+            aria-label={`Пример: ${title}`}
+            autoPlay={autoPlay}
+            muted
+            playsInline
+            preload={autoPlay ? 'auto' : 'none'}
+            onPlay={() => {
+              setPlaying(true);
+              setEnded(false);
+              animateProgress();
+            }}
+            onPause={() => {
+              stopProgress();
+              syncProgress();
+              setPlaying(false);
+            }}
+            onEnded={() => {
+              stopProgress();
+              syncProgress();
+              setPlaying(false);
+              setEnded(true);
+            }}
+            onError={() => setFailed(true)}
+            onLoadedMetadata={syncProgress}
+            onDurationChange={syncProgress}
+            onSeeked={syncProgress}
+          />
+        )}
+        {!failed && !frameReady && (
+          <img
+            className={styles.posterCover}
+            src={`/tutorial/${id}.webp`}
+            alt=""
+            aria-hidden="true"
+          />
+        )}
+        {ended && id !== 'stacking' && <span className={styles.winner}>4 в ряд — победа</span>}
+      </div>
       {failed ? (
         <p className={styles.mediaFallback}>Видео недоступно. Показан итоговый пример.</p>
       ) : (

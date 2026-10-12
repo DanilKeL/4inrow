@@ -12,6 +12,93 @@ async function progressSamples(page: import('@playwright/test').Page) {
   });
 }
 
+test('each example keeps its cover until the first video frame is presented', async ({ page }) => {
+  await page.addInitScript(() => {
+    const requestFrame = HTMLVideoElement.prototype.requestVideoFrameCallback;
+    const cancelFrame = HTMLVideoElement.prototype.cancelVideoFrameCallback;
+    const delayed = new Map<number, () => void>();
+    Object.defineProperty(window, '__presentTutorialFrames', {
+      value: () => {
+        for (const reveal of delayed.values()) reveal();
+        delayed.clear();
+      },
+    });
+    Object.defineProperty(window, '__pendingTutorialFrames', { get: () => delayed.size });
+    let firstBrightness = 0;
+    Object.defineProperty(window, '__tutorialFrameBrightness', { get: () => firstBrightness });
+    HTMLVideoElement.prototype.requestVideoFrameCallback = function (callback) {
+      const handle = requestFrame.call(this, (now, metadata) => {
+        const canvas = document.createElement('canvas');
+        canvas.width = canvas.height = 8;
+        const context = canvas.getContext('2d')!;
+        context.drawImage(this, 0, 0, 8, 8);
+        const pixels = context.getImageData(0, 0, 8, 8).data;
+        let sum = 0;
+        for (let index = 0; index < pixels.length; index += 4)
+          sum += pixels[index] + pixels[index + 1] + pixels[index + 2];
+        firstBrightness = sum / (64 * 3);
+        delayed.set(handle, () => callback(now, metadata));
+      });
+      return handle;
+    };
+    HTMLVideoElement.prototype.cancelVideoFrameCallback = function (handle) {
+      delayed.delete(handle);
+      cancelFrame.call(this, handle);
+    };
+  });
+  for (const viewport of [
+    { width: 1366, height: 768 },
+    { width: 390, height: 844 },
+  ]) {
+    await page.setViewportSize(viewport);
+    await page.goto('/');
+    await page.getByRole('button', { name: 'Как играть', exact: true }).click();
+    const dialog = page.getByRole('dialog', { name: 'Как играть' });
+    for (const example of tutorialExamples) {
+      await dialog.getByRole('button', { name: new RegExp(example.tab) }).click();
+      const video = dialog.locator('video');
+      const cover = dialog.locator('img[aria-hidden="true"]');
+      await expect(cover).toBeVisible();
+      await expect(cover).toHaveAttribute('src', `/tutorial/${example.id}.webp`);
+      await expect(video).toHaveCSS('opacity', '0');
+      await expect
+        .poll(() =>
+          cover.evaluate((image: HTMLImageElement) => image.complete && image.naturalWidth > 0),
+        )
+        .toBe(true);
+      await expect
+        .poll(() => page.evaluate(() => Reflect.get(window, '__pendingTutorialFrames')))
+        .toBe(1);
+      expect(
+        await page.evaluate(() => Reflect.get(window, '__tutorialFrameBrightness')),
+      ).toBeGreaterThan(100);
+      await page.evaluate(() => Reflect.get(window, '__presentTutorialFrames')());
+      await expect(cover).toHaveCount(0);
+      await expect(video).toHaveCSS('opacity', '1');
+    }
+    await dialog.getByRole('button', { name: 'Понятно', exact: true }).click();
+  }
+});
+
+test('video cover also clears in browsers without video frame callbacks', async ({ page }) => {
+  await page.addInitScript(() => {
+    Object.defineProperty(HTMLVideoElement.prototype, 'requestVideoFrameCallback', {
+      value: undefined,
+      configurable: true,
+    });
+  });
+  await page.goto('/');
+  await page.getByRole('button', { name: 'Как играть', exact: true }).click();
+  const dialog = page.getByRole('dialog', { name: 'Как играть' });
+  await expect(dialog.locator('img[aria-hidden="true"]')).toHaveCount(0);
+  await expect(dialog.locator('video')).toHaveCSS('opacity', '1');
+  await expect
+    .poll(() =>
+      dialog.locator('video').evaluate((video: HTMLVideoElement) => video.currentTime > 0),
+    )
+    .toBe(true);
+});
+
 test('the video progress moves smoothly from the beginning on desktop and mobile', async ({
   page,
 }) => {
@@ -106,6 +193,11 @@ test('real game clips play, seek and replay; all examples fit desktop and small 
         .map((item) => item.textContent),
     }));
     expect(layout).toEqual({ overflow: false, outside: [] });
+    const framing = await video.evaluate((item) => {
+      const bounds = item.getBoundingClientRect();
+      return { width: bounds.width, height: bounds.height };
+    });
+    expect(framing.height).toBeLessThanOrEqual(framing.width / 2 + 1);
     await page.screenshot({ path: info.outputPath(`guide-${width}.png`) });
   }
   await dialog.getByRole('button', { name: 'Понятно', exact: true }).click();

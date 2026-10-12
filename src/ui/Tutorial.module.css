@@ -3,7 +3,7 @@
   grid-template-columns: 192px minmax(0, 1fr);
   grid-template-rows: auto minmax(0, 1fr) auto;
   gap: 18px 24px;
-  flex: 1;
+  flex: 0 1 auto;
   min-height: 0;
 }
 .goal {
@@ -58,6 +58,8 @@
   min-height: 0;
 }
 .media {
+  display: grid;
+  grid-template-rows: minmax(0, 1fr) 36px;
   position: relative;
   min-height: 0;
   border: 1px solid #e0e3d9;
@@ -65,19 +67,30 @@
   overflow: hidden;
   background: #eeeee8;
 }
+.videoStage {
+  position: relative;
+  aspect-ratio: 2 / 1;
+  min-height: 0;
+}
 .media video,
 .media img {
+  position: absolute;
+  inset: 0;
   display: block;
   width: 100%;
   height: 100%;
   object-fit: contain;
-  padding-bottom: 32px;
+}
+.pendingVideo {
+  opacity: 0;
+}
+.posterCover {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: #eeeee8;
 }
 .playback {
-  position: absolute;
-  bottom: 0;
-  left: 0;
-  right: 0;
   display: flex;
   gap: 12px;
   align-items: center;
@@ -151,7 +164,7 @@
   font-size: 11px;
 }
 .caption {
-  min-height: 100px;
+  min-height: 0;
 }
 .caption h3 {
   margin: 0 0 8px;
@@ -217,9 +230,6 @@
   .lesson {
     gap: 10px;
   }
-  .caption {
-    min-height: 100px;
-  }
   .caption h3 {
     font-size: 17px;
     margin-bottom: 5px;
@@ -257,9 +267,6 @@
     padding: 6px;
     min-height: 28px;
     font-size: 11px;
-  }
-  .caption {
-    min-height: 68px;
   }
   .caption h3 {
     font-size: 16px;
