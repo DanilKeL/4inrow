@@ -134,6 +134,45 @@ export class TelegramAuth {
   config() {
     return { clientId: this.clientId ?? null, miniApp: Boolean(this.botToken) };
   }
+  private registrations = new Map<
+    string,
+    { user: TelegramUser; owner: string | null; expires: number }
+  >();
+
+  registration(user: TelegramUser, owner: string | null) {
+    for (const [key, pending] of this.registrations)
+      if (pending.expires <= Date.now()) this.registrations.delete(key);
+    if (this.registrations.size >= 10000) throw new AuthError(503, 'Повторите вход через минуту.');
+    const token = randomBytes(32).toString('hex');
+    this.registrations.set(createHash('sha256').update(token).digest('hex'), {
+      user,
+      owner,
+      expires: Date.now() + AGE,
+    });
+    return { token, suggestedUsername: user.username?.replace(/^@/, '') || user.id };
+  }
+  pending(cookie: string | undefined, owner: string | null) {
+    const token = cookie
+      ?.split(';')
+      .map((v) => v.trim())
+      .find((v) => v.startsWith(`${COOKIE}=`))
+      ?.slice(COOKIE.length + 1);
+    const key =
+      token && /^[a-f0-9]{64}$/.test(token) ? createHash('sha256').update(token).digest('hex') : '';
+    const pending = this.registrations.get(key);
+    if (!pending || pending.expires <= Date.now()) {
+      this.registrations.delete(key);
+      throw new AuthError(401, 'Сеанс регистрации истёк. Войдите через Telegram снова.');
+    }
+    if (pending.owner !== owner) throw new AuthError(409, 'Аккаунт изменился. Повторите вход.');
+    return { user: pending.user, finish: () => this.registrations.delete(key) };
+  }
+  botRequestAuthorized(header: string | undefined) {
+    if (!this.botToken || !header) return false;
+    const expected = createHash('sha256').update(`Bearer ${this.botToken}`).digest();
+    const actual = createHash('sha256').update(header).digest();
+    return timingSafeEqual(expected, actual);
+  }
   cookie(token: string | null, secure: boolean) {
     return `${COOKIE}=${token ?? ''}; Path=/auth/telegram; HttpOnly; SameSite=Strict; ${secure ? 'Secure; ' : ''}Max-Age=${token ? AGE / 1000 : 0}`;
   }

@@ -56,6 +56,8 @@ export function Account({ onOpenHistory }: { onOpenHistory?: () => void }) {
     hasPassword,
     telegramLinked,
     telegramUsername,
+    telegramRegistration,
+    bindEmail,
     loading,
     error,
     notice,
@@ -76,6 +78,7 @@ export function Account({ onOpenHistory }: { onOpenHistory?: () => void }) {
   const verificationResult = search.get('emailVerified');
   const [view, setView] = useState<View>(resetToken ? 'reset' : 'register');
   const [signedView, setSignedView] = useState<SignedView>('overview');
+  const [emailBinding, setEmailBinding] = useState(false);
   const [username, setUsername] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -108,6 +111,7 @@ export function Account({ onOpenHistory }: { onOpenHistory?: () => void }) {
       if (password !== passwordRepeat) return setLocalError('Пароли не совпадают.');
       if (await completePasswordReset(resetToken, password)) {
         window.history.replaceState({}, '', window.location.pathname);
+        setView('login');
         setPassword('');
         setPasswordRepeat('');
       }
@@ -161,7 +165,7 @@ export function Account({ onOpenHistory }: { onOpenHistory?: () => void }) {
     ? Math.round((history.statistics.wins / history.statistics.total) * 100)
     : 0;
 
-  if (signedIn)
+  if (signedIn && view !== 'reset')
     return (
       <div className={accountStyles.dashboard} data-testid="account-dashboard">
         {signedView === 'overview' && (verifiedNotice || notice) && (
@@ -209,7 +213,18 @@ export function Account({ onOpenHistory }: { onOpenHistory?: () => void }) {
                     </>
                   ) : (
                     <>
-                      <UserRound size={13} /> Локальный аккаунт
+                      <UserRound size={13} /> {telegramLinked ? 'Telegram' : 'Локальный аккаунт'}
+                      <button
+                        type="button"
+                        className={styles.textButton}
+                        onClick={() => {
+                          clearMessages();
+                          setSignedView('security');
+                          setEmailBinding(true);
+                        }}
+                      >
+                        Привязать почту
+                      </button>
                     </>
                   )}
                 </p>
@@ -389,6 +404,30 @@ export function Account({ onOpenHistory }: { onOpenHistory?: () => void }) {
               </dl>
             </section>
             <section className={accountStyles.passwordCard}>
+              {!profileEmail && (
+                <div className={accountStyles.signedTabs}>
+                  <button
+                    type="button"
+                    aria-pressed={!emailBinding}
+                    onClick={() => {
+                      clearMessages();
+                      setEmailBinding(false);
+                    }}
+                  >
+                    Пароль
+                  </button>
+                  <button
+                    type="button"
+                    aria-pressed={emailBinding}
+                    onClick={() => {
+                      clearMessages();
+                      setEmailBinding(true);
+                    }}
+                  >
+                    Привязать почту
+                  </button>
+                </div>
+              )}
               <div className={accountStyles.telegramSection}>
                 {telegramLinked ? (
                   <span className={accountStyles.telegramLinked}>
@@ -399,69 +438,106 @@ export function Account({ onOpenHistory }: { onOpenHistory?: () => void }) {
                   <TelegramLogin purpose="link" />
                 )}
               </div>
-              <div className={accountStyles.passwordHeading}>
-                <LockKeyhole size={20} />
-                <div>
-                  <span>{hasPassword ? 'СМЕНА ПАРОЛЯ' : 'СОЗДАНИЕ ПАРОЛЯ'}</span>
-                  <strong>Обновите данные входа</strong>
-                </div>
-              </div>
-              <form onSubmit={(event) => void submitPassword(event)}>
-                {hasPassword && (
+              {emailBinding && !profileEmail ? (
+                <form
+                  onSubmit={(event) => {
+                    event.preventDefault();
+                    void bindEmail(email.trim());
+                  }}
+                >
                   <label>
-                    Текущий пароль
+                    Email
                     <input
-                      name="currentPassword"
-                      type="password"
-                      autoComplete="current-password"
-                      value={currentPassword}
-                      onChange={(event) => setCurrentPassword(event.target.value)}
+                      name="bindEmail"
+                      type="email"
+                      autoComplete="email"
+                      value={email}
+                      onChange={(event) => setEmail(event.target.value)}
+                      maxLength={254}
                       required
                     />
                   </label>
-                )}
-                <label>
-                  Новый пароль
-                  <input
-                    name="newPassword"
-                    type="password"
-                    autoComplete="new-password"
-                    value={newPassword}
-                    onChange={(event) => setNewPassword(event.target.value)}
-                    minLength={8}
-                    maxLength={128}
-                    required
-                  />
-                  <small>От 8 до 128 символов</small>
-                </label>
-                <label>
-                  Повторите новый пароль
-                  <input
-                    name="newPasswordRepeat"
-                    type="password"
-                    autoComplete="new-password"
-                    value={newPasswordRepeat}
-                    onChange={(event) => setNewPasswordRepeat(event.target.value)}
-                    minLength={8}
-                    maxLength={128}
-                    required
-                  />
-                </label>
-                {(localError || error) && (
-                  <p role="alert" className={styles.onlineError}>
-                    {localError || error}
-                  </p>
-                )}
-                {notice && (
-                  <p role="status" className={styles.accountNotice}>
-                    {notice}
-                  </p>
-                )}
-                <button className={styles.primary} disabled={loading} type="submit">
-                  <KeyRound size={17} />{' '}
-                  {loading ? 'Сохраняем…' : hasPassword ? 'Изменить пароль' : 'Создать пароль'}
-                </button>
-              </form>
+                  {error && (
+                    <p role="alert" className={styles.onlineError}>
+                      {error}
+                    </p>
+                  )}
+                  {notice && (
+                    <p role="status" className={styles.accountNotice}>
+                      {notice}
+                    </p>
+                  )}
+                  <button className={styles.primary} disabled={loading} type="submit">
+                    {loading ? 'Отправляем…' : 'Отправить подтверждение'}
+                  </button>
+                </form>
+              ) : (
+                <>
+                  <div className={accountStyles.passwordHeading}>
+                    <LockKeyhole size={20} />
+                    <div>
+                      <span>{hasPassword ? 'СМЕНА ПАРОЛЯ' : 'СОЗДАНИЕ ПАРОЛЯ'}</span>
+                      <strong>Обновите данные входа</strong>
+                    </div>
+                  </div>
+                  <form onSubmit={(event) => void submitPassword(event)}>
+                    {hasPassword && (
+                      <label>
+                        Текущий пароль
+                        <input
+                          name="currentPassword"
+                          type="password"
+                          autoComplete="current-password"
+                          value={currentPassword}
+                          onChange={(event) => setCurrentPassword(event.target.value)}
+                          required
+                        />
+                      </label>
+                    )}
+                    <label>
+                      Новый пароль
+                      <input
+                        name="newPassword"
+                        type="password"
+                        autoComplete="new-password"
+                        value={newPassword}
+                        onChange={(event) => setNewPassword(event.target.value)}
+                        minLength={8}
+                        maxLength={128}
+                        required
+                      />
+                      <small>От 8 до 128 символов</small>
+                    </label>
+                    <label>
+                      Повторите новый пароль
+                      <input
+                        name="newPasswordRepeat"
+                        type="password"
+                        autoComplete="new-password"
+                        value={newPasswordRepeat}
+                        onChange={(event) => setNewPasswordRepeat(event.target.value)}
+                        minLength={8}
+                        maxLength={128}
+                        required
+                      />
+                    </label>
+                    {(localError || error) && (
+                      <p role="alert" className={styles.onlineError}>
+                        {localError || error}
+                      </p>
+                    )}
+                    {notice && (
+                      <p role="status" className={styles.accountNotice}>
+                        {notice}
+                      </p>
+                    )}
+                    <button className={styles.primary} disabled={loading} type="submit">
+                      <KeyRound size={17} />{' '}
+                      {loading ? 'Сохраняем…' : hasPassword ? 'Изменить пароль' : 'Создать пароль'}
+                    </button>
+                  </form>
+                </>
+              )}
             </section>
           </div>
         )}
@@ -531,6 +607,14 @@ export function Account({ onOpenHistory }: { onOpenHistory?: () => void }) {
           <button className={styles.primary} disabled={loading} type="submit">
             {loading ? 'Отправляем…' : 'Получить ссылку'}
           </button>
+          <a
+            className={accountStyles.telegramButton}
+            href="https://t.me/forinrow_bot?start=reset"
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            Восстановить через Telegram
+          </a>
           <button className={styles.secondary} type="button" onClick={() => switchView('login')}>
             Вернуться ко входу
           </button>
@@ -552,96 +636,104 @@ export function Account({ onOpenHistory }: { onOpenHistory?: () => void }) {
           {verifiedNotice || notice}
         </p>
       )}
-      <div className={styles.accountTabs}>
-        <button
-          aria-pressed={view === 'register'}
-          className={view === 'register' ? styles.selected : ''}
-          onClick={() => switchView('register')}
-        >
-          Регистрация
-        </button>
-        <button
-          aria-pressed={view === 'login'}
-          className={view === 'login' ? styles.selected : ''}
-          onClick={() => switchView('login')}
-        >
-          Вход
-        </button>
-      </div>
+      {!telegramRegistration && (
+        <div className={styles.accountTabs}>
+          <button
+            aria-pressed={view === 'register'}
+            className={view === 'register' ? styles.selected : ''}
+            onClick={() => switchView('register')}
+          >
+            Регистрация
+          </button>
+          <button
+            aria-pressed={view === 'login'}
+            className={view === 'login' ? styles.selected : ''}
+            onClick={() => switchView('login')}
+          >
+            Вход
+          </button>
+        </div>
+      )}
       <TelegramLogin />
-      <form onSubmit={(event) => void submit(event)}>
-        <label>
-          Имя пользователя
-          <input
-            name="username"
-            autoComplete="username"
-            value={username}
-            onChange={(event) => setUsername(event.target.value)}
-            pattern={view === 'register' ? '[A-Za-z0-9_]{3,24}' : undefined}
-            title={
-              view === 'register' ? 'От 3 до 24 английских букв, цифр или символов _.' : undefined
-            }
-            autoCapitalize="none"
-            spellCheck={false}
-            minLength={3}
-            maxLength={24}
-            required
-          />
-          {view === 'register' && (
-            <small className={styles.inputHint}>Английские буквы, цифры и _ · 3–24 символа</small>
-          )}
-        </label>
-        {view === 'register' && (
+      {!telegramRegistration && (
+        <form onSubmit={(event) => void submit(event)}>
           <label>
-            Email
+            Имя пользователя
             <input
-              name="email"
-              type="email"
-              autoComplete="email"
-              value={email}
-              onChange={(event) => setEmail(event.target.value)}
+              name="username"
+              autoComplete="username"
+              value={username}
+              onChange={(event) => setUsername(event.target.value)}
+              pattern={view === 'register' ? '[A-Za-z0-9_]{3,24}' : undefined}
+              title={
+                view === 'register' ? 'От 3 до 24 английских букв, цифр или символов _.' : undefined
+              }
+              autoCapitalize="none"
+              spellCheck={false}
+              minLength={3}
+              maxLength={24}
+              required
+            />
+            {view === 'register' && (
+              <small className={styles.inputHint}>Английские буквы, цифры и _ · 3–24 символа</small>
+            )}
+          </label>
+          {view === 'register' && (
+            <label>
+              Email
+              <input
+                name="email"
+                type="email"
+                autoComplete="email"
+                value={email}
+                onChange={(event) => setEmail(event.target.value)}
+                required
+              />
+            </label>
+          )}
+          <label>
+            Пароль
+            <input
+              name="password"
+              type="password"
+              autoComplete={view === 'register' ? 'new-password' : 'current-password'}
+              value={password}
+              onChange={(event) => setPassword(event.target.value)}
+              minLength={view === 'register' ? 8 : undefined}
               required
             />
           </label>
-        )}
-        <label>
-          Пароль
-          <input
-            name="password"
-            type="password"
-            autoComplete={view === 'register' ? 'new-password' : 'current-password'}
-            value={password}
-            onChange={(event) => setPassword(event.target.value)}
-            minLength={view === 'register' ? 8 : undefined}
-            required
-          />
-        </label>
-        {(localError || error) && (
-          <p role="alert" className={styles.onlineError}>
-            {localError || error}
-          </p>
-        )}
-        <button className={styles.primary} disabled={loading} type="submit">
-          {loading ? 'Подождите…' : view === 'register' ? 'Зарегистрироваться' : 'Войти'}
-        </button>
-        {view === 'login' && (
-          <>
-            <button className={styles.secondary} type="button" onClick={() => switchView('forgot')}>
-              Забыли пароль?
-            </button>
-            {(email || username) && (
+          {(localError || error) && (
+            <p role="alert" className={styles.onlineError}>
+              {localError || error}
+            </p>
+          )}
+          <button className={styles.primary} disabled={loading} type="submit">
+            {loading ? 'Подождите…' : view === 'register' ? 'Зарегистрироваться' : 'Войти'}
+          </button>
+          {view === 'login' && (
+            <>
               <button
-                className={styles.textButton}
+                className={styles.secondary}
                 type="button"
-                disabled={loading}
-                onClick={() => void resendVerification(email.trim() || username.trim())}
+                onClick={() => switchView('forgot')}
               >
-                Отправить подтверждение ещё раз
+                Забыли пароль?
               </button>
-            )}
-          </>
-        )}
-      </form>
+              {(email || username) && (
+                <button
+                  className={styles.textButton}
+                  type="button"
+                  disabled={loading}
+                  onClick={() => void resendVerification(email.trim() || username.trim())}
+                >
+                  Отправить подтверждение ещё раз
+                </button>
+              )}
+            </>
+          )}
+        </form>
+      )}
     </div>
   );
 }

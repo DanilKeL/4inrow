@@ -6,6 +6,7 @@ export interface MailMessage {
   email: string;
   username: string;
   token: string;
+  purpose?: 'binding';
 }
 
 export interface Mailer {
@@ -102,22 +103,29 @@ export class ResendMailer implements Mailer {
     );
   }
 
-  sendVerification({ email, username, token }: MailMessage) {
+  sendVerification({ email, username, token, purpose }: MailMessage) {
     const link = `${this.publicUrl}/auth/verify?token=${encodeURIComponent(token)}`;
+    const binding = purpose === 'binding';
+    const body = binding
+      ? 'Подтвердите привязку этого адреса электронной почты к вашему аккаунту FOUR³.'
+      : 'Подтвердите адрес электронной почты, чтобы завершить регистрацию в FOUR³.';
+    const ignoreText = binding
+      ? 'Если вы не запрашивали привязку почты, просто проигнорируйте это письмо.'
+      : 'Если вы не регистрировались в FOUR³, просто проигнорируйте это письмо.';
     return this.send(
       email,
-      'Подтверждение регистрации в FOUR³',
-      `Здравствуйте, ${username}!\n\nПодтвердите адрес электронной почты, чтобы завершить регистрацию в FOUR³:\n${link}\n\nСсылка действует 24 часа.\nЕсли вы не регистрировались в FOUR³, просто проигнорируйте это письмо.\n\nFOUR³ · ${this.publicUrl}`,
+      binding ? 'Привязка почты к FOUR³' : 'Подтверждение регистрации в FOUR³',
+      `Здравствуйте, ${username}!\n\n${body}\n${link}\n\nСсылка действует 24 часа.\n${ignoreText}\n\nFOUR³ · ${this.publicUrl}`,
       renderEmail({
         publicUrl: this.publicUrl,
-        preheader: 'Подтвердите адрес электронной почты, чтобы завершить регистрацию.',
-        title: 'Подтвердите регистрацию',
+        preheader: body,
+        title: binding ? 'Подтвердите привязку почты' : 'Подтвердите регистрацию',
         username,
-        body: 'Подтвердите адрес электронной почты, чтобы завершить регистрацию в FOUR³.',
+        body,
         actionLabel: 'Подтвердить email',
         actionUrl: link,
         expiry: 'Ссылка действует 24 часа.',
-        ignoreText: 'Если вы не регистрировались в FOUR³, просто проигнорируйте это письмо.',
+        ignoreText,
       }),
     );
   }

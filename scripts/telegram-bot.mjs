@@ -3,6 +3,7 @@ import { dirname } from 'node:path';
 import { request } from 'node:https';
 import { isIP } from 'node:net';
 import { commandReply, commands } from './telegram-content.mjs';
+import { recoveryReply, recoveryUser } from './telegram-recovery.mjs';
 
 const token = process.env.TELEGRAM_BOT_TOKEN;
 if (!token) {
@@ -77,7 +78,9 @@ async function api(method, body = {}) {
       data = await response.json();
     }
   } catch (error) {
-    throw new Error(`Telegram connection failed for ${method} (${error.code ?? error.cause?.code ?? 'NETWORK'})`);
+    throw new Error(
+      `Telegram connection failed for ${method} (${error.code ?? error.cause?.code ?? 'NETWORK'})`,
+    );
   }
   if (!data.ok) {
     const error = new Error(`Telegram ${method} rejected (${data.error_code})`);
@@ -112,7 +115,24 @@ try {
         allowed_updates: ['message'],
       });
       for (const update of updates) {
-        const reply = commandReply(update.message);
+        let reply;
+        if (recoveryUser(update.message)) {
+          try {
+            reply = await recoveryReply(update.message, {
+              token,
+              publicUrl: process.env.FOUR_PUBLIC_URL ?? 'https://4inrow.ru',
+              apiUrl: process.env.FOUR_BOT_API_URL ?? 'http://127.0.0.1:3001',
+            });
+          } catch {
+            reply = {
+              method: 'sendMessage',
+              body: {
+                chat_id: update.message.chat.id,
+                text: 'Восстановление временно недоступно. Повторите /reset чуть позже.',
+              },
+            };
+          }
+        } else reply = commandReply(update.message);
         if (reply) {
           try {
             await api(reply.method, reply.body);

@@ -7,7 +7,17 @@ const app = createOnlineServer({
   authFile: null,
   statsFile: null,
   staticDir: null,
-  mailer: null,
+  mailer:
+    process.env.FOUR_TEST_MAIL === '1'
+      ? {
+          sendVerification: async (message) => {
+            process.send?.({ type: 'mail', ...message });
+          },
+          sendPasswordReset: async (message) => {
+            process.send?.({ type: 'mail', ...message });
+          },
+        }
+      : null,
   telegram: {
     botToken: '8834741855:isolated-browser-test',
     clientId: '8834741855',

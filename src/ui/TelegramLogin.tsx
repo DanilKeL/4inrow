@@ -7,7 +7,7 @@ import styles from './UI.module.css';
 
 type Challenge = { nonce: string; clientId: string | null; miniApp: boolean };
 export function TelegramLogin({ purpose = 'login' }: { purpose?: 'login' | 'link' }) {
-  const { username, loading, telegramLogin, clearMessages } = useAccount();
+  const { username, loading, telegramLogin, clearMessages, telegramRegistration } = useAccount();
   const [challenge, setChallenge] = useState<Challenge | null>(null);
   const [available, setAvailable] = useState(false);
   const [error, setError] = useState('');
@@ -73,7 +73,8 @@ export function TelegramLogin({ purpose = 'login' }: { purpose?: 'login' | 'link
   };
   const complete = async (body: { nonce: string; initData?: string; idToken?: string }) => {
     await telegramLogin(body);
-    retry();
+    if (mounted.current) setActive(false);
+    if (!useAccount.getState().telegramRegistration) retry();
   };
   const start = () => {
     if (!challenge) {
@@ -125,6 +126,8 @@ export function TelegramLogin({ purpose = 'login' }: { purpose?: 'login' | 'link
       retry();
     }
   };
+  if (telegramRegistration)
+    return <TelegramRegistration suggested={telegramRegistration} onCancel={retry} />;
   if (!available) return null;
   return (
     <div className={accountStyles.telegramSection}>
@@ -163,5 +166,59 @@ export function TelegramLogin({ purpose = 'login' }: { purpose?: 'login' | 'link
         </p>
       )}
     </div>
+  );
+}
+
+function TelegramRegistration({
+  suggested,
+  onCancel,
+}: {
+  suggested: string;
+  onCancel: () => void;
+}) {
+  const [username, setUsername] = useState(suggested);
+  const { loading, error, registerTelegram, cancelTelegramRegistration } = useAccount();
+  return (
+    <form
+      onSubmit={(event) => {
+        event.preventDefault();
+        void registerTelegram(username.trim());
+      }}
+    >
+      <label>
+        Имя пользователя
+        <input
+          name="telegramUsername"
+          autoComplete="username"
+          autoCapitalize="none"
+          spellCheck={false}
+          value={username}
+          onChange={(event) => setUsername(event.target.value)}
+          pattern="[A-Za-z0-9_]{3,24}"
+          minLength={3}
+          maxLength={24}
+          required
+        />
+        <small className={styles.inputHint}>Английские буквы, цифры и _ · 3–24 символа</small>
+      </label>
+      {error && (
+        <p role="alert" className={styles.onlineError}>
+          {error}
+        </p>
+      )}
+      <button type="submit" className={styles.primary} disabled={loading}>
+        {loading ? 'Сохраняем…' : 'Завершить регистрацию'}
+      </button>
+      <button
+        type="button"
+        className={styles.secondary}
+        disabled={loading}
+        onClick={() => {
+          void cancelTelegramRegistration().then(onCancel);
+        }}
+      >
+        Отменить
+      </button>
+    </form>
   );
 }

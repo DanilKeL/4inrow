@@ -184,6 +184,7 @@ function parseCommand(raw: string): ClientCommand | null {
 export function createOnlineServer(options: OnlineServerOptions = {}) {
   const auth = new AuthStore(options.authFile);
   const telegram = new TelegramAuth(options.telegram);
+  const botResets = new Map<string, { until: number; result: object }>();
   const mailer = options.mailer === undefined ? ResendMailer.fromEnv() : options.mailer;
   const statistics = new StatisticsStore(
     options.statsFile === undefined && options.authFile === null ? null : options.statsFile,
@@ -629,6 +630,25 @@ export function createOnlineServer(options: OnlineServerOptions = {}) {
               respond(200, telegram.config());
               return;
             }
+            if (pathname === '/auth/telegram/bot-reset' && req.method === 'POST') {
+              if (!localProxy || !telegram.botRequestAuthorized(req.headers.authorization))
+                throw new AuthError(403, 'Доступ запрещён.');
+              const data = await readAuthJson();
+              if (
+                typeof data.id !== 'string' ||
+                !/^[1-9]\d{0,15}$/.test(data.id) ||
+                !Number.isSafeInteger(Number(data.id))
+              )
+                throw new AuthError(400, 'Некорректный Telegram ID.');
+              for (const [id, previous] of botResets)
+                if (previous.until <= Date.now()) botResets.delete(id);
+              const cached = botResets.get(data.id);
+              const result =
+                cached?.result ?? (await auth.requestTelegramPasswordReset(data.id)) ?? {};
+              if (!cached) botResets.set(data.id, { until: Date.now() + 60_000, result });
+              respond(200, result);
+              return;
+            }
             if (req.method !== 'POST') throw new AuthError(405, 'Метод не поддерживается.');
             checkRate(authAttempts, 30);
             const data = await readAuthJson();
@@ -643,6 +663,15 @@ export function createOnlineServer(options: OnlineServerOptions = {}) {
               });
             } else if (pathname === '/auth/telegram/complete') {
               const verified = await telegram.complete(req.headers.cookie, data, owner);
+              if (!verified.linkOwner && !auth.hasTelegramAccount(verified.user.id)) {
+                const pending = telegram.registration(verified.user, owner);
+                res.setHeader('Set-Cookie', telegram.cookie(pending.token, secure));
+                respond(200, {
+                  registrationRequired: true,
+                  suggestedUsername: pending.suggestedUsername,
+                });
+                return;
+              }
               // Linking and creating an account only accept identities verified on the server.
               const result = await auth.telegramLogin(verified.user, verified.linkOwner);
               res.setHeader('Set-Cookie', [
@@ -654,6 +683,26 @@ export function createOnlineServer(options: OnlineServerOptions = {}) {
                 ...auth.profile(`four_session=${result.token}`),
                 linked: Boolean(verified.linkOwner),
               });
+            } else if (pathname === '/auth/telegram/register') {
+              const pending = telegram.pending(req.headers.cookie, owner);
+              const result = await auth.telegramLogin(pending.user, null, data.username);
+              pending.finish();
+              res.setHeader('Set-Cookie', [
+                auth.cookie(result.token, secure),
+                telegram.cookie(null, secure),
+              ]);
+              respond(200, {
+                authenticated: true,
+                ...auth.profile(`four_session=${result.token}`),
+              });
+            } else if (pathname === '/auth/telegram/cancel') {
+              try {
+                telegram.pending(req.headers.cookie, owner).finish();
+              } catch {
+                /* Already expired. */
+              }
+              res.setHeader('Set-Cookie', telegram.cookie(null, secure));
+              respond(200, {});
             } else throw new AuthError(404, 'Адрес не найден.');
           } catch (error) {
             respond(error instanceof AuthError ? error.status : 500, {
@@ -738,6 +787,32 @@ export function createOnlineServer(options: OnlineServerOptions = {}) {
             const guest = existing ? { name: existing, token: null } : await auth.createGuest();
             if (guest.token) res.setHeader('Set-Cookie', auth.cookie(guest.token, secure));
             respond(200, { authenticated: false, username: null, guestName: guest.name });
+          }
+          return;
+        }
+        if (pathname === '/auth/email/bind' && req.method === 'POST') {
+          try {
+            checkRate(mailAttempts, 5);
+            if (!auth.username(req.headers.cookie))
+              throw new AuthError(401, 'Войдите в аккаунт заново.');
+            if (!mailer) throw new AuthError(503, 'Отправка писем временно недоступна.');
+            const data = await readAuthJson();
+            if (
+              typeof data.email === 'string' &&
+              mailer.validateRecipient &&
+              !(await mailer.validateRecipient(data.email))
+            )
+              throw new AuthError(400, 'Проверьте адрес email.');
+            const pending = await auth.bindEmail(req.headers.cookie, data.email);
+            await mailer.sendVerification(pending);
+            respond(200, { message: 'Подтвердите привязку почты по ссылке из письма.' });
+          } catch (error) {
+            respond(error instanceof AuthError ? error.status : 503, {
+              error:
+                error instanceof AuthError
+                  ? error.message
+                  : 'Не удалось отправить письмо. Попробуйте позже.',
+            });
           }
           return;
         }

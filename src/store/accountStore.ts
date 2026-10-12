@@ -39,6 +39,7 @@ interface AccountState {
   hasPassword: boolean;
   telegramLinked: boolean;
   telegramUsername: string | null;
+  telegramRegistration: string | null;
   identityReady: boolean;
   loading: boolean;
   error: string;
@@ -52,6 +53,9 @@ interface AccountState {
   refreshProfile: () => Promise<void>;
   changePassword: (currentPassword: string, newPassword: string) => Promise<boolean>;
   telegramLogin: (body: { nonce: string; initData?: string; idToken?: string }) => Promise<boolean>;
+  registerTelegram: (username: string) => Promise<boolean>;
+  cancelTelegramRegistration: () => Promise<void>;
+  bindEmail: (email: string) => Promise<boolean>;
   clearMessages: () => void;
   logout: () => Promise<void>;
 }
@@ -75,6 +79,7 @@ export const useAccount = create<AccountState>((set) => ({
   hasPassword: true,
   telegramLinked: false,
   telegramUsername: null,
+  telegramRegistration: null,
   identityReady: false,
   loading: false,
   error: '',
@@ -275,8 +280,14 @@ export const useAccount = create<AccountState>((set) => ({
         telegramLinked?: boolean;
         telegramUsername?: string | null;
         linked?: boolean;
+        registrationRequired?: boolean;
+        suggestedUsername?: string;
         error?: string;
       };
+      if (response.ok && data.registrationRequired && data.suggestedUsername) {
+        set({ telegramRegistration: data.suggestedUsername });
+        return true;
+      }
       if (!response.ok || !data.username)
         throw new Error(data.error ?? 'Не удалось войти через Telegram.');
       set({
@@ -289,6 +300,63 @@ export const useAccount = create<AccountState>((set) => ({
         telegramUsername: data.telegramUsername ?? null,
         notice: data.linked ? 'Telegram привязан.' : '',
       });
+      return true;
+    } catch (error) {
+      set({ error: error instanceof Error ? error.message : 'Нет связи с сервером.' });
+      return false;
+    } finally {
+      set({ loading: false });
+    }
+  },
+  registerTelegram: async (username) => {
+    set({ loading: true, error: '', notice: '' });
+    try {
+      const response = await post('/auth/telegram/register', { username });
+      const data = (await response.json()) as {
+        username?: string;
+        email?: string | null;
+        emailVerified?: boolean;
+        createdAt?: number;
+        hasPassword?: boolean;
+        telegramLinked?: boolean;
+        telegramUsername?: string | null;
+        error?: string;
+      };
+      if (!response.ok || !data.username)
+        throw new Error(data.error ?? 'Не удалось зарегистрироваться.');
+      set({
+        username: data.username,
+        telegramRegistration: null,
+        email: data.email ?? null,
+        emailVerified: Boolean(data.emailVerified),
+        createdAt: data.createdAt ?? null,
+        hasPassword: data.hasPassword !== false,
+        telegramLinked: Boolean(data.telegramLinked),
+        telegramUsername: data.telegramUsername ?? null,
+      });
+      return true;
+    } catch (error) {
+      set({ error: error instanceof Error ? error.message : 'Нет связи с сервером.' });
+      return false;
+    } finally {
+      set({ loading: false });
+    }
+  },
+  cancelTelegramRegistration: async () => {
+    set({ telegramRegistration: null, error: '', notice: '' });
+    try {
+      await post('/auth/telegram/cancel', {});
+    } catch {
+      /* Pending proof expires on the server. */
+    }
+  },
+  bindEmail: async (email) => {
+    set({ loading: true, error: '', notice: '' });
+    try {
+      const response = await post('/auth/email/bind', { email });
+      const data = (await response.json()) as { message?: string; error?: string };
+      if (!response.ok) throw new Error(data.error ?? 'Не удалось привязать почту.');
+      set({ notice: data.message ?? 'Подтвердите привязку почты по ссылке из письма.' });
       return true;
     } catch (error) {
       set({ error: error instanceof Error ? error.message : 'Нет связи с сервером.' });

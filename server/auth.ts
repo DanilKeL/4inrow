@@ -27,7 +27,7 @@ type Account = {
   telegram?: { id: string; username?: string };
 };
 type Session = { usernameKey?: string; guestName?: string; expires: number };
-type ActionToken = { usernameKey: string; expires: number };
+type ActionToken = { usernameKey: string; expires: number; email?: string; telegramId?: string };
 type Database = {
   accounts: Record<string, Account>;
   sessions: Record<string, Session>;
@@ -249,7 +249,15 @@ export class AuthStore {
     return token;
   }
 
-  async telegramLogin(user: { id: string; username?: string }, linkOwner: string | null = null) {
+  hasTelegramAccount(id: string) {
+    return Object.values(this.data.accounts).some((account) => account.telegram?.id === id);
+  }
+
+  async telegramLogin(
+    user: { id: string; username?: string },
+    linkOwner: string | null = null,
+    rawUsername?: unknown,
+  ) {
     const linked = Object.entries(this.data.accounts).find(
       ([, account]) => account.telegram?.id === user.id,
     );
@@ -271,15 +279,9 @@ export class AuthStore {
         throw new AuthError(403, 'Подтвердите email по ссылке из письма.');
       account.telegram = user;
     } else {
-      const preferred =
-        user.username && /^[A-Za-z0-9_]{3,24}$/.test(user.username)
-          ? user.username
-          : `tg_${user.id}`;
-      let username = preferred;
-      if (this.data.accounts[this.key(username)]) username = `tg_${user.id}`;
-      while (this.data.accounts[this.key(username)])
-        username = `${preferred.slice(0, 15)}_${randomBytes(4).toString('hex')}`;
+      const username = this.validateUsername(rawUsername);
       key = this.key(username);
+      if (this.data.accounts[key]) throw new AuthError(409, 'Это имя пользователя уже занято.');
       // No fabricated email and no usable password. A password can be set after signing in.
       this.data.accounts[key] = {
         username,
@@ -312,13 +314,24 @@ export class AuthStore {
     delete collection[tokenHash];
     if (!token || token.expires <= Date.now())
       throw new AuthError(400, 'Ссылка недействительна или устарела.');
-    return token.usernameKey;
+    return token;
   }
 
   async verifyEmail(rawToken: unknown) {
-    const usernameKey = this.consumeToken(this.data.verificationTokens, rawToken);
+    const action = this.consumeToken(this.data.verificationTokens, rawToken);
+    const usernameKey = action.usernameKey;
     const account = this.data.accounts[usernameKey];
-    if (!account?.email) throw new AuthError(400, 'Ссылка недействительна или устарела.');
+    if (!account || account.disabled || (!account.email && !action.email))
+      throw new AuthError(400, 'Ссылка недействительна или устарела.');
+    if (action.email) {
+      if (account.email || Object.values(this.data.accounts).some((a) => a.email === action.email))
+        throw new AuthError(409, 'Этот email уже привязан к аккаунту.');
+      account.email = action.email;
+      // Recovery through Telegram is no longer available once email is confirmed.
+      for (const [hash, reset] of Object.entries(this.data.resetTokens))
+        if (reset.usernameKey === usernameKey && reset.telegramId)
+          delete this.data.resetTokens[hash];
+    }
     account.emailVerified = true;
     const token = this.newSession(usernameKey);
     await this.save();
@@ -343,7 +356,7 @@ export class AuthStore {
     if (typeof rawEmail !== 'string') return null;
     const email = rawEmail.normalize('NFKC').trim().toLocaleLowerCase('und');
     const entry = Object.entries(this.data.accounts).find(
-      ([, account]) => account.email === email && account.emailVerified,
+      ([, account]) => account.email === email && account.emailVerified && !account.disabled,
     );
     if (!entry) return null;
     const [usernameKey, account] = entry;
@@ -354,9 +367,15 @@ export class AuthStore {
 
   async resetPassword(rawToken: unknown, rawPassword: unknown) {
     const password = this.validatePassword(rawPassword);
-    const usernameKey = this.consumeToken(this.data.resetTokens, rawToken);
+    const action = this.consumeToken(this.data.resetTokens, rawToken);
+    const usernameKey = action.usernameKey;
     const account = this.data.accounts[usernameKey];
-    if (!account) throw new AuthError(400, 'Ссылка недействительна или устарела.');
+    if (
+      !account ||
+      account.disabled ||
+      (action.telegramId && (account.telegram?.id !== action.telegramId || account.emailVerified))
+    )
+      throw new AuthError(400, 'Ссылка недействительна или устарела.');
     const salt = randomBytes(16).toString('hex');
     account.salt = salt;
     account.hash = ((await scrypt(password, salt, 64)) as Buffer).toString('hex');
@@ -366,6 +385,32 @@ export class AuthStore {
     const token = this.newSession(usernameKey);
     await this.save();
     return { username: account.username, token };
+  }
+
+  async bindEmail(cookieHeader: string | undefined, rawEmail: unknown) {
+    const owner = this.username(cookieHeader);
+    if (!owner) throw new AuthError(401, 'Войдите в аккаунт заново.');
+    const key = this.key(owner);
+    const account = this.data.accounts[key];
+    if (account.email) throw new AuthError(409, 'Почта уже привязана.');
+    const email = this.validateEmail(rawEmail);
+    if (Object.values(this.data.accounts).some((a) => a.email === email))
+      throw new AuthError(409, 'Аккаунт с этим email уже существует.');
+    const token = this.issueToken(this.data.verificationTokens, key, VERIFICATION_AGE);
+    this.data.verificationTokens[this.hashToken(token)].email = email;
+    await this.save();
+    return { username: account.username, email, token, purpose: 'binding' as const };
+  }
+
+  async requestTelegramPasswordReset(id: string) {
+    const entry = Object.entries(this.data.accounts).find(([, a]) => a.telegram?.id === id);
+    if (!entry || entry[1].disabled) return null;
+    const [key, account] = entry;
+    if (account.email && account.emailVerified) return { viaEmail: true as const };
+    const token = this.issueToken(this.data.resetTokens, key, 15 * 60_000);
+    this.data.resetTokens[this.hashToken(token)].telegramId = id;
+    await this.save();
+    return { token };
   }
 
   async createGuest() {

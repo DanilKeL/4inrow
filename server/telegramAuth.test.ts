@@ -162,7 +162,11 @@ describe('Telegram accounts', () => {
     dirs.push(dir);
     const path = join(dir, 'accounts.json');
     const auth = new AuthStore(path);
-    const created = await auth.telegramLogin({ id: '123456789', username: 'TelegramPlayer' });
+    const created = await auth.telegramLogin(
+      { id: '123456789', username: 'TelegramPlayer' },
+      null,
+      'TelegramPlayer',
+    );
     const profile = auth.profile(`four_session=${created.token}`);
     expect(profile).toMatchObject({
       username: 'TelegramPlayer',
@@ -181,8 +185,15 @@ describe('Telegram accounts', () => {
   it('never takes over a password account with the same nickname', async () => {
     const auth = new AuthStore(null);
     await auth.register('TelegramPlayer', 'password-123');
-    const created = await auth.telegramLogin({ id: '123456789', username: 'TelegramPlayer' });
-    expect(created.username).toBe('tg_123456789');
+    await expect(
+      auth.telegramLogin({ id: '123456789', username: 'TelegramPlayer' }, null, 'TelegramPlayer'),
+    ).rejects.toThrow('занято');
+    const created = await auth.telegramLogin(
+      { id: '123456789', username: 'TelegramPlayer' },
+      null,
+      'ChosenName',
+    );
+    expect(created.username).toBe('ChosenName');
     expect((await auth.login('TelegramPlayer', 'password-123')).username).toBe('TelegramPlayer');
     expect(auth.adminAccounts()).toHaveLength(2);
   });
@@ -203,11 +214,13 @@ describe('Telegram accounts', () => {
     await auth.adminUpdate('ExistingPlayer', { disabled: true });
     await expect(auth.telegramLogin({ id: '123456789' })).rejects.toThrow('заблокирован');
     await auth.adminDelete('ExistingPlayer');
-    expect((await auth.telegramLogin({ id: '123456789' })).username).toBe('tg_123456789');
+    expect((await auth.telegramLogin({ id: '123456789' }, null, 'ChosenAgain')).username).toBe(
+      'ChosenAgain',
+    );
   });
   it('allows a Telegram-only player to create a password and then requires it for changes', async () => {
     const auth = new AuthStore(null);
-    const created = await auth.telegramLogin({ id: '123456789' });
+    const created = await auth.telegramLogin({ id: '123456789' }, null, 'tg_123456789');
     const changed = await auth.changePassword(
       `four_session=${created.token}`,
       '',
@@ -270,11 +283,18 @@ describe('Telegram HTTP sessions', () => {
     const complete = await post('/auth/telegram/complete', body, cookie);
     expect(complete.status).toBe(200);
     expect(await complete.json()).toMatchObject({
+      registrationRequired: true,
+      suggestedUsername: 'HttpTelegram',
+    });
+    const pending = complete.headers.getSetCookie()[0].split(';')[0];
+    const registered = await post('/auth/telegram/register', { username: 'HttpTelegram' }, pending);
+    expect(registered.status).toBe(200);
+    expect(await registered.json()).toMatchObject({
       username: 'HttpTelegram',
       telegramLinked: true,
       hasPassword: false,
     });
-    const session = complete.headers
+    const session = registered.headers
       .getSetCookie()
       .find((cookie) => cookie.startsWith('four_session='))!
       .split(';')[0];

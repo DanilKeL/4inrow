@@ -7,19 +7,26 @@ const botToken = '8834741855:isolated-browser-test';
 let pair: Awaited<ReturnType<typeof generateKeyPair>>;
 let server: ChildProcess;
 let api: string;
+let emails: { email: string; token: string; purpose?: string }[];
 test.beforeAll(async () => {
   pair = await generateKeyPair('RS256');
 });
-test.beforeEach(async ({ page }) => {
+test.beforeEach(async ({ page }, info) => {
+  emails = [];
   server = spawn(process.execPath, ['--import', 'tsx', 'e2e/telegram-auth-server.ts'], {
     env: {
       ...process.env,
+      FOUR_TEST_MAIL: info.title.includes('email binding') ? '1' : '0',
       FOUR_TEST_TELEGRAM_JWKS: JSON.stringify({
         keys: [{ ...(await exportJWK(pair.publicKey)), kid: 'e2e', alg: 'RS256' }],
       }),
     },
-    stdio: ['ignore', 'pipe', 'pipe'],
+    stdio: ['ignore', 'pipe', 'pipe', 'ipc'],
     windowsHide: true,
+  });
+  server.on('message', (message) => {
+    if ((message as { type?: string }).type === 'mail')
+      emails.push(message as (typeof emails)[number]);
   });
   api = await new Promise<string>((resolve, reject) => {
     const timer = setTimeout(() => reject(new Error('Telegram test server did not start')), 10000);
@@ -51,6 +58,57 @@ test.beforeEach(async ({ page }) => {
   `,
     }),
   );
+});
+
+test('Telegram recovery and email binding are usable on a small phone and keep the same account', async ({
+  page,
+}, info) => {
+  await page.setViewportSize({ width: 320, height: 568 });
+  const account = await openAccount(page);
+  const button = account.getByRole('button', { name: 'Войти через Telegram' });
+  await expect(button).toBeEnabled();
+  await button.click();
+  await finishLogin(page, 444444444, 'EmailPlayer');
+  await account.getByRole('button', { name: 'Завершить регистрацию' }).click();
+  await expect(account.getByTestId('account-dashboard')).toBeVisible();
+  const response = await fetch(`${api}/auth/telegram/bot-reset`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${botToken}` },
+    body: JSON.stringify({ id: '444444444' }),
+  });
+  const { token } = (await response.json()) as { token: string };
+  // A recovery link must open the reset form even when this browser is already signed in.
+  await page.goto(`/?reset=${token}`);
+  await expect(page.locator('[aria-busy="true"]')).toHaveCount(0);
+  await account.getByLabel('Новый пароль', { exact: true }).fill('recovered-password-123');
+  await account.getByLabel('Повторите пароль').fill('recovered-password-123');
+  await account.getByRole('button', { name: 'Изменить пароль' }).click();
+  await expect(account.getByTestId('account-dashboard')).toBeVisible();
+  await account.getByRole('button', { name: 'Безопасность' }).click();
+  await account.getByRole('button', { name: 'Привязать почту' }).click();
+  await account.getByLabel('Email', { exact: true }).fill('player@example.org');
+  await account.getByRole('button', { name: 'Отправить подтверждение' }).click();
+  await expect(account.getByRole('status')).toContainText('Подтвердите привязку');
+  await expect.poll(() => emails.length).toBe(1);
+  expect(emails[0]).toMatchObject({ email: 'player@example.org', purpose: 'binding' });
+  expect(
+    await account.evaluate((element) => element.scrollHeight <= element.clientHeight + 1),
+  ).toBe(true);
+  await page.screenshot({ path: info.outputPath('telegram-email-binding-mobile.png') });
+  const proof = await page.evaluate(
+    (token) =>
+      fetch('/auth/verify', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ token }),
+      }).then((r) => r.json()),
+    emails[0].token,
+  );
+  expect(proof).toMatchObject({ username: 'EmailPlayer', emailVerified: true });
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.reload();
+  await page.getByRole('button', { name: 'Аккаунт: EmailPlayer' }).click();
+  await expect(account.getByText('player@example.org')).toBeVisible();
 });
 test.afterEach(async () => {
   if (server && server.exitCode === null)
@@ -110,6 +168,14 @@ test('Telegram creates a playable account, survives reload, and permits an optio
   await page.screenshot({ path: info.outputPath('telegram-registration-desktop.png') });
   await button.click();
   await finishLogin(page, 111111111, 'TelegramBrowser');
+  await expect(account.getByLabel('Имя пользователя')).toHaveValue('TelegramBrowser');
+  await account.getByLabel('Имя пользователя').fill('ChosenBrowser');
+  await page.setViewportSize({ width: 320, height: 568 });
+  expect(
+    await account.evaluate((element) => element.scrollHeight <= element.clientHeight + 1),
+  ).toBe(true);
+  await page.screenshot({ path: info.outputPath('telegram-choose-username-mobile.png') });
+  await account.getByRole('button', { name: 'Завершить регистрацию' }).click();
   await expect(account.getByTestId('account-dashboard')).toBeVisible();
   await expect(account.getByTestId('account-rating')).toContainText('1000');
   await account.getByRole('button', { name: 'Безопасность' }).click();
@@ -120,13 +186,13 @@ test('Telegram creates a playable account, survives reload, and permits an optio
   await account.getByRole('button', { name: 'Создать пароль' }).click();
   await expect(account.getByLabel('Текущий пароль')).toBeVisible();
   await page.reload();
-  await expect(page.getByRole('button', { name: 'Аккаунт: TelegramBrowser' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Аккаунт: ChosenBrowser' })).toBeVisible();
   await page.getByRole('button', { name: /Аккаунт:/ }).click();
   await account.getByRole('button', { name: 'Выйти' }).click();
   await expect(account.getByRole('button', { name: 'Войти через Telegram' })).toBeEnabled();
   await account.getByRole('button', { name: 'Войти через Telegram' }).click();
   await finishLogin(page, 111111111, 'ChangedTelegramName');
-  await expect(page.getByRole('button', { name: 'Аккаунт: TelegramBrowser' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Аккаунт: ChosenBrowser' })).toBeVisible();
 });
 
 test('linking Telegram retains the existing nickname and level records', async ({ page }) => {
@@ -226,6 +292,8 @@ test('inside a Telegram Mini App the signed identity logs in without a browser p
   const account = await openAccount(page);
   await expect(account.getByRole('button', { name: 'Войти через Telegram' })).toBeEnabled();
   await account.getByRole('button', { name: 'Войти через Telegram' }).click();
+  await expect(account.getByLabel('Имя пользователя')).toHaveValue('MiniAppPlayer');
+  await account.getByRole('button', { name: 'Завершить регистрацию' }).click();
   await expect(page.getByRole('button', { name: 'Аккаунт: MiniAppPlayer' })).toBeVisible();
   expect(
     await page.evaluate(() => document.querySelector('script[src*="telegram-login.js"]')),

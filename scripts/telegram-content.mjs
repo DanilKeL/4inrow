@@ -4,6 +4,7 @@ export const commands = [
   { command: 'start', description: 'Открыть FOUR³' },
   { command: 'play', description: 'Начать игру' },
   { command: 'help', description: 'Правила игры' },
+  { command: 'reset', description: 'Восстановить пароль' },
 ];
 const playButton = { inline_keyboard: [[{ text: 'Играть в FOUR³ ↗', web_app: { url: APP_URL } }]] };
 

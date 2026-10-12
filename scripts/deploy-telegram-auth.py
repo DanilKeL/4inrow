@@ -33,6 +33,7 @@ def main():
     credential = Path('/etc/four-game/telegram.env')
     shutil.copy2(service, backup / 'four-game.service')
     shutil.copy2(credential, backup / 'telegram.env')
+    bot_active = subprocess.run(['systemctl', 'is-active', '--quiet', 'four-telegram-bot']).returncode == 0
     run('systemctl', 'start', 'four-game-backup.service')
     stage = archive.parent / ('telegram-auth-' + stamp)
     stage.mkdir(mode=0o700)
@@ -53,6 +54,8 @@ def main():
     swapped = False
     stopped = False
     try:
+        if bot_active:
+            run('systemctl', 'stop', 'four-telegram-bot')
         run('systemctl', 'stop', 'four-game')
         stopped = True
         run('python3', '/usr/local/lib/four-game/backup-database.py', '--snapshot-only')
@@ -83,7 +86,12 @@ def main():
                 time.sleep(1)
         else:
             raise RuntimeError('Updated service failed its health check')
+        if bot_active:
+            run('systemctl', 'start', 'four-telegram-bot')
+            run('systemctl', 'is-active', '--quiet', 'four-telegram-bot')
     except Exception:
+        if bot_active:
+            run('systemctl', 'stop', 'four-telegram-bot')
         if stopped:
             run('systemctl', 'stop', 'four-game')
         if swapped:
@@ -95,6 +103,8 @@ def main():
         shutil.copy2(backup / 'telegram.env', credential)
         run('systemctl', 'daemon-reload')
         run('systemctl', 'start', 'four-game')
+        if bot_active:
+            run('systemctl', 'start', 'four-telegram-bot')
         raise
     print('BACKUP=' + str(backup))
     print('RELEASE_SHA256=' + expected)
