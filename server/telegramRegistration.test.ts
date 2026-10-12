@@ -183,6 +183,9 @@ describe('Telegram recovery and email binding', () => {
     ).toEqual(recovery);
     const verified = await post('/auth/verify', { token: emails[0].token });
     expect(verified.status).toBe(200);
+    expect(
+      await (await post('/auth/telegram/bot-reset', { id: '101010101' }, '', botHeaders)).json(),
+    ).toEqual({ viaEmail: true });
     expect((await post('/auth/verify', { token: emails[0].token })).status).toBe(400);
     expect(
       (

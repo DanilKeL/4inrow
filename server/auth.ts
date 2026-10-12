@@ -335,7 +335,7 @@ export class AuthStore {
     account.emailVerified = true;
     const token = this.newSession(usernameKey);
     await this.save();
-    return { username: account.username, token };
+    return { username: account.username, token, telegramId: account.telegram?.id };
   }
 
   async resendVerification(rawIdentifier: unknown) {

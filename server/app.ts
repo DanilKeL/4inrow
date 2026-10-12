@@ -843,6 +843,7 @@ export function createOnlineServer(options: OnlineServerOptions = {}) {
             checkRate(mailAttempts, 10);
             const data = await readAuthJson();
             const result = await auth.verifyEmail(data.token);
+            if (result.telegramId) botResets.delete(result.telegramId);
             res.setHeader('Set-Cookie', auth.cookie(result.token, secure));
             respond(200, {
               authenticated: true,
@@ -859,6 +860,7 @@ export function createOnlineServer(options: OnlineServerOptions = {}) {
         if (pathname === '/auth/verify' && req.method === 'GET') {
           try {
             const result = await auth.verifyEmail(requestUrl.searchParams.get('token'));
+            if (result.telegramId) botResets.delete(result.telegramId);
             res.setHeader('Set-Cookie', auth.cookie(result.token, secure));
             res.writeHead(303, { Location: '/?emailVerified=1' }).end();
           } catch {
