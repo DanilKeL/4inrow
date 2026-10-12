@@ -1,6 +1,30 @@
 import { expect, it } from 'vitest';
+import { readFileSync } from 'node:fs';
 import { replay } from '../game/core';
 import { tutorialExamples } from './tutorialExamples';
+
+it('ships mobile-compatible H.264 clips with an opening cover and fast-start metadata', () => {
+  for (const example of tutorialExamples) {
+    const bytes = readFileSync(`public/tutorial/${example.id}.mp4`);
+    const avc = bytes.indexOf('avcC');
+    expect(avc, example.id).toBeGreaterThan(0);
+    expect(bytes[avc + 4], example.id).toBe(1);
+    expect(bytes[avc + 5], example.id).toBe(66); // Baseline; no High Profile hardware requirement.
+    expect(bytes[avc + 7], example.id).toBe(31); // Level 3.1; never auto-selected Level 6.2.
+    const boxes: string[] = [];
+    for (let offset = 0; offset + 8 <= bytes.length;) {
+      const length = bytes.readUInt32BE(offset);
+      expect(length).toBeGreaterThanOrEqual(8);
+      boxes.push(bytes.toString('ascii', offset + 4, offset + 8));
+      offset += length;
+    }
+    expect(boxes.indexOf('moov')).toBeGreaterThanOrEqual(0);
+    expect(boxes.indexOf('moov')).toBeLessThan(boxes.indexOf('mdat'));
+    const cover = readFileSync(`public/tutorial/${example.id}-start.webp`);
+    expect(cover.toString('ascii', 0, 4)).toBe('RIFF');
+    expect(cover.toString('ascii', 8, 12)).toBe('WEBP');
+  }
+});
 
 it('shows legal alternating games with supported pieces and the advertised winning direction', () => {
   const directions = [

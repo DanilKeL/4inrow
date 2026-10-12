@@ -11,6 +11,7 @@ import { useBackgroundState } from './useBackgroundState';
 function LessonVideo({ id, title, autoPlay }: { id: string; title: string; autoPlay: boolean }) {
   const ref = useRef<HTMLVideoElement>(null);
   const [source] = useState(() => tutorialVideoUrl(id));
+  const openingCover = `/tutorial/${id}-start.webp`;
   const [playing, setPlaying] = useState(false);
   const [ended, setEnded] = useState(false);
   const [failed, setFailed] = useState(false);
@@ -100,7 +101,7 @@ function LessonVideo({ id, title, autoPlay }: { id: string; title: string; autoP
             ref={ref}
             className={frameReady ? undefined : styles.pendingVideo}
             src={source}
-            poster={`/tutorial/${id}.webp`}
+            poster={openingCover}
             aria-label={`Пример: ${title}`}
             autoPlay={autoPlay}
             muted
@@ -129,12 +130,7 @@ function LessonVideo({ id, title, autoPlay }: { id: string; title: string; autoP
           />
         )}
         {!failed && !frameReady && (
-          <img
-            className={styles.posterCover}
-            src={`/tutorial/${id}.webp`}
-            alt=""
-            aria-hidden="true"
-          />
+          <img className={styles.posterCover} src={openingCover} alt="" aria-hidden="true" />
         )}
         {ended && id !== 'stacking' && <span className={styles.winner}>4 в ряд — победа</span>}
       </div>

@@ -59,7 +59,7 @@ test('each example keeps its cover until the first video frame is presented', as
       const video = dialog.locator('video');
       const cover = dialog.locator('img[aria-hidden="true"]');
       await expect(cover).toBeVisible();
-      await expect(cover).toHaveAttribute('src', `/tutorial/${example.id}.webp`);
+      await expect(cover).toHaveAttribute('src', `/tutorial/${example.id}-start.webp`);
       await expect(video).toHaveCSS('opacity', '0');
       await expect
         .poll(() =>
