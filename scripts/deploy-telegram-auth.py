@@ -34,8 +34,8 @@ def main():
     shutil.copy2(service, backup / 'four-game.service')
     shutil.copy2(credential, backup / 'telegram.env')
     bot_active = subprocess.run(['systemctl', 'is-active', '--quiet', 'four-telegram-bot']).returncode == 0
-    cloud = subprocess.run(['systemctl', 'start', 'four-game-backup.service'])
-    if cloud.returncode:
+    cloud = None if '--local-backup' in sys.argv[3:] else subprocess.run(['systemctl', 'start', 'four-game-backup.service'])
+    if cloud is None or cloud.returncode:
         # A remote upload outage must not prevent a release with a verified local
         # rollback snapshot. The snapshot below is mandatory before swapping.
         print('Cloud upload unavailable; a verified local database snapshot is required for this release.', flush=True)
