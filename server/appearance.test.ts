@@ -3,6 +3,8 @@ import type { AddressInfo } from 'node:net';
 import { createOnlineServer } from './app';
 import { createAdminPasswordHash } from './admin';
 import { BUILTIN_SKINS, defaultCatalog, type SkinCatalog } from '../src/skins/catalog';
+import { blankDesign, imageLayer, motifLayer, SURFACES } from '../src/skins/design';
+import { readFileSync } from 'node:fs';
 
 let app: ReturnType<typeof createOnlineServer>;
 let url: string;
@@ -108,4 +110,45 @@ it('broadcasts a saved and activated custom style immediately to independent ope
   expect((await fetch(url + '/appearance').then((r) => r.json())).activeSkinId).toBe(
     saved.savedSkinId,
   );
+});
+it('saves a full composition beyond the legacy body limit and validates uploaded image references', async () => {
+  const cookie = await start();
+  const headers = { 'Content-Type': 'application/json', Cookie: cookie, Origin: url };
+  const image = readFileSync(new URL('../public/favicon.png', import.meta.url));
+  const upload = await fetch(url + '/admin-api/skin-assets', {
+    method: 'POST',
+    headers,
+    body: JSON.stringify({ dataUrl: 'data:image/png;base64,' + image.toString('base64') }),
+  });
+  expect(upload.status).toBe(201);
+  const asset = await upload.json();
+  const design = blankDesign();
+  for (const surface of SURFACES)
+    design.surfaces[surface].layers = Array.from({ length: 12 }, (_, i) =>
+      motifLayer('star', '#123456', `star-${i}`),
+    );
+  design.surfaces.board.layers[0] = imageLayer(asset.id, '#123456', 'star-0');
+  const body = {
+    name: 'Полная композиция',
+    palette: defaultCatalog().skins[0].palette,
+    design,
+    expectedRevision: 0,
+  };
+  expect(Buffer.byteLength(JSON.stringify(body))).toBeGreaterThan(8192);
+  const response = await fetch(url + '/admin-api/skins', {
+    method: 'POST',
+    headers,
+    body: JSON.stringify(body),
+  });
+  expect(response.status).toBe(201);
+  const saved = await response.json();
+  expect(saved.skins.at(-1).design).toEqual(design);
+  Object.assign(design.surfaces.board.layers[0], { imageId: 'f'.repeat(64) });
+  const bad = await fetch(url + '/admin-api/skins/' + saved.savedSkinId, {
+    method: 'PATCH',
+    headers,
+    body: JSON.stringify({ ...body, design, expectedRevision: saved.revision }),
+  });
+  expect(bad.status).toBe(400);
+  expect((await fetch(url + '/appearance').then((r) => r.json())).revision).toBe(saved.revision);
 });

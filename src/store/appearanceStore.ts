@@ -1,5 +1,7 @@
 import { create } from 'zustand';
-import { defaultCatalog, normalizeCatalog, type SkinCatalog } from '../skins/catalog';
+import { activeSkin, defaultCatalog, normalizeCatalog, type SkinCatalog } from '../skins/catalog';
+import { designImageIds } from '../skins/design';
+import { prefetchSkinImages } from '../skins/imageAssets';
 
 const CACHE_KEY = 'four-skins-v1';
 function cachedCatalog(): SkinCatalog {
@@ -27,10 +29,12 @@ export const useAppearance = create<{
       /* Optional cache. */
     }
     if (!unchanged) set({ catalog });
+    void prefetchSkinImages(designImageIds(activeSkin(catalog).design));
   },
 }));
 
 export function initializeAppearance(): () => void {
+  void prefetchSkinImages(designImageIds(activeSkin(useAppearance.getState().catalog).design));
   let stopped = false;
   let generation = 0;
   let source: EventSource | undefined;

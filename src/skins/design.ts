@@ -1,0 +1,233 @@
+export const SURFACES = ['board', 'darkCap', 'darkBody', 'lightCap', 'lightBody'] as const;
+export type SurfaceName = (typeof SURFACES)[number];
+export const PATTERNS = [
+  'none',
+  'celestial',
+  'botanical',
+  'artdeco',
+  'guilloche',
+  'marble',
+] as const;
+export type Pattern = (typeof PATTERNS)[number];
+export const MOTIFS = ['moon', 'sun', 'star', 'lotus', 'laurel', 'diamond', 'rings'] as const;
+export type Motif = (typeof MOTIFS)[number];
+export type Placement = 'single' | 'corners' | 'grid';
+type LayerBase = {
+  id: string;
+  x: number;
+  y: number;
+  size: number;
+  rotation: number;
+  opacity: number;
+  color: string;
+  tint: boolean;
+  placement: Placement;
+};
+export type DesignLayer = LayerBase &
+  ({ kind: 'motif'; motif: Motif } | { kind: 'image'; imageId: string });
+export type SurfaceDesign = {
+  pattern: Pattern;
+  ink: string;
+  patternScale: number;
+  patternOpacity: number;
+  border: boolean;
+  roughness: number;
+  metalness: number;
+  layers: DesignLayer[];
+};
+export type SkinDesign = { version: 1; surfaces: Record<SurfaceName, SurfaceDesign> };
+export const MAX_DESIGN_IMAGES = 16;
+
+const record = (value: unknown): value is Record<string, unknown> =>
+  Boolean(value) && typeof value === 'object' && !Array.isArray(value);
+const color = (value: unknown): value is string =>
+  typeof value === 'string' && /^#[0-9a-f]{6}$/i.test(value);
+const range = (value: unknown, min: number, max: number) =>
+  typeof value === 'number' && Number.isFinite(value) && value >= min && value <= max;
+const keys = (value: Record<string, unknown>, expected: string[]) =>
+  Object.keys(value).sort().join() === [...expected].sort().join();
+
+export function isDesignLayer(value: unknown): value is DesignLayer {
+  if (!record(value)) return false;
+  const base = [
+    'id',
+    'kind',
+    'x',
+    'y',
+    'size',
+    'rotation',
+    'opacity',
+    'color',
+    'tint',
+    'placement',
+  ];
+  return (
+    typeof value.id === 'string' &&
+    /^[a-zA-Z0-9_-]{1,48}$/.test(value.id) &&
+    range(value.x, 0, 1) &&
+    range(value.y, 0, 1) &&
+    range(value.size, 0.05, 1) &&
+    range(value.rotation, -180, 180) &&
+    range(value.opacity, 0, 1) &&
+    color(value.color) &&
+    typeof value.tint === 'boolean' &&
+    ['single', 'corners', 'grid'].includes(String(value.placement)) &&
+    ((value.kind === 'motif' &&
+      MOTIFS.includes(value.motif as Motif) &&
+      keys(value, [...base, 'motif'])) ||
+      (value.kind === 'image' &&
+        typeof value.imageId === 'string' &&
+        /^[a-f0-9]{64}$/.test(value.imageId) &&
+        keys(value, [...base, 'imageId'])))
+  );
+}
+export function isSkinDesign(value: unknown): value is SkinDesign {
+  if (
+    !record(value) ||
+    !keys(value, ['version', 'surfaces']) ||
+    value.version !== 1 ||
+    !record(value.surfaces) ||
+    !keys(value.surfaces, [...SURFACES])
+  )
+    return false;
+  const surfaces = value.surfaces;
+  const valid = SURFACES.every((surface) => {
+    const part = surfaces[surface];
+    return (
+      record(part) &&
+      keys(part, [
+        'pattern',
+        'ink',
+        'patternScale',
+        'patternOpacity',
+        'border',
+        'roughness',
+        'metalness',
+        'layers',
+      ]) &&
+      PATTERNS.includes(part.pattern as Pattern) &&
+      color(part.ink) &&
+      range(part.patternScale, 0.5, 3) &&
+      range(part.patternOpacity, 0, 1) &&
+      typeof part.border === 'boolean' &&
+      range(part.roughness, 0, 1) &&
+      range(part.metalness, 0, 1) &&
+      Array.isArray(part.layers) &&
+      part.layers.length <= 12 &&
+      part.layers.every(isDesignLayer) &&
+      new Set(part.layers.map((layer) => layer.id)).size === part.layers.length
+    );
+  });
+  return valid && designImageIds(value as SkinDesign).length <= MAX_DESIGN_IMAGES;
+}
+export function blankDesign(ink = '#c8a970'): SkinDesign {
+  const surfaces = {} as SkinDesign['surfaces'];
+  for (const surface of SURFACES)
+    surfaces[surface] = {
+      pattern: 'none',
+      ink,
+      patternScale: 1,
+      patternOpacity: 0.65,
+      border: false,
+      roughness: surface === 'board' ? 0.42 : 0.5,
+      metalness: 0,
+      layers: [],
+    };
+  return { version: 1, surfaces };
+}
+export function motifLayer(
+  motif: Motif,
+  color = '#c8a970',
+  id = `motif-${motif}`,
+): Extract<DesignLayer, { kind: 'motif' }> {
+  return {
+    id,
+    kind: 'motif',
+    motif,
+    x: 0.5,
+    y: 0.5,
+    size: 0.56,
+    rotation: 0,
+    opacity: 1,
+    color,
+    tint: false,
+    placement: 'single',
+  };
+}
+export function imageLayer(
+  imageId: string,
+  color = '#c8a970',
+  id = `image-${imageId.slice(0, 12)}`,
+): Extract<DesignLayer, { kind: 'image' }> {
+  return {
+    id,
+    kind: 'image',
+    imageId,
+    x: 0.5,
+    y: 0.5,
+    size: 0.56,
+    rotation: 0,
+    opacity: 1,
+    color,
+    tint: false,
+    placement: 'single',
+  };
+}
+export function nocturneDesign(): SkinDesign {
+  const design = blankDesign('#d8bc7f');
+  const { board, darkCap, lightCap, darkBody, lightBody } = design.surfaces;
+  Object.assign(board, {
+    pattern: 'celestial',
+    patternOpacity: 0.8,
+    border: true,
+    roughness: 0.3,
+    metalness: 0.55,
+  });
+  board.layers = [{ ...motifLayer('laurel', '#d8bc7f'), size: 0.2, placement: 'corners' }];
+  Object.assign(darkCap, {
+    pattern: 'celestial',
+    patternOpacity: 0.5,
+    border: true,
+    roughness: 0.36,
+    metalness: 0.2,
+  });
+  darkCap.layers = [motifLayer('moon', '#dfc688')];
+  Object.assign(lightCap, {
+    ink: '#947244',
+    pattern: 'guilloche',
+    patternOpacity: 0.3,
+    border: true,
+    roughness: 0.42,
+    metalness: 0.1,
+  });
+  lightCap.layers = [motifLayer('sun', '#947244')];
+  Object.assign(darkBody, {
+    pattern: 'botanical',
+    patternOpacity: 0.5,
+    border: true,
+    roughness: 0.38,
+    metalness: 0.15,
+  });
+  Object.assign(lightBody, {
+    pattern: 'botanical',
+    ink: '#947244',
+    patternOpacity: 0.4,
+    border: true,
+    roughness: 0.44,
+    metalness: 0.08,
+  });
+  return design;
+}
+export function designImageIds(design?: SkinDesign): string[] {
+  return [
+    ...new Set(
+      design
+        ? SURFACES.flatMap((surface) =>
+            design.surfaces[surface].layers.flatMap((layer) =>
+              layer.kind === 'image' ? [layer.imageId] : [],
+            ),
+          )
+        : [],
+    ),
+  ];
+}

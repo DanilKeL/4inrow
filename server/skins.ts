@@ -9,10 +9,14 @@ import {
   type Skin,
   type SkinCatalog,
 } from '../src/skins/catalog.ts';
+import { designImageIds } from '../src/skins/design.ts';
 
 type SavedCatalog = { revision: number; activeSkinId: string; custom: Skin[] };
 export class SkinsStore {
-  constructor(private db: DatabaseSync) {
+  constructor(
+    private db: DatabaseSync,
+    private hasAsset: (id: string) => boolean = () => false,
+  ) {
     db.exec('CREATE TABLE IF NOT EXISTS game_settings (key TEXT PRIMARY KEY, value TEXT NOT NULL)');
   }
   private read(): SavedCatalog {
@@ -81,8 +85,13 @@ export class SkinsStore {
       builtin: false,
       palette: structuredClone(palette),
       ...(data.artwork === undefined ? {} : { artwork: data.artwork as Skin['artwork'] }),
+      ...(data.design === undefined
+        ? {}
+        : { design: structuredClone(data.design) as Skin['design'] }),
     };
     if (!isSkin(skin)) throw new AuthError(400, 'Некорректный стиль.');
+    if (designImageIds(skin.design).some((image) => !this.hasAsset(image)))
+      throw new AuthError(400, 'Сначала загрузите все картинки стиля.');
     const catalog = this.change(data.expectedRevision, (saved) => {
       if (id && !saved.custom.some((current) => current.id === id))
         throw new AuthError(404, 'Стиль не найден.');

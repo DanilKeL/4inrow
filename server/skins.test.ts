@@ -5,6 +5,7 @@ import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { SkinsStore } from './skins';
 import { BUILTIN_SKINS, defaultCatalog, DEFAULT_ROOM_COLOR, isCatalog } from '../src/skins/catalog';
+import { blankDesign, imageLayer, motifLayer, nocturneDesign } from '../src/skins/design';
 
 const databases: DatabaseSync[] = [];
 const directories: string[] = [];
@@ -101,4 +102,48 @@ it('protects the active skin, supports deleting inactive custom styles, and keep
   const removed = store.remove(saved.savedSkinId, 3);
   expect(removed.skins).toHaveLength(BUILTIN_SKINS.length);
   expect(removed.activeSkinId).toBe('coffee-board');
+});
+it('persists the full layered composition, rejects malformed layers atomically, and permits clearing it', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'four-skin-design-'));
+  directories.push(dir);
+  const file = join(dir, 'statistics.sqlite');
+  const store = open(file);
+  const palette = BUILTIN_SKINS.find((skin) => skin.id === 'nocturne')!.palette;
+  const design = nocturneDesign();
+  const saved = store.save({ name: 'Моя композиция', palette, design, expectedRevision: 0 });
+  const active = store.activate(saved.savedSkinId, saved.revision);
+  databases.pop()!.close();
+  const restored = open(file);
+  expect(restored.get()).toEqual(active);
+  expect(isCatalog(restored.get())).toBe(true);
+  const invalid = structuredClone(design);
+  invalid.surfaces.board.layers.push({ ...motifLayer('star'), x: 50 });
+  expect(() =>
+    restored.save(
+      { name: 'Bad', palette, design: invalid, expectedRevision: active.revision },
+      saved.savedSkinId,
+    ),
+  ).toThrow('Некорректный стиль');
+  expect(restored.get()).toEqual(active);
+  const cleared = restored.save(
+    { name: 'Без узоров', palette, expectedRevision: active.revision },
+    saved.savedSkinId,
+  );
+  expect(cleared.skins.find((skin) => skin.id === saved.savedSkinId)?.design).toBeUndefined();
+});
+it('requires uploaded assets before saving and deduplicates references across surfaces', () => {
+  const db = new DatabaseSync(':memory:');
+  databases.push(db);
+  const asset = 'b'.repeat(64);
+  const store = new SkinsStore(db, (id) => id === asset);
+  const design = blankDesign();
+  design.surfaces.board.layers = [imageLayer(asset)];
+  const palette = defaultCatalog().skins[0].palette;
+  const saved = store.save({ name: 'Картинка', palette, design, expectedRevision: 0 });
+  expect(saved.skins.at(-1)?.design).toEqual(design);
+  Object.assign(design.surfaces.board.layers[0], { imageId: 'c'.repeat(64) });
+  expect(() =>
+    store.save({ name: 'Нет картинки', palette, design, expectedRevision: saved.revision }),
+  ).toThrow('загрузите');
+  expect(store.get().revision).toBe(saved.revision);
 });

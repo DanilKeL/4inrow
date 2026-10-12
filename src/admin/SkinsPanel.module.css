@@ -38,7 +38,8 @@
   cursor: default;
 }
 .root button:focus-visible,
-.root input:focus-visible {
+.root input:focus-visible,
+.root select:focus-visible {
   outline: 2px solid #2955e7;
   outline-offset: 3px;
 }
@@ -134,6 +135,22 @@
 }
 .editor h2 {
   font-size: 16px;
+}
+.composition {
+  display: grid;
+  gap: 16px;
+  border-top: 1px solid #e1e3dc;
+  padding-top: 18px;
+  min-width: 0;
+}
+.templates {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.templates button {
+  flex: 1;
+  min-width: 0;
 }
 .name {
   display: grid;
@@ -256,5 +273,8 @@
   }
   .heading h1 {
     font-size: 22px;
+  }
+  .templates {
+    flex-direction: column;
   }
 }

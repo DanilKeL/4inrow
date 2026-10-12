@@ -1,3 +1,4 @@
+import { isSkinDesign, type SkinDesign } from './design.ts';
 export type PiecePalette = { body: string; cap: string; mark: string };
 export type SkinPalette = {
   room: string;
@@ -12,6 +13,7 @@ export type Skin = {
   builtin: boolean;
   palette: SkinPalette;
   artwork?: 'nocturne';
+  design?: SkinDesign;
 };
 export type SkinCatalog = {
   schemaVersion: 1;
@@ -104,6 +106,7 @@ export function isSkin(value: unknown): value is Skin {
     value.name.length <= 48 &&
     value.builtin === BUILTIN_SKINS.some((skin) => skin.id === value.id) &&
     (value.artwork === undefined || value.artwork === 'nocturne') &&
+    (value.design === undefined || isSkinDesign(value.design)) &&
     isPalette(value.palette)
   );
 }

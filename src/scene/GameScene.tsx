@@ -21,12 +21,16 @@ import {
   MeshStandardMaterial,
   Vector2,
   Vector3,
+  type CanvasTexture,
 } from 'three';
 import type { OrbitControls as OrbitControlsImpl } from 'three-stdlib';
 import type { GameState, Move, Position } from '../game/core';
 import { displayedHeight, visibleLineSegments } from './layers';
 import { activeSkin, type Skin } from '../skins/catalog';
+import { designImageIds, type DesignLayer, type SurfaceName } from '../skins/design';
+import { getLoadedSkinImage, loadSkinImage, subscribeSkinImages } from '../skins/imageAssets';
 import { useAppearance } from '../store/appearanceStore';
+import { makeSurfaceTexture, surfaceDrawingSignature } from './skinDesignTextures';
 import {
   disposeNocturneTextures,
   makeNocturneTextures,
@@ -84,7 +88,130 @@ declare global {
   }
 }
 
-function BoardModel({ skin, artwork }: { skin: Skin; artwork: NocturneTextures | null }) {
+type SkinTextures = Omit<NocturneTextures, 'metal'> & { metal: CanvasTexture | null };
+const EMPTY_IMAGES = new Map<string, HTMLImageElement>();
+
+function useSurfaceArtwork(
+  surface: SurfaceName,
+  signature: string | null,
+  images: Map<string, HTMLImageElement>,
+) {
+  const previousImages = useRef(EMPTY_IMAGES);
+  const relevantImages = new Map<string, HTMLImageElement>();
+  if (signature) {
+    const drawing = JSON.parse(signature) as { layers: DesignLayer[] };
+    for (const layer of drawing.layers) {
+      if (layer.kind !== 'image') continue;
+      const image = images.get(layer.imageId);
+      if (image) relevantImages.set(layer.imageId, image);
+    }
+  }
+  if (
+    previousImages.current.size !== relevantImages.size ||
+    [...relevantImages].some(([id, image]) => previousImages.current.get(id) !== image)
+  ) {
+    previousImages.current = relevantImages;
+  }
+  const drawingImages = previousImages.current;
+  const texture = useMemo(
+    () =>
+      signature ? makeSurfaceTexture(surface, signature, (id) => drawingImages.get(id)) : null,
+    [surface, signature, drawingImages],
+  );
+  useEffect(() => () => texture?.dispose(), [texture]);
+  return texture;
+}
+
+function useSkinArtwork(skin: Skin): SkinTextures | null {
+  const imageKey = designImageIds(skin.design).sort().join(',');
+  const cached = useMemo(() => {
+    const result = new Map<string, HTMLImageElement>();
+    for (const id of imageKey.split(',').filter(Boolean)) {
+      const image = getLoadedSkinImage(id);
+      if (image) result.set(id, image);
+    }
+    return result;
+  }, [imageKey]);
+  const [loaded, setLoaded] = useState({ key: '', images: EMPTY_IMAGES });
+  useEffect(() => {
+    let current = true;
+    const ids = imageKey.split(',').filter(Boolean);
+    if (!ids.length) {
+      setLoaded((previous) =>
+        previous.images.size ? { key: '', images: EMPTY_IMAGES } : previous,
+      );
+      return;
+    }
+    const requested = new Set(ids);
+    const receive = (id: string, image: HTMLImageElement) => {
+      if (!current || !requested.has(id)) return;
+      setLoaded((previous) => {
+        if (!current) return previous;
+        const base = previous.key === imageKey ? previous.images : cached;
+        if (base.get(id) === image) return previous;
+        const next = new Map(base);
+        next.set(id, image);
+        return { key: imageKey, images: next };
+      });
+    };
+    const unsubscribe = subscribeSkinImages(receive);
+    for (const id of ids) {
+      const image = getLoadedSkinImage(id);
+      if (image) receive(id, image);
+    }
+    let cursor = 0;
+    void Promise.all(
+      Array.from({ length: Math.min(4, ids.length) }, async () => {
+        while (cursor < ids.length) {
+          const id = ids[cursor++];
+          try {
+            receive(id, await loadSkinImage(id));
+          } catch {
+            /* Keep the drawing usable offline even if a new image is unavailable. */
+          }
+        }
+      }),
+    );
+    return () => {
+      current = false;
+      unsubscribe();
+    };
+  }, [imageKey, cached]);
+  const images = loaded.key === imageKey ? loaded.images : cached;
+  const signature = (surface: SurfaceName, color: string) =>
+    skin.design ? surfaceDrawingSignature(color, skin.design.surfaces[surface]) : null;
+  const board = useSurfaceArtwork('board', signature('board', skin.palette.board.body), images);
+  const darkCap = useSurfaceArtwork('darkCap', signature('darkCap', skin.palette.dark.cap), images);
+  const darkBody = useSurfaceArtwork(
+    'darkBody',
+    signature('darkBody', skin.palette.dark.body),
+    images,
+  );
+  const lightCap = useSurfaceArtwork(
+    'lightCap',
+    signature('lightCap', skin.palette.light.cap),
+    images,
+  );
+  const lightBody = useSurfaceArtwork(
+    'lightBody',
+    signature('lightBody', skin.palette.light.body),
+    images,
+  );
+  const legacy = useMemo(
+    () => (!skin.design && skin.artwork === 'nocturne' ? makeNocturneTextures(skin.palette) : null),
+    [skin.design, skin.artwork, skin.palette],
+  );
+  useEffect(() => () => disposeNocturneTextures(legacy), [legacy]);
+  return useMemo(
+    () =>
+      board && darkCap && darkBody && lightCap && lightBody
+        ? { board, darkCap, darkBody, lightCap, lightBody, metal: null }
+        : legacy,
+    [board, darkCap, darkBody, lightCap, lightBody, legacy],
+  );
+}
+
+function BoardModel({ skin, artwork }: { skin: Skin; artwork: SkinTextures | null }) {
   const { scene } = useGLTF('/models/four-board.glb');
   const { model, materials, geometries } = useMemo(() => {
     const model = scene.clone(true);
@@ -125,12 +252,15 @@ function BoardModel({ skin, artwork }: { skin: Skin; artwork: NocturneTextures |
       const { material } = original;
       if (!(material instanceof MeshStandardMaterial)) continue;
       const mapped = Boolean(material.map);
+      const metallicMapped = Boolean(material.metalnessMap);
       if (material.name.startsWith('Porcelain')) {
         material.color.set(artwork ? '#ffffff' : skin.palette.board.body);
         material.map = artwork?.board ?? null;
         material.metalnessMap = artwork?.metal ?? null;
-        material.roughness = artwork ? 0.3 : original.roughness;
-        material.metalness = artwork ? 0.86 : original.metalness;
+        material.roughness =
+          skin.design?.surfaces.board.roughness ?? (artwork ? 0.3 : original.roughness);
+        material.metalness =
+          skin.design?.surfaces.board.metalness ?? (artwork ? 0.86 : original.metalness);
       }
       if (material.name === 'Satin champagne') {
         material.color.set(skin.palette.board.rim);
@@ -140,9 +270,10 @@ function BoardModel({ skin, artwork }: { skin: Skin; artwork: NocturneTextures |
       if (material.name === 'Anodized graphite' && original.color)
         material.color.copy(artwork ? original.color.clone().set('#101c23') : original.color);
       if (material.name === 'Cobalt enamel') material.color.set(skin.palette.accent);
-      if (mapped !== Boolean(material.map)) material.needsUpdate = true;
+      if (mapped !== Boolean(material.map) || metallicMapped !== Boolean(material.metalnessMap))
+        material.needsUpdate = true;
     }
-  }, [materials, skin.palette, artwork]);
+  }, [materials, skin.palette, skin.design, artwork]);
   useEffect(() => () => materials.forEach(({ material }) => material.dispose()), [materials]);
   useEffect(() => () => geometries.forEach((geometry) => geometry.dispose()), [geometries]);
   // Only the shell owns a UV-mapped copy; the cached GLTF stays unchanged.
@@ -208,7 +339,7 @@ function Piece({
   introduction?: number;
   revealed?: boolean;
   skin: Skin;
-  artwork: NocturneTextures | null;
+  artwork: SkinTextures | null;
 }) {
   const group = useRef<Group>(null);
   const bodyMaterial = useRef<MeshStandardMaterial>(null);
@@ -222,6 +353,11 @@ function Piece({
   const pos = position(move);
   const dark = move.player === 1;
   const palette = dark ? skin.palette.dark : skin.palette.light;
+  const bodyDesign = skin.design?.surfaces[dark ? 'darkBody' : 'lightBody'];
+  const capDesign = skin.design?.surfaces[dark ? 'darkCap' : 'lightCap'];
+  const decoratedCap = capDesign
+    ? capDesign.pattern !== 'none' || capDesign.layers.length > 0
+    : Boolean(artwork);
   useEffect(() => {
     fade.current = {
       value: fade.current.value,
@@ -295,8 +431,8 @@ function Piece({
           ref={bodyMaterial}
           color={artwork ? '#ffffff' : palette.body}
           map={artwork ? (dark ? artwork.darkBody : artwork.lightBody) : null}
-          roughness={dark ? 0.34 : 0.48}
-          metalness={dark ? 0.2 : 0.08}
+          roughness={bodyDesign?.roughness ?? (dark ? 0.34 : 0.48)}
+          metalness={bodyDesign?.metalness ?? (dark ? 0.2 : 0.08)}
           onUpdate={(material) => setMaterialOpacity(material, fade.current.value)}
         />
       </mesh>
@@ -306,12 +442,12 @@ function Piece({
           ref={capMaterial}
           color={artwork ? '#ffffff' : palette.cap}
           map={artwork ? (dark ? artwork.darkCap : artwork.lightCap) : null}
-          roughness={artwork ? 0.48 : 0.52}
-          metalness={artwork ? 0.12 : 0}
+          roughness={capDesign?.roughness ?? (artwork ? 0.48 : 0.52)}
+          metalness={capDesign?.metalness ?? (artwork ? 0.12 : 0)}
           onUpdate={(material) => setMaterialOpacity(material, fade.current.value)}
         />
       </mesh>
-      <mesh visible={!artwork} rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.258, 0]}>
+      <mesh visible={!decoratedCap} rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.258, 0]}>
         {dark ? <circleGeometry args={[0.052, 24]} /> : <ringGeometry args={[0.067, 0.085, 32]} />}
         <meshBasicMaterial
           ref={symbolMaterial}
@@ -470,11 +606,7 @@ function Board({
     };
   }, [clearHover]);
   const pieceGeometry = useMemo(makePieceGeometry, []);
-  const artwork = useMemo(
-    () => (skin.artwork === 'nocturne' ? makeNocturneTextures(skin.palette) : null),
-    [skin.artwork, skin.palette],
-  );
-  useEffect(() => () => disposeNocturneTextures(artwork), [artwork]);
+  const artwork = useSkinArtwork(skin);
   useEffect(
     () => () => {
       if (invalidTimer.current) clearTimeout(invalidTimer.current);

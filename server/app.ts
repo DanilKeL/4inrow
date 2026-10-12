@@ -16,6 +16,7 @@ import { DailyService, type DailyServiceOptions } from './dailyService.ts';
 import { waitingPairs } from './matchmaking.ts';
 import { TelegramAuth, type TelegramAuthOptions } from './telegramAuth.ts';
 import { AppearanceEvents } from './appearanceEvents.ts';
+import { SKIN_ASSET_JSON_LIMIT } from './skinAssets.ts';
 
 interface Seat {
   account: string | null;
@@ -219,6 +220,31 @@ export function createOnlineServer(options: OnlineServerOptions = {}) {
     void (async () => {
       const requestUrl = new URL(req.url ?? '/', 'http://localhost');
       const pathname = decodeURIComponent(requestUrl.pathname);
+      if (pathname.startsWith('/appearance/assets/')) {
+        res.setHeader('X-Content-Type-Options', 'nosniff');
+        if (req.method !== 'GET' && req.method !== 'HEAD') {
+          res.setHeader('Allow', 'GET, HEAD');
+          res.writeHead(405).end();
+          return;
+        }
+        const asset = statistics.skinAssets.get(pathname.slice('/appearance/assets/'.length));
+        if (!asset) {
+          res.setHeader('Cache-Control', 'no-store');
+          res.writeHead(404).end();
+          return;
+        }
+        const etag = `"${asset.id}"`;
+        res.setHeader('Content-Type', asset.mime);
+        res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
+        res.setHeader('ETag', etag);
+        if (req.headers['if-none-match']?.split(',').map((value) => value.trim()).includes(etag)) {
+          res.writeHead(304).end();
+          return;
+        }
+        res.setHeader('Content-Length', asset.bytes.length);
+        res.writeHead(200).end(req.method === 'HEAD' ? undefined : asset.bytes);
+        return;
+      }
       if (pathname === '/appearance' || pathname === '/appearance/events') {
         res.setHeader('Content-Type', 'application/json; charset=utf-8');
         res.setHeader('Cache-Control', 'no-store');
@@ -413,16 +439,22 @@ export function createOnlineServer(options: OnlineServerOptions = {}) {
           localProxy && typeof req.headers['x-real-ip'] === 'string'
             ? req.headers['x-real-ip']
             : (req.socket.remoteAddress ?? 'unknown');
-        const readJson = async () => {
+        const readJson = async (limit = 8192) => {
           if (!req.headers['content-type']?.startsWith('application/json'))
             throw new AuthError(415, 'Ожидается JSON-запрос.');
-          let body = '';
+          if (Number(req.headers['content-length']) > limit) {
+            req.resume();
+            throw new AuthError(413, 'Слишком большой запрос.');
+          }
+          const chunks: Buffer[] = [];
+          let size = 0;
           for await (const chunk of req) {
-            body += chunk;
-            if (body.length > 8192) throw new AuthError(413, 'Слишком большой запрос.');
+            size += Buffer.byteLength(chunk);
+            if (size > limit) throw new AuthError(413, 'Слишком большой запрос.');
+            chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
           }
           try {
-            const data: unknown = JSON.parse(body);
+            const data: unknown = JSON.parse(Buffer.concat(chunks).toString('utf8'));
             if (!isRecord(data)) throw new Error('not an object');
             return data;
           } catch {
@@ -482,18 +514,27 @@ export function createOnlineServer(options: OnlineServerOptions = {}) {
           }
           if (!admin.authenticated(req.headers.cookie))
             throw new AuthError(401, 'Войдите в админ-панель.');
+          if (pathname === '/admin-api/skin-assets') {
+            if (req.method !== 'POST') {
+              res.setHeader('Allow', 'POST');
+              throw new AuthError(405, 'Метод не поддерживается.');
+            }
+            const data = await readJson(SKIN_ASSET_JSON_LIMIT);
+            respond(201, statistics.skinAssets.save(data.dataUrl));
+            return;
+          }
           if (pathname === '/admin-api/skins' && req.method === 'GET') {
             respond(200, statistics.skins.get());
             return;
           }
           if (pathname === '/admin-api/skins' && req.method === 'POST') {
-            const catalog = statistics.skins.save(await readJson());
+            const catalog = statistics.skins.save(await readJson(128 * 1024));
             appearanceEvents.publish(catalog);
             respond(201, catalog);
             return;
           }
           if (pathname === '/admin-api/skins' && req.method === 'PATCH') {
-            const data = await readJson();
+            const data = await readJson(128 * 1024);
             const catalog = statistics.skins.activate(data.activeSkinId, data.expectedRevision);
             appearanceEvents.publish(catalog);
             respond(200, catalog);
@@ -504,7 +545,7 @@ export function createOnlineServer(options: OnlineServerOptions = {}) {
             ['PATCH', 'DELETE'].includes(req.method ?? '')
           ) {
             const id = pathname.slice('/admin-api/skins/'.length);
-            const data = await readJson();
+            const data = await readJson(req.method === 'PATCH' ? 128 * 1024 : 8192);
             const catalog =
               req.method === 'DELETE'
                 ? statistics.skins.remove(id, data.expectedRevision)
