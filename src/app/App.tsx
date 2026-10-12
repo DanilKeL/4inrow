@@ -53,6 +53,7 @@ import { Account } from '../ui/Account';
 import { Levels } from '../ui/Levels';
 import { TurnTimer } from '../ui/TurnTimer';
 import { RankedResult } from '../ui/RankedResult';
+import { hasRankedWinningLine } from '../game/victoryPresentation';
 import { Leaderboard } from '../ui/Leaderboard';
 import { useLevelProgress } from '../store/levelStore';
 import { useMatchHistory } from '../store/matchHistory';
@@ -232,6 +233,8 @@ export default function App() {
     else setOverlay((current) => (current === 'online-pause' ? null : current));
   }, [pauseIdentity, setOverlay]);
   const isMenu = state.phase === 'menu';
+  const rankedVictory =
+    !isMenu && state.phase !== 'replay' && hasRankedWinningLine(state.online?.snapshot);
   const showResumeBanner = ready && identityReady && isMenu && canContinue && !overlay;
   const savedRecordId = saved?.recordId;
   const discardSaved = useCallback(() => {
@@ -541,7 +544,11 @@ export default function App() {
                 </>
               )}
             </div>
-            <div className={styles.canvasWrap} onContextMenu={(event) => event.preventDefault()}>
+            <div
+              className={styles.canvasWrap}
+              data-testid={rankedVictory ? 'victory-presentation' : undefined}
+              onContextMenu={(event) => event.preventDefault()}
+            >
               <ErrorBoundary onError={handleSceneError}>
                 <Suspense
                   fallback={
@@ -553,6 +560,7 @@ export default function App() {
                 >
                   <GameScene
                     game={shown}
+                    rankedVictory={rankedVictory}
                     onPlace={state.place}
                     interactive={!isMenu && canPlace(state) && !overlay}
                     xray={!isMenu && state.xray}
@@ -714,6 +722,7 @@ export default function App() {
         <RankedResult
           key={`${state.online?.snapshot.code ?? 'none'}-${state.online?.snapshot.round ?? 0}`}
           blocked={Boolean(overlay || showResumeBanner)}
+          boardReady={ready}
         />
 
         {showResumeBanner && (

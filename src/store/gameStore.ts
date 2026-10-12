@@ -28,6 +28,7 @@ import {
   type DailyChallenge,
 } from '../game/daily';
 import { useDaily } from './dailyStore';
+import { hasRankedWinningLine, RANKED_WIN_FALL_MS } from '../game/victoryPresentation';
 
 export type Phase =
   | 'menu'
@@ -143,7 +144,13 @@ function receiveOnline(snapshot: LobbySnapshot, player?: Player) {
     current.online.snapshot.code !== snapshot.code ||
     current.online.snapshot.round !== snapshot.round;
   const moved = !fresh && snapshot.game.history.length > current.game.history.length;
-  cancelPending();
+  const continuingAnimation =
+    !fresh &&
+    !moved &&
+    current.phase === 'animating' &&
+    snapshot.game.history.length === current.game.history.length &&
+    snapshot.game.status === current.game.status;
+  if (!continuingAnimation) cancelPending();
   useGame.setState({
     mode: 'online',
     levelId: null,
@@ -158,11 +165,12 @@ function receiveOnline(snapshot: LobbySnapshot, player?: Player) {
     message: '',
     game: snapshot.game,
     names: [snapshot.players[0].name, snapshot.players[1]?.name ?? 'Ждём игрока'],
-    phase: moved
-      ? 'animating'
-      : current.phase === 'replay' && !fresh
-        ? 'replay'
-        : onlinePhase(snapshot),
+    phase:
+      moved || continuingAnimation
+        ? 'animating'
+        : current.phase === 'replay' && !fresh
+          ? 'replay'
+          : onlinePhase(snapshot),
     elapsed: onlineElapsed(snapshot),
     ...(moved ? { layers: [0, 1, 2, 3, 4] } : {}),
     ...(fresh
@@ -183,7 +191,12 @@ function receiveOnline(snapshot: LobbySnapshot, player?: Player) {
           playSound(snapshot.game.status === 'won' ? 'win' : 'place');
         useGame.getState().settle();
       },
-      useSettings.getState().animations ? 440 : 80,
+      useSettings.getState().animations
+        ? hasRankedWinningLine(snapshot) &&
+          !window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
+          ? RANKED_WIN_FALL_MS
+          : 440
+        : 80,
     );
 }
 

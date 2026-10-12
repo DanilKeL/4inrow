@@ -1,12 +1,77 @@
-import { test, expect } from '@playwright/test';
-import { collectErrors, openHistory, place } from './helpers';
+import { test, expect, type Page } from '@playwright/test';
+import { collectErrors, columnPosition, openHistory, place } from './helpers';
 
-test('ranked quick game alerts, survives reload, awards Elo and shows it on another device', async ({
+interface VictorySample {
+  elapsedMs: number;
+  renderedFallOffset: number;
+  renderedWinningLines: number;
+  lineProgress: number;
+  resultVisible: boolean;
+}
+
+interface VictoryTimeline {
+  boardAt: number | null;
+  resultAt: number | null;
+  firstDelta: string | null;
+  firstRating: string | null;
+  drop: VictorySample | null;
+  line: VictorySample | null;
+}
+
+async function recordVictoryTimeline(page: Page) {
+  await page.evaluate(() => {
+    const timeline: VictoryTimeline = {
+      boardAt: null,
+      resultAt: null,
+      firstDelta: null,
+      firstRating: null,
+      drop: null,
+      line: null,
+    };
+    (window as unknown as { victoryTimeline: VictoryTimeline }).victoryTimeline = timeline;
+    const observer = new MutationObserver(() => {
+      if (
+        timeline.boardAt === null &&
+        document.querySelector('[data-testid="victory-presentation"]')
+      )
+        timeline.boardAt = performance.now();
+      if (timeline.resultAt === null && document.querySelector('[data-testid="ranked-result"]')) {
+        timeline.resultAt = performance.now();
+        timeline.firstDelta =
+          document.querySelector('[data-testid="ranked-result-delta"]')?.textContent ?? null;
+        timeline.firstRating =
+          document.querySelector('[data-testid="ranked-result-rating"]')?.textContent ?? null;
+        observer.disconnect();
+      }
+    });
+    observer.observe(document.body, { childList: true, subtree: true, attributes: true });
+    // Capture the rendered scene inside its real frame loop. Playwright round trips
+    // on a software WebGL driver must not postpone our sample until the chip lands.
+    const sampleFrame = () => {
+      const presentation = window.__fourScene?.getVictoryPresentationState();
+      if (presentation) {
+        const sample: VictorySample = {
+          elapsedMs: presentation.elapsedMs,
+          renderedFallOffset: presentation.renderedFallOffset,
+          renderedWinningLines: presentation.renderedWinningLines,
+          lineProgress: presentation.lineProgress,
+          resultVisible: Boolean(document.querySelector('[data-testid="ranked-result"]')),
+        };
+        if (timeline.drop === null && presentation.elapsedMs >= 600) timeline.drop = sample;
+        if (timeline.line === null && presentation.elapsedMs >= 2000) timeline.line = sample;
+      }
+      if (timeline.resultAt === null) requestAnimationFrame(sampleFrame);
+    };
+    requestAnimationFrame(sampleFrame);
+  });
+}
+
+test('ranked quick game reveals the winning move before Elo, survives reload and keeps a dismissed result closed', async ({
   page,
   browser,
   baseURL,
 }, info) => {
-  test.setTimeout(60000);
+  test.setTimeout(75000);
   const other = await browser.newPage({
     baseURL,
     viewport: { width: 320, height: 568 },
@@ -17,10 +82,18 @@ test('ranked quick game alerts, survives reload, awards Elo and shows it on anot
   const password = 'rank-browser-test-123';
   const errors = [collectErrors(page), collectErrors(other)];
   try {
+    for (const client of [page, other])
+      await client.emulateMedia({ reducedMotion: 'no-preference' });
     await page.context().grantPermissions(['notifications']);
     await page.addInitScript(() => {
       const log = { notices: [] as string[], tones: 0 };
       (window as unknown as { matchAlerts: typeof log }).matchAlerts = log;
+      // Headless Edge may retain its OS notification policy even after grantPermissions.
+      // This test observes browser delivery through the real worker, not the OS popup.
+      Object.defineProperty(Notification, 'permission', {
+        configurable: true,
+        get: () => 'granted',
+      });
       ServiceWorkerRegistration.prototype.showNotification = async function (title) {
         log.notices.push(title);
       };
@@ -44,6 +117,11 @@ test('ranked quick game alerts, survives reload, awards Elo and shows it on anot
       ).toBe(true);
       await client.goto('/');
     }
+    // Keep notification delivery independent of a cold worker installation on a new origin.
+    await page.evaluate(async () => {
+      await navigator.serviceWorker.register('/match-notifications.js');
+      await navigator.serviceWorker.ready;
+    });
     await page.getByRole('button', { name: 'Рейтинговая игра', exact: true }).click();
     await other.getByRole('button', { name: 'Рейтинговая игра', exact: true }).click();
     await expect(page.getByRole('dialog')).toContainText('Рейтинг соперника: 1000');
@@ -91,11 +169,66 @@ test('ranked quick game alerts, survives reload, awards Elo and shows it on anot
       [1, 4],
       [2, 0],
       [2, 4],
-      [3, 0],
     ].entries())
       await place(i % 2 ? second : first, x, y, i + 1, (i % 2 ? second : first) === other);
+
+    // Observe the actual DOM transition on each device rather than timing a test click:
+    // both clients must have time to read the winning line before the rating obscures it.
+    await Promise.all([recordVictoryTimeline(first), recordVictoryTimeline(second)]);
+    const firstCanvas = await first.getByTestId('game-canvas').boundingBox();
+    const mobileCanvas = await other.getByTestId('game-canvas').boundingBox();
+    const winningColumn = await columnPosition(first, 3, 0);
+    if (first === other) await first.touchscreen.tap(winningColumn.screenX, winningColumn.screenY);
+    else await first.mouse.click(winningColumn.screenX, winningColumn.screenY);
+    await first.waitForFunction(
+      () =>
+        (window as unknown as { victoryTimeline: VictoryTimeline }).victoryTimeline.drop !== null,
+    );
+    await first.screenshot({
+      clip: firstCanvas!,
+      path: info.outputPath('ranked-winning-drop.png'),
+    });
+    for (const client of [first, second]) {
+      const presentation = await client.evaluate(
+        () => (window as unknown as { victoryTimeline: VictoryTimeline }).victoryTimeline.drop,
+      );
+      expect(presentation).not.toBeNull();
+      expect(presentation!.renderedFallOffset).toBeGreaterThan(0.05);
+      expect(presentation!.renderedWinningLines).toBe(0);
+      expect(presentation!.resultVisible).toBe(false);
+    }
+    await first.waitForFunction(
+      () =>
+        (window as unknown as { victoryTimeline: VictoryTimeline }).victoryTimeline.line !== null,
+    );
+    await other.screenshot({
+      clip: mobileCanvas!,
+      path: info.outputPath('ranked-winning-line-mobile.png'),
+    });
+    for (const client of [first, second]) {
+      const presentation = await client.evaluate(
+        () => (window as unknown as { victoryTimeline: VictoryTimeline }).victoryTimeline.line,
+      );
+      expect(presentation).not.toBeNull();
+      expect(Math.abs(presentation!.renderedFallOffset)).toBeLessThan(0.02);
+      expect(presentation!.lineProgress).toBeGreaterThan(0.5);
+      expect(presentation!.renderedWinningLines).toBeGreaterThanOrEqual(1);
+      expect(presentation!.resultVisible).toBe(false);
+      await expect(client.getByTestId('move-count')).toHaveText('7 / 125');
+      await expect(client.getByTestId('victory-presentation')).toBeVisible();
+    }
     await expect(first.getByTestId('ranked-result')).toBeVisible();
     await expect(second.getByTestId('ranked-result')).toBeVisible();
+    for (const client of [first, second]) {
+      const timeline = await client.evaluate(
+        () => (window as unknown as { victoryTimeline: VictoryTimeline }).victoryTimeline,
+      );
+      expect(timeline.boardAt).not.toBeNull();
+      expect(timeline.resultAt).not.toBeNull();
+      expect(timeline.resultAt! - timeline.boardAt!).toBeGreaterThanOrEqual(3500);
+      expect(timeline.firstDelta).toBe('+0');
+      expect(timeline.firstRating).toBe('1000');
+    }
     await expect(first.getByTestId('ranked-result')).toContainText('Победа');
     await expect(second.getByTestId('ranked-result')).toContainText('Поражение');
     await expect(first.getByTestId('ranked-result-delta')).toHaveText('+16');
@@ -117,11 +250,19 @@ test('ranked quick game alerts, survives reload, awards Elo and shows it on anot
       }),
     ).toBe(true);
     await other.screenshot({ path: info.outputPath('ranked-result-mobile.png') });
+    await second.getByRole('button', { name: 'Посмотреть поле', exact: true }).click();
+    await expect(second.getByTestId('ranked-result')).toHaveCount(0);
     await first.getByRole('button', { name: /Сыграть ещё с/ }).click();
     await expect(first.getByTestId('ranked-result')).toContainText('Ждём решения соперника');
-    await second.getByRole('button', { name: /Сыграть ещё с/ }).click();
-    for (const client of [page, other])
+    // The peer's rematch snapshot must not reopen a result that was deliberately closed.
+    await expect(second.getByTestId('ranked-result')).toHaveCount(0);
+    await second.getByRole('button', { name: 'Ещё партия', exact: true }).click();
+    for (const client of [page, other]) {
       await expect(client.getByTestId('turn-timer')).toHaveText(/\d+сек/);
+      await expect(client.getByTestId('move-count')).toHaveText('0 / 125');
+      await expect(client.getByTestId('ranked-result')).toHaveCount(0);
+      await expect(client.getByTestId('victory-presentation')).toHaveCount(0);
+    }
     const before = await (await page.request.get('/auth/history')).json();
     expect(before.rating.games).toBe(1);
     expect(before.matches[0].ratingChange).toBe(first === page ? 16 : -16);
@@ -168,7 +309,16 @@ test('ranked surrender keeps the winner result visible and records the loser', a
       await client.getByRole('button', { name: 'Принять матч', exact: true }).click();
     await page.getByRole('button', { name: 'Покинуть лобби' }).click();
     await expect(page.getByRole('dialog')).toContainText('уменьшит рейтинг');
+    await recordVictoryTimeline(other);
+    const surrenderStarted = await other.evaluate(() => performance.now());
     await page.getByRole('button', { name: 'Выйти из лобби', exact: true }).click();
+    await expect(other.getByTestId('ranked-result')).toBeVisible();
+    await expect(other.getByTestId('victory-presentation')).toHaveCount(0);
+    const surrenderTimeline = await other.evaluate(
+      () => (window as unknown as { victoryTimeline: VictoryTimeline }).victoryTimeline,
+    );
+    expect(surrenderTimeline.boardAt).toBeNull();
+    expect(surrenderTimeline.resultAt! - surrenderStarted).toBeLessThan(3000);
     await expect(other.getByTestId('ranked-status')).toContainText('1016 (+16)');
     await expect(other.getByTestId('ranked-status')).toContainText('сдался');
     await openHistory(page);

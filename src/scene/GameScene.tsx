@@ -23,9 +23,15 @@ import {
   Vector3,
   type CanvasTexture,
 } from 'three';
-import type { OrbitControls as OrbitControlsImpl } from 'three-stdlib';
+import type { Line2, LineSegments2, OrbitControls as OrbitControlsImpl } from 'three-stdlib';
 import type { GameState, Move, Position } from '../game/core';
+import { RANKED_WIN_FALL_MS, RANKED_WIN_LINE_MS } from '../game/victoryPresentation';
 import { displayedHeight, visibleLineSegments } from './layers';
+import {
+  rankedSegmentProgress,
+  rankedVictoryProgress,
+  type RankedVictoryClock,
+} from './rankedVictory';
 import { activeSkin, type Skin } from '../skins/catalog';
 import { designImageIds, type DesignLayer, type SurfaceName } from '../skins/design';
 import { getLoadedSkinImage, loadSkinImage, subscribeSkinImages } from '../skins/imageAssets';
@@ -55,6 +61,7 @@ export interface GameSceneProps {
   background?: string;
   cameraFov?: number;
   skin?: Skin;
+  rankedVictory?: boolean;
 }
 
 const SPACING = 1.09;
@@ -84,9 +91,24 @@ declare global {
         screenX: number;
         screenY: number;
       }>;
+      getVictoryPresentationState: () => VictoryPresentationState | null;
+      getRenderedWinningLines: () => Array<{
+        visible: boolean;
+        materialVisible: boolean;
+        opacity: number;
+        start: number[];
+        end: number[];
+      }>;
     };
   }
 }
+
+type VictoryPresentationState = ReturnType<typeof rankedVictoryProgress> & {
+  elapsedMs: number;
+  renderedFallOffset: number;
+  renderedWinningLines: number;
+};
+type VictoryDiagnostics = RefObject<(() => VictoryPresentationState | null) | null>;
 
 type SkinTextures = Omit<NocturneTextures, 'metal'> & { metal: CanvasTexture | null };
 const EMPTY_IMAGES = new Map<string, HTMLImageElement>();
@@ -327,6 +349,8 @@ function Piece({
   revealed = true,
   skin,
   artwork,
+  victoryClock,
+  presentationPieceRef,
 }: {
   move: Move;
   geometry: LatheGeometry;
@@ -340,6 +364,8 @@ function Piece({
   revealed?: boolean;
   skin: Skin;
   artwork: SkinTextures | null;
+  victoryClock?: RankedVictoryClock | null;
+  presentationPieceRef?: RefObject<Group | null>;
 }) {
   const group = useRef<Group>(null);
   const bodyMaterial = useRef<MeshStandardMaterial>(null);
@@ -358,6 +384,14 @@ function Piece({
   const decoratedCap = capDesign
     ? capDesign.pattern !== 'none' || capDesign.layers.length > 0
     : Boolean(artwork);
+  useLayoutEffect(() => {
+    if (!presentationPieceRef) return;
+    const piece = group.current;
+    presentationPieceRef.current = piece;
+    return () => {
+      if (presentationPieceRef.current === piece) presentationPieceRef.current = null;
+    };
+  }, [presentationPieceRef]);
   useEffect(() => {
     fade.current = {
       value: fade.current.value,
@@ -369,6 +403,8 @@ function Piece({
   useFrame((state, delta) => {
     age.current += delta;
     if (revealed) introAge.current += delta;
+    const victoryAge = victoryClock ? performance.now() - victoryClock.startedAt : 0;
+    const victory = victoryClock ? rankedVictoryProgress(victoryAge) : null;
     const settledY = pos[1] + (ghost ? 0.045 : 0);
     const introFinished =
       introduction === undefined ||
@@ -377,6 +413,9 @@ function Piece({
     if (
       !latest &&
       !winner &&
+      (!victory ||
+        (victoryAge >= RANKED_WIN_FALL_MS + RANKED_WIN_LINE_MS &&
+          appliedOpacity.current === opacity * (opacity === 1 ? 0.52 : 1))) &&
       introFinished &&
       fade.current.elapsed >= 0.15 &&
       appliedOpacity.current !== null &&
@@ -395,7 +434,8 @@ function Piece({
       transition.value =
         transition.from + (transition.target - transition.from) * (transition.elapsed / 0.15);
     }
-    const renderedOpacity = transition.value * entranceOpacity;
+    const dimming = victory && !winner && opacity === 1 ? 1 - 0.48 * victory.dimProgress : 1;
+    const renderedOpacity = transition.value * entranceOpacity * dimming;
     if (appliedOpacity.current !== renderedOpacity) {
       appliedOpacity.current = renderedOpacity;
       for (const material of [bodyMaterial.current, capMaterial.current]) {
@@ -403,17 +443,22 @@ function Piece({
         setMaterialOpacity(material, renderedOpacity);
       }
       if (symbolMaterial.current) symbolMaterial.current.opacity = renderedOpacity * 0.85;
-      if (ringMaterial.current) ringMaterial.current.opacity = ghost ? 0.8 : renderedOpacity;
     }
+    if (ringMaterial.current)
+      ringMaterial.current.opacity = ghost
+        ? 0.8
+        : renderedOpacity * (winner && victory ? victory.ringProgress : 1);
     if (group.current) {
       const t = age.current;
       const fall =
         latest && animate && !ghost
-          ? t < 0.27
-            ? 2.2 * (1 - (t / 0.27) ** 2)
-            : t < 0.41
-              ? Math.sin(((t - 0.27) / 0.14) * Math.PI) * 0.085
-              : 0
+          ? victory
+            ? victory.fallOffset
+            : t < 0.27
+              ? 2.2 * (1 - (t / 0.27) ** 2)
+              : t < 0.41
+                ? Math.sin(((t - 0.27) / 0.14) * Math.PI) * 0.085
+                : 0
           : 0;
       // A short, decelerating descent lets the menu assemble gently without bouncing.
       const introFall = 0.7 * (1 - introProgress) ** 3;
@@ -422,7 +467,11 @@ function Piece({
     }
     if (ringMaterial.current)
       ringMaterial.current.emissiveIntensity =
-        winner && animate ? 0.6 + Math.sin(state.clock.elapsedTime * 3) * 0.3 : 0.35;
+        winner && animate
+          ? victory
+            ? 0.5 + Math.sin((Math.max(0, victoryAge - RANKED_WIN_FALL_MS) / 1000) * 1.8) * 0.12
+            : 0.6 + Math.sin(state.clock.elapsedTime * 3) * 0.3
+          : 0.35;
   });
   return (
     <group ref={group} position={pos} visible={visible && (introduction === undefined || !animate)}>
@@ -433,7 +482,9 @@ function Piece({
           map={artwork ? (dark ? artwork.darkBody : artwork.lightBody) : null}
           roughness={bodyDesign?.roughness ?? (dark ? 0.34 : 0.48)}
           metalness={bodyDesign?.metalness ?? (dark ? 0.2 : 0.08)}
-          onUpdate={(material) => setMaterialOpacity(material, fade.current.value)}
+          onUpdate={(material) =>
+            setMaterialOpacity(material, appliedOpacity.current ?? fade.current.value)
+          }
         />
       </mesh>
       <mesh position={[0, 0.2505, 0]}>
@@ -444,7 +495,9 @@ function Piece({
           map={artwork ? (dark ? artwork.darkCap : artwork.lightCap) : null}
           roughness={capDesign?.roughness ?? (artwork ? 0.48 : 0.52)}
           metalness={capDesign?.metalness ?? (artwork ? 0.12 : 0)}
-          onUpdate={(material) => setMaterialOpacity(material, fade.current.value)}
+          onUpdate={(material) =>
+            setMaterialOpacity(material, appliedOpacity.current ?? fade.current.value)
+          }
         />
       </mesh>
       <mesh visible={!decoratedCap} rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.258, 0]}>
@@ -467,7 +520,7 @@ function Piece({
             emissiveIntensity={0.35}
             transparent
             depthWrite={false}
-            opacity={ghost ? 0.8 : opacity}
+            opacity={ghost ? 0.8 : winner && victoryClock ? 0 : opacity}
           />
         </mesh>
       )}
@@ -482,11 +535,28 @@ function CameraRig({
   game,
   layers,
   demo,
-}: Pick<GameSceneProps, 'cameraView' | 'cameraReset' | 'animations' | 'game' | 'layers' | 'demo'>) {
+  rankedVictory,
+  victoryDiagnostics,
+}: Pick<
+  GameSceneProps,
+  'cameraView' | 'cameraReset' | 'animations' | 'game' | 'layers' | 'demo' | 'rankedVictory'
+> & {
+  victoryDiagnostics: VictoryDiagnostics;
+}) {
   const controls = useRef<OrbitControlsImpl>(null);
-  const { camera, size, gl } = useThree();
+  const { camera, size, gl, scene } = useThree();
   const destination = useRef<Vector3 | null>(null);
   const targetDestination = useRef(new Vector3(0, 0.25, 0));
+  const winningPoints = game.winningLines.flat();
+  const winningCenter = winningPoints.length
+    ? winningPoints
+        .reduce<Vector3>((sum, point) => sum.add(new Vector3(...position(point))), new Vector3())
+        .divideScalar(winningPoints.length)
+    : null;
+  const centerX = winningCenter?.x ?? 0;
+  const centerY = winningCenter?.y ?? 0;
+  const centerZ = winningCenter?.z ?? 0;
+  const hasWinningCenter = winningCenter !== null;
   useEffect(() => {
     const fit = Math.max(1, 0.9 / (size.width / size.height));
     const view =
@@ -507,17 +577,37 @@ function CameraRig({
     }
   }, [cameraView, cameraReset, camera, size.width, size.height, animations, demo]);
   useEffect(() => {
-    if (game.status !== 'won' || !game.winningLines.length) return;
-    const points = game.winningLines.flat();
-    const center = points
-      .reduce<Vector3>((sum, point) => sum.add(new Vector3(...position(point))), new Vector3())
-      .divideScalar(points.length);
-    targetDestination.current.copy(center).multiplyScalar(0.42);
+    if (game.status !== 'won' || !hasWinningCenter) return;
+    targetDestination.current.set(centerX, centerY, centerZ).multiplyScalar(0.42);
     destination.current = camera.position.clone();
-  }, [game.status, game.winningLines, camera]);
+  }, [game.status, hasWinningCenter, centerX, centerY, centerZ, camera]);
   useEffect(() => {
     if (!import.meta.env.DEV) return;
     const api = {
+      getVictoryPresentationState: () => victoryDiagnostics.current?.() ?? null,
+      getRenderedWinningLines: () => {
+        const lines: Array<{
+          visible: boolean;
+          materialVisible: boolean;
+          opacity: number;
+          start: number[];
+          end: number[];
+        }> = [];
+        scene.traverse((object) => {
+          const line = object as Line2;
+          if (!line.isLine2) return;
+          const start = line.geometry.attributes.instanceStart;
+          const end = line.geometry.attributes.instanceEnd;
+          lines.push({
+            visible: line.visible,
+            materialVisible: line.material.visible,
+            opacity: line.material.opacity,
+            start: [start.getX(0), start.getY(0), start.getZ(0)],
+            end: [end.getX(0), end.getY(0), end.getZ(0)],
+          });
+        });
+        return lines;
+      },
       getColumnScreenPositions: () => {
         const bounds = gl.domElement.getBoundingClientRect();
         camera.updateMatrixWorld();
@@ -543,10 +633,10 @@ function CameraRig({
     return () => {
       if (window.__fourScene === api) delete window.__fourScene;
     };
-  }, [camera, gl, game.heights, layers]);
+  }, [camera, gl, scene, game.heights, layers, victoryDiagnostics]);
   useFrame((_, delta) => {
     if (!destination.current || !controls.current) return;
-    const speed = animations ? 1 - Math.exp(-delta * 6) : 1;
+    const speed = animations ? 1 - Math.exp(-delta * (rankedVictory ? 1.8 : 6)) : 1;
     camera.position.lerp(destination.current, speed);
     controls.current.target.lerp(targetDestination.current, speed);
     controls.current.update();
@@ -577,6 +667,77 @@ function CameraRig({
   );
 }
 
+function WinningLine({
+  points,
+  color,
+  victoryClock,
+  segment,
+  total,
+}: {
+  points: Position[];
+  color: string;
+  victoryClock: RankedVictoryClock | null;
+  segment: number;
+  total: number;
+}) {
+  const rendered = useRef<Line2 | LineSegments2>(null);
+  const applied = useRef<{
+    geometry: Line2['geometry'] | LineSegments2['geometry'];
+    progress: number;
+  } | null>(null);
+  const coordinates = useMemo(
+    () =>
+      points.map((point) => {
+        const value = position(point);
+        value[1] += 0.27;
+        return value;
+      }),
+    [points],
+  );
+  useLayoutEffect(() => {
+    const line = rendered.current;
+    if (line) {
+      line.visible = !victoryClock;
+      // Drei forwards JSX visibility to both the object and its material.
+      // Keep material visibility enabled while the object controls the reveal.
+      line.material.visible = true;
+    }
+    applied.current = null;
+  }, [victoryClock, coordinates]);
+  useFrame(() => {
+    const line = rendered.current;
+    if (!line || !victoryClock) return;
+    const { lineProgress } = rankedVictoryProgress(performance.now() - victoryClock.startedAt);
+    const progress = rankedSegmentProgress(lineProgress, segment, total);
+    if (applied.current?.geometry === line.geometry && applied.current.progress === progress)
+      return;
+    applied.current = { geometry: line.geometry, progress };
+    line.visible = progress > 0;
+    if (!line.visible) return;
+    const [start, end] = coordinates;
+    const endpoint = line.geometry.attributes.instanceEnd;
+    endpoint.setXYZ(
+      0,
+      start[0] + (end[0] - start[0]) * progress,
+      start[1] + (end[1] - start[1]) * progress,
+      start[2] + (end[2] - start[2]) * progress,
+    );
+    endpoint.needsUpdate = true;
+    line.material.opacity = 0.83 * Math.min(1, progress * 4);
+  });
+  return (
+    <Line
+      ref={rendered}
+      points={coordinates}
+      color={color}
+      lineWidth={4}
+      transparent
+      opacity={0.83}
+      depthTest={false}
+    />
+  );
+}
+
 function Board({
   game,
   onPlace,
@@ -590,15 +751,18 @@ function Board({
   skin,
   gesture,
   clearHover,
+  rankedVictory,
+  victoryDiagnostics,
 }: GameSceneProps & {
   skin: Skin;
   gesture: RefObject<Gesture>;
   clearHover: RefObject<(() => void) | null>;
+  victoryDiagnostics: VictoryDiagnostics;
 }) {
   const [hover, setHover] = useState<number | null>(null);
   const [invalidColumn, setInvalidColumn] = useState<number | null>(null);
   const invalidTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const { gl } = useThree();
+  const { gl, scene } = useThree();
   useEffect(() => {
     clearHover.current = () => setHover(null);
     return () => {
@@ -628,6 +792,41 @@ function Board({
   }, [hover, interactive, game.heights, gl]);
   const winners = new Set(game.winningLines.flat().map((p) => `${p.x},${p.y},${p.z}`));
   const last = game.history.at(-1);
+  const victoryKey =
+    rankedVictory && animations && !demo && last
+      ? `${last.index}-${last.x}-${last.y}-${last.z}-${last.player}`
+      : null;
+  const victoryClock = useMemo(
+    () => (victoryKey ? { key: victoryKey, startedAt: performance.now() } : null),
+    [victoryKey],
+  );
+  const lastPiece = useRef<Group | null>(null);
+  const lastY = last ? position(last)[1] : 0;
+  useEffect(() => {
+    if (!import.meta.env.DEV || !victoryClock) {
+      victoryDiagnostics.current = null;
+      return;
+    }
+    const read = () => {
+      const elapsedMs = performance.now() - victoryClock.startedAt;
+      let renderedWinningLines = 0;
+      scene.traverse((object) => {
+        const line = object as Line2;
+        if (line.isLine2 && line.visible && line.material.visible && line.material.opacity > 0)
+          renderedWinningLines++;
+      });
+      return {
+        ...rankedVictoryProgress(elapsedMs),
+        elapsedMs,
+        renderedFallOffset: (lastPiece.current?.position.y ?? lastY) - lastY,
+        renderedWinningLines,
+      };
+    };
+    victoryDiagnostics.current = read;
+    return () => {
+      if (victoryDiagnostics.current === read) victoryDiagnostics.current = null;
+    };
+  }, [victoryClock, victoryDiagnostics, lastY, scene]);
   const select = (event: ThreeEvent<PointerEvent>, x: number, y: number) => {
     event.stopPropagation();
     const g = gesture.current;
@@ -722,13 +921,17 @@ function Board({
           opacity={
             xray
               ? 0.43
-              : game.status === 'won' && !winners.has(`${move.x},${move.y},${move.z}`)
+              : game.status === 'won' &&
+                  !victoryClock &&
+                  !winners.has(`${move.x},${move.y},${move.z}`)
                 ? 0.52
                 : 1
           }
           animate={animations}
           introduction={demo ? 0.45 + (move.x + move.y) * 0.055 + move.z * 0.14 : undefined}
           revealed={revealed}
+          victoryClock={victoryClock}
+          presentationPieceRef={last === move ? lastPiece : undefined}
         />
       ))}
       {hover !== null &&
@@ -756,23 +959,29 @@ function Board({
             ghost
           />
         )}
-      {game.winningLines
-        .flatMap((line) => visibleLineSegments(line, layers))
-        .map((line, index) => (
-          <Line
-            key={index}
-            points={line.map((p) => {
-              const value = position(p);
-              value[1] += 0.27;
-              return value;
-            })}
+      {game.winningLines.flatMap((source, lineIndex) => {
+        // Draw outward from the last chip when it forms an endpoint of the line.
+        const endpoint = source.at(-1);
+        const line =
+          victoryClock &&
+          endpoint &&
+          last &&
+          endpoint.x === last.x &&
+          endpoint.y === last.y &&
+          endpoint.z === last.z
+            ? [...source].reverse()
+            : source;
+        return visibleLineSegments(line, layers).map((points) => (
+          <WinningLine
+            key={`${lineIndex}-${points[0].x}-${points[0].y}-${points[0].z}`}
+            points={points}
             color={skin.palette.accent}
-            lineWidth={4}
-            transparent
-            opacity={0.83}
-            depthTest={false}
+            victoryClock={victoryClock}
+            segment={line.indexOf(points[0])}
+            total={line.length - 1}
           />
-        ))}
+        ));
+      })}
     </group>
   );
 }
@@ -880,6 +1089,7 @@ export default function GameScene(props: GameSceneProps) {
   });
   const pointerEvents = useRef<((enabled: boolean) => void) | null>(null);
   const clearHover = useRef<(() => void) | null>(null);
+  const victoryDiagnostics = useRef<(() => VictoryPresentationState | null) | null>(null);
   useEffect(() => {
     const finish = (event: PointerEvent) => {
       gesture.current.pointers.delete(event.pointerId);
@@ -960,10 +1170,16 @@ export default function GameScene(props: GameSceneProps) {
           <directionalLight position={[6, 4, -5]} intensity={1.4} color="#dde7ff" />
           <directionalLight position={[-4, 2, -4]} intensity={0.6} color="#ffffff" />
           <Suspense fallback={null}>
-            <Board {...props} skin={skin} gesture={gesture} clearHover={clearHover} />
+            <Board
+              {...props}
+              skin={skin}
+              gesture={gesture}
+              clearHover={clearHover}
+              victoryDiagnostics={victoryDiagnostics}
+            />
             <SceneReady onReady={props.onReady} />
           </Suspense>
-          <CameraRig {...props} />
+          <CameraRig {...props} victoryDiagnostics={victoryDiagnostics} />
         </Canvas>
       </SceneBoundary>
     </div>

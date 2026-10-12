@@ -2,53 +2,44 @@ import { useEffect, useRef, useState, type CSSProperties } from 'react';
 import { Clock3, Eye, Home, RotateCcw, TrendingDown, TrendingUp } from 'lucide-react';
 import { motion, useReducedMotion } from 'motion/react';
 import { useGame } from '../store/gameStore';
+import { useSettings } from '../store/settingsStore';
+import { rankedResultDelay } from '../game/victoryPresentation';
+import { useAnimatedInteger, useResultReveal } from './useRankedPresentation';
 import styles from './RankedResult.module.css';
 
-function useAnimatedInteger(target: number, delay = 0) {
-  const reducedMotion = useReducedMotion();
-  const [value, setValue] = useState(reducedMotion ? target : 0);
-  useEffect(() => {
-    if (reducedMotion) {
-      setValue(target);
-      return;
-    }
-    let frame = 0;
-    const started = performance.now() + delay;
-    const update = (now: number) => {
-      if (now < started) {
-        frame = requestAnimationFrame(update);
-        return;
-      }
-      const progress = Math.min(1, (now - started) / 850);
-      const eased = 1 - (1 - progress) ** 3;
-      setValue(Math.round(target * eased));
-      if (progress < 1) frame = requestAnimationFrame(update);
-    };
-    frame = requestAnimationFrame(update);
-    return () => cancelAnimationFrame(frame);
-  }, [delay, reducedMotion, target]);
-  return value;
-}
-
-export function RankedResult({ blocked = false }: { blocked?: boolean }) {
+export function RankedResult({
+  blocked = false,
+  boardReady = true,
+}: {
+  blocked?: boolean;
+  boardReady?: boolean;
+}) {
   const state = useGame();
+  const animations = useSettings((settings) => settings.animations);
+  const reducedMotion = Boolean(useReducedMotion()) || !animations;
   const [dismissed, setDismissed] = useState(false);
   const panel = useRef<HTMLDivElement>(null);
   const snapshot = state.online?.snapshot;
   const ranking = snapshot?.ranking;
   const index = (state.online?.player ?? 1) - 1;
   const delta = ranking?.changes?.[index] ?? 0;
-  const animatedDelta = useAnimatedInteger(delta, 220);
-  const animatedRating = useAnimatedInteger((ranking?.points[index] ?? 0) + delta, 80);
-  const visible = Boolean(
-    !blocked &&
-    !dismissed &&
+  const resultKey =
     state.mode === 'online' &&
     snapshot &&
     snapshot.game.status !== 'playing' &&
     ranking?.rated &&
-    ranking.changes,
+    ranking.changes
+      ? `${snapshot.code}-${snapshot.round}`
+      : null;
+  const revealed = useResultReveal(
+    resultKey,
+    snapshot ? rankedResultDelay(snapshot, !reducedMotion) : 0,
+    boardReady,
   );
+  const visible = Boolean(!blocked && !dismissed && revealed);
+  const points = ranking?.points[index] ?? 0;
+  const animatedDelta = useAnimatedInteger(delta, 0, visible, reducedMotion, 220);
+  const animatedRating = useAnimatedInteger(points + delta, points, visible, reducedMotion, 80);
 
   useEffect(() => {
     if (!visible) return;
@@ -76,7 +67,13 @@ export function RankedResult({ blocked = false }: { blocked?: boolean }) {
       : `Равная партия с ${opponent}`;
 
   return (
-    <div className={styles.backdrop} data-testid="ranked-result-backdrop">
+    <motion.div
+      className={styles.backdrop}
+      data-testid="ranked-result-backdrop"
+      initial={{ opacity: reducedMotion ? 1 : 0 }}
+      animate={{ opacity: 1 }}
+      transition={{ duration: reducedMotion ? 0 : 0.55, ease: [0.22, 1, 0.36, 1] }}
+    >
       <motion.div
         ref={panel}
         role="dialog"
@@ -84,12 +81,12 @@ export function RankedResult({ blocked = false }: { blocked?: boolean }) {
         aria-labelledby="ranked-result-title"
         tabIndex={-1}
         className={`${styles.panel} ${won ? styles.won : lost ? styles.lost : styles.draw}`}
-        initial={{ opacity: 0, scale: 0.96, y: 18 }}
+        initial={reducedMotion ? false : { opacity: 0, scale: 0.98, y: 14 }}
         animate={{ opacity: 1, scale: 1, y: 0 }}
-        transition={{ type: 'spring', stiffness: 250, damping: 24 }}
+        transition={{ duration: reducedMotion ? 0 : 0.55, ease: [0.22, 1, 0.36, 1] }}
         data-testid="ranked-result"
       >
-        {won && (
+        {won && !reducedMotion && (
           <div className={styles.particles} aria-hidden="true">
             {Array.from({ length: 12 }, (_, index) => (
               <span
@@ -107,9 +104,13 @@ export function RankedResult({ blocked = false }: { blocked?: boolean }) {
         <p className={styles.eyebrow}>РЕЙТИНГОВАЯ ПАРТИЯ ЗАВЕРШЕНА</p>
         <motion.div
           className={styles.resultMark}
-          initial={{ scale: 0.6, rotate: -8 }}
+          initial={reducedMotion ? false : { scale: 0.8, rotate: -4 }}
           animate={{ scale: 1, rotate: 0 }}
-          transition={{ type: 'spring', stiffness: 260, damping: 18, delay: 0.08 }}
+          transition={{
+            duration: reducedMotion ? 0 : 0.5,
+            delay: reducedMotion ? 0 : 0.12,
+            ease: [0.22, 1, 0.36, 1],
+          }}
         >
           {delta >= 0 ? <TrendingUp size={30} /> : <TrendingDown size={30} />}
         </motion.div>
@@ -155,6 +156,6 @@ export function RankedResult({ blocked = false }: { blocked?: boolean }) {
           </button>
         </div>
       </motion.div>
-    </div>
+    </motion.div>
   );
 }
