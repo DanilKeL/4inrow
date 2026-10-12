@@ -14,6 +14,8 @@ import { Canvas, useFrame, useThree, type ThreeEvent } from '@react-three/fiber'
 import { Line, OrbitControls, useGLTF } from '@react-three/drei';
 import {
   Group,
+  Material,
+  Mesh,
   LatheGeometry,
   MeshBasicMaterial,
   MeshStandardMaterial,
@@ -23,6 +25,8 @@ import {
 import type { OrbitControls as OrbitControlsImpl } from 'three-stdlib';
 import type { GameState, Move, Position } from '../game/core';
 import { displayedHeight, visibleLineSegments } from './layers';
+import { activeSkin, type Skin } from '../skins/catalog';
+import { useAppearance } from '../store/appearanceStore';
 
 export interface GameSceneProps {
   game: GameState;
@@ -40,12 +44,12 @@ export interface GameSceneProps {
   onError?: () => void;
   background?: string;
   cameraFov?: number;
+  skin?: Skin;
 }
 
 const SPACING = 1.09;
 const STEP = 0.5;
 const FIRST = 0.365;
-const BLUE = '#3661ee';
 const MAX_RENDER_PIXELS = 3_000_000;
 const position = ({ x, y, z }: Position): [number, number, number] => [
   (x - 2) * SPACING,
@@ -74,10 +78,33 @@ declare global {
   }
 }
 
-function BoardModel() {
+function BoardModel({ skin }: { skin: Skin }) {
   const { scene } = useGLTF('/models/four-board.glb');
-  const model = useMemo(() => scene.clone(true), [scene]);
-  // Geometry and materials belong to useGLTF's cache; scene instances only own their transforms.
+  const { model, materials } = useMemo(() => {
+    const model = scene.clone(true);
+    const copies = new Map<Material, Material>();
+    const copy = (material: Material) => {
+      if (!copies.has(material)) copies.set(material, material.clone());
+      return copies.get(material)!;
+    };
+    model.traverse((object) => {
+      if (object instanceof Mesh)
+        object.material = Array.isArray(object.material)
+          ? object.material.map(copy)
+          : copy(object.material);
+    });
+    return { model, materials: [...copies.values()] };
+  }, [scene]);
+  useLayoutEffect(() => {
+    for (const material of materials) {
+      if (!(material instanceof MeshStandardMaterial)) continue;
+      if (material.name.startsWith('Porcelain')) material.color.set(skin.palette.board.body);
+      if (material.name === 'Satin champagne') material.color.set(skin.palette.board.rim);
+      if (material.name === 'Cobalt enamel') material.color.set(skin.palette.accent);
+    }
+  }, [materials, skin.palette]);
+  useEffect(() => () => materials.forEach((material) => material.dispose()), [materials]);
+  // Geometry remains shared; each scene owns and disposes its material copies.
   return <primitive object={model} dispose={null} />;
 }
 
@@ -121,6 +148,7 @@ function Piece({
   ghost = false,
   introduction,
   revealed = true,
+  skin,
 }: {
   move: Move;
   geometry: LatheGeometry;
@@ -132,6 +160,7 @@ function Piece({
   ghost?: boolean;
   introduction?: number;
   revealed?: boolean;
+  skin: Skin;
 }) {
   const group = useRef<Group>(null);
   const bodyMaterial = useRef<MeshStandardMaterial>(null);
@@ -144,6 +173,7 @@ function Piece({
   const appliedOpacity = useRef<number | null>(null);
   const pos = position(move);
   const dark = move.player === 1;
+  const palette = dark ? skin.palette.dark : skin.palette.light;
   useEffect(() => {
     fade.current = {
       value: fade.current.value,
@@ -215,7 +245,7 @@ function Piece({
       <mesh geometry={geometry}>
         <meshStandardMaterial
           ref={bodyMaterial}
-          color={dark ? '#24272c' : '#cbb394'}
+          color={palette.body}
           roughness={dark ? 0.34 : 0.48}
           metalness={dark ? 0.2 : 0.08}
           onUpdate={(material) => setMaterialOpacity(material, fade.current.value)}
@@ -225,7 +255,7 @@ function Piece({
         <cylinderGeometry args={[0.317, 0.317, 0.009, 40]} />
         <meshStandardMaterial
           ref={capMaterial}
-          color={dark ? '#24292f' : '#dcc4a3'}
+          color={palette.cap}
           roughness={0.52}
           onUpdate={(material) => setMaterialOpacity(material, fade.current.value)}
         />
@@ -234,7 +264,7 @@ function Piece({
         {dark ? <circleGeometry args={[0.052, 24]} /> : <ringGeometry args={[0.067, 0.085, 32]} />}
         <meshBasicMaterial
           ref={symbolMaterial}
-          color={dark ? '#858992' : '#8f7b60'}
+          color={palette.mark}
           transparent
           opacity={opacity * 0.85}
           depthWrite={false}
@@ -245,8 +275,8 @@ function Piece({
           <torusGeometry args={[0.353, winner ? 0.017 : 0.009, 8, 48]} />
           <meshStandardMaterial
             ref={ringMaterial}
-            color={BLUE}
-            emissive={BLUE}
+            color={skin.palette.accent}
+            emissive={skin.palette.accent}
             emissiveIntensity={0.35}
             transparent
             depthWrite={false}
@@ -370,9 +400,14 @@ function Board({
   hints,
   demo,
   revealed,
+  skin,
   gesture,
   clearHover,
-}: GameSceneProps & { gesture: RefObject<Gesture>; clearHover: RefObject<(() => void) | null> }) {
+}: GameSceneProps & {
+  skin: Skin;
+  gesture: RefObject<Gesture>;
+  clearHover: RefObject<(() => void) | null>;
+}) {
   const [hover, setHover] = useState<number | null>(null);
   const [invalidColumn, setInvalidColumn] = useState<number | null>(null);
   const invalidTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -428,7 +463,7 @@ function Board({
   };
   return (
     <group>
-      <BoardModel />
+      <BoardModel skin={skin} />
       {game.heights.map((height, i) => {
         const x = i % 5;
         const y = Math.floor(i / 5);
@@ -441,10 +476,18 @@ function Board({
               <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.173, 0]}>
                 <torusGeometry args={[0.49, 0.01, 8, 64]} />
                 <meshStandardMaterial
-                  color={invalidColumn === i ? '#db584b' : hovered ? BLUE : '#cbc2b2'}
+                  color={
+                    invalidColumn === i
+                      ? '#db584b'
+                      : hovered
+                        ? skin.palette.accent
+                        : skin.palette.board.rim
+                  }
                   metalness={0.35}
                   roughness={0.36}
-                  emissive={invalidColumn === i ? '#db584b' : hovered ? BLUE : '#000000'}
+                  emissive={
+                    invalidColumn === i ? '#db584b' : hovered ? skin.palette.accent : '#000000'
+                  }
                   emissiveIntensity={0.2}
                 />
               </mesh>
@@ -458,7 +501,7 @@ function Board({
             {height === 0 && (
               <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.108, 0]}>
                 <circleGeometry args={[0.025, 16]} />
-                <meshBasicMaterial color="#979992" />
+                <meshBasicMaterial color={skin.palette.board.dot} />
               </mesh>
             )}
             <mesh
@@ -482,6 +525,7 @@ function Board({
         <Piece
           key={`${demo ? 'demo' : 'game'}-${move.index}-${move.x}-${move.y}`}
           move={move}
+          skin={skin}
           geometry={pieceGeometry}
           latest={!demo && last === move}
           winner={winners.has(`${move.x},${move.y},${move.z}`)}
@@ -506,6 +550,7 @@ function Board({
         game.heights[hover] < 5 && (
           <Piece
             key={`ghost-${hover}`}
+            skin={skin}
             move={{
               x: hover % 5,
               y: Math.floor(hover / 5),
@@ -531,7 +576,7 @@ function Board({
               value[1] += 0.27;
               return value;
             })}
-            color={BLUE}
+            color={skin.palette.accent}
             lineWidth={4}
             transparent
             opacity={0.83}
@@ -630,6 +675,8 @@ function ScenePerformance({
 }
 
 export default function GameScene(props: GameSceneProps) {
+  const catalog = useAppearance((state) => state.catalog);
+  const skin = props.skin ?? activeSkin(catalog);
   // Canvas reapplies its dpr prop on each render. Keep the measured value here
   // so timer ticks and moves cannot reset the renderer to its initial DPR.
   const [renderDpr, setRenderDpr] = useState(1);
@@ -725,7 +772,7 @@ export default function GameScene(props: GameSceneProps) {
           <directionalLight position={[6, 4, -5]} intensity={1.4} color="#dde7ff" />
           <directionalLight position={[-4, 2, -4]} intensity={0.6} color="#ffffff" />
           <Suspense fallback={null}>
-            <Board {...props} gesture={gesture} clearHover={clearHover} />
+            <Board {...props} skin={skin} gesture={gesture} clearHover={clearHover} />
             <SceneReady onReady={props.onReady} />
           </Suspense>
           <CameraRig {...props} />

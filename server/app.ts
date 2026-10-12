@@ -15,6 +15,7 @@ import type { AnalyticsFilter } from '../src/network/analyticsTypes.ts';
 import { DailyService, type DailyServiceOptions } from './dailyService.ts';
 import { waitingPairs } from './matchmaking.ts';
 import { TelegramAuth, type TelegramAuthOptions } from './telegramAuth.ts';
+import { AppearanceEvents } from './appearanceEvents.ts';
 
 interface Seat {
   account: string | null;
@@ -190,6 +191,7 @@ export function createOnlineServer(options: OnlineServerOptions = {}) {
     options.statsFile === undefined && options.authFile === null ? null : options.statsFile,
   );
   const admin = new AdminAccess(options.adminPasswordHash);
+  const appearanceEvents = new AppearanceEvents();
   const daily = new DailyService(statistics, options.daily);
   if (options.authFile !== null || options.daily) daily.start();
   const rooms = new Map<string, Room>();
@@ -217,6 +219,18 @@ export function createOnlineServer(options: OnlineServerOptions = {}) {
     void (async () => {
       const requestUrl = new URL(req.url ?? '/', 'http://localhost');
       const pathname = decodeURIComponent(requestUrl.pathname);
+      if (pathname === '/appearance' || pathname === '/appearance/events') {
+        res.setHeader('Content-Type', 'application/json; charset=utf-8');
+        res.setHeader('Cache-Control', 'no-store');
+        res.setHeader('X-Content-Type-Options', 'nosniff');
+        if (req.method !== 'GET') {
+          res.setHeader('Allow', 'GET');
+          res.writeHead(405).end(JSON.stringify({ error: 'Метод не поддерживается.' }));
+        } else if (pathname.endsWith('/events'))
+          appearanceEvents.subscribe(res, statistics.skins.get());
+        else res.writeHead(200).end(JSON.stringify(statistics.skins.get()));
+        return;
+      }
       if (pathname === '/daily' || pathname === '/daily/results') {
         res.setHeader('Content-Type', 'application/json; charset=utf-8');
         res.setHeader('Cache-Control', 'no-store');
@@ -468,6 +482,37 @@ export function createOnlineServer(options: OnlineServerOptions = {}) {
           }
           if (!admin.authenticated(req.headers.cookie))
             throw new AuthError(401, 'Войдите в админ-панель.');
+          if (pathname === '/admin-api/skins' && req.method === 'GET') {
+            respond(200, statistics.skins.get());
+            return;
+          }
+          if (pathname === '/admin-api/skins' && req.method === 'POST') {
+            const catalog = statistics.skins.save(await readJson());
+            appearanceEvents.publish(catalog);
+            respond(201, catalog);
+            return;
+          }
+          if (pathname === '/admin-api/skins' && req.method === 'PATCH') {
+            const data = await readJson();
+            const catalog = statistics.skins.activate(data.activeSkinId, data.expectedRevision);
+            appearanceEvents.publish(catalog);
+            respond(200, catalog);
+            return;
+          }
+          if (
+            pathname.startsWith('/admin-api/skins/') &&
+            ['PATCH', 'DELETE'].includes(req.method ?? '')
+          ) {
+            const id = pathname.slice('/admin-api/skins/'.length);
+            const data = await readJson();
+            const catalog =
+              req.method === 'DELETE'
+                ? statistics.skins.remove(id, data.expectedRevision)
+                : statistics.skins.save(data, id);
+            appearanceEvents.publish(catalog);
+            respond(200, catalog);
+            return;
+          }
           if (pathname === '/admin-api/analytics' && req.method === 'GET') {
             const today = new Date(Date.now() + 3 * 3600000).toISOString().slice(0, 10);
             const monthAgo = new Date(Date.now() + 3 * 3600000 - 29 * 86400000)
@@ -1970,6 +2015,7 @@ export function createOnlineServer(options: OnlineServerOptions = {}) {
     clearInterval(cleanup);
     clearInterval(heartbeat);
     clearInterval(matchmaking);
+    appearanceEvents.close();
     for (const room of rooms.values()) {
       clearTimeout(room.pauseTimer);
       persistRoom(room);

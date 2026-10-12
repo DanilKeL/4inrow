@@ -559,9 +559,21 @@
     display: none;
   }
   .profileHero,
-  .recentCard,
   .securityInfo {
     display: none;
+  }
+  .recentCard {
+    padding: 0;
+    border: 0;
+    background: transparent;
+  }
+  .recentCard > :not(.recentHeader),
+  .recentHeader > div {
+    display: none;
+  }
+  .recentHeader {
+    justify-content: flex-end;
+    margin-bottom: 0;
   }
   .passwordCard form {
     gap: 7px;

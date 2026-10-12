@@ -5,6 +5,7 @@ import './styles/global.css';
 import { initializeAnalytics } from './network/analytics';
 import { initializeOffline } from './network/offline';
 import { initializeTelegram, loadTelegramSDK } from './telegram/bridge';
+import { initializeAppearance } from './store/appearanceStore';
 
 const AdminApp = lazy(() => import('./admin/AdminApp'));
 // Home-screen Safari can omit version tokens and use navigator.standalone.
@@ -21,6 +22,7 @@ function updateStandalone() {
   );
 }
 updateStandalone();
+initializeAppearance();
 standalone.addEventListener('change', updateStandalone);
 if (!window.location.pathname.startsWith('/admin')) {
   initializeOffline();

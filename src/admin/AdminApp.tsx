@@ -9,6 +9,7 @@ import {
   Copy,
   KeyRound,
   LogOut,
+  Palette,
   RefreshCw,
   Save,
   Search,
@@ -18,6 +19,8 @@ import {
 } from 'lucide-react';
 import styles from './AdminApp.module.css';
 import AnalyticsDashboard from './AnalyticsDashboard';
+import SkinsPanel from './SkinsPanel';
+import { adminApi as api } from './api';
 
 type PlayerAccount = {
   username: string;
@@ -43,19 +46,8 @@ type AccountPage = {
   pageSize: number;
 };
 
-async function api<T>(path: string, init?: RequestInit): Promise<T> {
-  const response = await fetch(path, {
-    credentials: 'same-origin',
-    ...init,
-    headers: init?.body ? { 'Content-Type': 'application/json', ...init.headers } : init?.headers,
-  });
-  const data = (await response.json()) as T & { error?: string };
-  if (!response.ok) throw new Error(data.error ?? 'Операция не выполнена.');
-  return data;
-}
-
 export default function AdminApp() {
-  const [tab, setTab] = useState<'accounts' | 'analytics'>('analytics');
+  const [tab, setTab] = useState<'accounts' | 'analytics' | 'skins'>('analytics');
   const [checking, setChecking] = useState(true);
   const [configured, setConfigured] = useState(true);
   const [authenticated, setAuthenticated] = useState(false);
@@ -222,9 +214,14 @@ export default function AdminApp() {
           <UsersRound size={17} />
           Игроки
         </button>
+        <button aria-current={tab === 'skins' ? 'page' : undefined} onClick={() => setTab('skins')}>
+          <Palette size={17} /> Оформление
+        </button>
       </nav>
       {tab === 'analytics' ? (
         <AnalyticsDashboard onUnauthorized={onUnauthorized} />
+      ) : tab === 'skins' ? (
+        <SkinsPanel onUnauthorized={onUnauthorized} />
       ) : (
         <section className={styles.content}>
           <div className={styles.toolbar}>

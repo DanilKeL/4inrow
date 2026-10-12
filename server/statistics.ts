@@ -13,11 +13,13 @@ import { ratingDelta } from './rating.ts';
 import { getLevel } from '../src/game/levels/index.ts';
 import { AnalyticsStore } from './analytics.ts';
 import type { DailyChallenge, DailyStanding } from '../src/game/daily.ts';
+import { SkinsStore } from './skins.ts';
 
 type Result = { owner: string; player: Player };
 export class StatisticsStore {
   private db: DatabaseSync;
   readonly analytics: AnalyticsStore;
+  readonly skins: SkinsStore;
   constructor(
     file: string | null = process.env.FOUR_STATS_FILE ??
       resolve(dirname(process.env.FOUR_AUTH_FILE ?? 'data/accounts.json'), 'statistics.sqlite'),
@@ -60,6 +62,7 @@ export class StatisticsStore {
     )
       this.db.exec("ALTER TABLE matches ADD COLUMN metadata TEXT NOT NULL DEFAULT '{}'");
     this.analytics = new AnalyticsStore(this.db);
+    this.skins = new SkinsStore(this.db);
   }
 
   levelProgress(owner: string) {
