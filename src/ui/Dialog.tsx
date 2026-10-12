@@ -83,15 +83,24 @@ export function Dialog({
       }}
       onPointerUp={(event) => {
         const start = backdropPress.current;
-        backdropPress.current = null;
         if (
-          start &&
-          start.id === event.pointerId &&
-          event.target === event.currentTarget &&
-          Math.hypot(event.clientX - start.x, event.clientY - start.y) <= 8 &&
-          document.visibilityState === 'visible'
+          !start ||
+          start.id !== event.pointerId ||
+          event.target !== event.currentTarget ||
+          Math.hypot(event.clientX - start.x, event.clientY - start.y) > 8 ||
+          document.visibilityState !== 'visible'
         )
-          onClose();
+          backdropPress.current = null;
+      }}
+      onClick={(event) => {
+        const start = backdropPress.current;
+        backdropPress.current = null;
+        if (event.target !== event.currentTarget) return;
+        // Keep the backdrop mounted through the click synthesized after pointerup/touchend.
+        // Removing it earlier lets mobile browsers retarget that click to a menu button.
+        event.preventDefault();
+        event.stopPropagation();
+        if (start && document.visibilityState === 'visible') onClose();
       }}
     >
       <motion.div

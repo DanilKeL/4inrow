@@ -67,15 +67,40 @@ describe('keyboard dialog access', () => {
     expect(close).not.toHaveBeenCalled();
     fireEvent.pointerCancel(backdrop, position);
     fireEvent.pointerUp(backdrop, position);
+    fireEvent.click(backdrop);
     fireEvent.pointerDown(backdrop, position);
     fireEvent.pointerMove(backdrop, { ...position, clientY: 80 });
     fireEvent.pointerUp(backdrop, position);
+    fireEvent.click(backdrop);
     fireEvent.pointerDown(backdrop, position);
     fireEvent(document, new Event('visibilitychange'));
     fireEvent.pointerUp(backdrop, position);
+    fireEvent.click(backdrop);
     expect(close).not.toHaveBeenCalled();
     fireEvent.pointerDown(backdrop, position);
     fireEvent.pointerUp(backdrop, position);
+    expect(close).not.toHaveBeenCalled();
+    fireEvent.click(backdrop);
     expect(close).toHaveBeenCalledOnce();
+  });
+
+  it('consumes the final backdrop click instead of bubbling it to the menu', () => {
+    const close = vi.fn();
+    const menuClick = vi.fn();
+    render(
+      <div onClick={menuClick}>
+        <Dialog title="Настройки" onClose={close}>
+          Настройки
+        </Dialog>
+      </div>,
+    );
+    const backdrop = screen.getByRole('dialog').parentElement!;
+    const position = { clientX: 20, clientY: 40, button: 0 };
+    fireEvent.pointerDown(backdrop, position);
+    fireEvent.pointerUp(backdrop, position);
+    expect(close).not.toHaveBeenCalled();
+    expect(fireEvent.click(backdrop)).toBe(false);
+    expect(close).toHaveBeenCalledOnce();
+    expect(menuClick).not.toHaveBeenCalled();
   });
 });
