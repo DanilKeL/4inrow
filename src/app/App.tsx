@@ -69,6 +69,7 @@ import { DailyChallenge } from '../ui/DailyChallenge';
 import { useDaily } from '../store/dailyStore';
 import { dailyMoveCount } from '../game/daily';
 import { telegramApp } from '../telegram/bridge';
+import { useBackgroundState } from '../ui/useBackgroundState';
 
 const GameScene = lazy(() => import('../scene/GameScene'));
 type Overlay =
@@ -87,6 +88,22 @@ type Overlay =
   | 'leaderboard'
   | 'daily'
   | null;
+
+function restorableOverlay(value: unknown): value is Overlay {
+  return (
+    value === null ||
+    [
+      'account',
+      'settings',
+      'tutorial',
+      'history',
+      'levels',
+      'leaderboard',
+      'daily',
+      'setup',
+    ].includes(String(value))
+  );
+}
 
 function demoGame(): GameState {
   const game = createGame();
@@ -180,10 +197,14 @@ export default function App() {
       mounted = false;
     };
   }, []);
-  const [overlay, setOverlay] = useState<Overlay>(() => {
-    const query = new URLSearchParams(window.location.search);
-    return query.has('reset') || query.has('emailVerified') ? 'account' : null;
-  });
+  const query = new URLSearchParams(window.location.search);
+  const accountLink = query.has('reset') || query.has('emailVerified');
+  const [overlay, setOverlay] = useBackgroundState<Overlay>(
+    'four-ui-overlay',
+    accountLink ? 'account' : null,
+    restorableOverlay,
+    !accountLink,
+  );
   const [setupMode, setSetupMode] = useState<Mode>('local');
   const [quickName, setQuickName] = useState('Игрок');
   const [viewMenu, setViewMenu] = useState(false);
@@ -209,7 +230,7 @@ export default function App() {
   useEffect(() => {
     if (pauseIdentity) setOverlay('online-pause');
     else setOverlay((current) => (current === 'online-pause' ? null : current));
-  }, [pauseIdentity]);
+  }, [pauseIdentity, setOverlay]);
   const isMenu = state.phase === 'menu';
   const showResumeBanner = ready && identityReady && isMenu && canContinue && !overlay;
   const savedRecordId = saved?.recordId;
@@ -224,7 +245,7 @@ export default function App() {
       useGame.getState().cancelOnline();
     setOverlay(null);
     if (useGame.getState().phase === 'paused') useGame.getState().resume();
-  }, []);
+  }, [setOverlay]);
   const openSetup = (mode: Mode) => {
     setSetupMode(mode);
     setOverlay('setup');
@@ -237,10 +258,10 @@ export default function App() {
   };
   useEffect(() => {
     if (overlay === 'quick' && state.mode === 'online' && state.online) setOverlay(null);
-  }, [overlay, state.mode, state.online]);
+  }, [overlay, state.mode, state.online, setOverlay]);
   useEffect(() => {
     if (state.quickMatch) setOverlay('quick');
-  }, [state.quickMatch]);
+  }, [state.quickMatch, setOverlay]);
   const openSettings = () => {
     state.pause();
     setOverlay('settings');
@@ -291,7 +312,7 @@ export default function App() {
       const game = useGame.getState();
       if (game.mode !== 'online' && ['playing', 'ai-thinking', 'animating'].includes(game.phase)) {
         game.pause();
-        setOverlay('pause');
+        setOverlay((current) => current ?? 'pause');
       }
     };
     const settings = () => {
@@ -307,7 +328,7 @@ export default function App() {
       app.offEvent('deactivated', deactivate);
       app.SettingsButton?.offClick(settings);
     };
-  }, []);
+  }, [setOverlay]);
   useEffect(() => {
     void useAccount.getState().load();
     useGame.getState().restoreOnline();
@@ -327,7 +348,7 @@ export default function App() {
     };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
-  }, [overlay, showResumeBanner]);
+  }, [overlay, showResumeBanner, setOverlay]);
 
   const turnText =
     state.phase === 'ai-thinking'

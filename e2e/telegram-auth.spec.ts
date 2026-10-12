@@ -107,7 +107,7 @@ test('Telegram recovery and email binding are usable on a small phone and keep t
   expect(proof).toMatchObject({ username: 'EmailPlayer', emailVerified: true });
   await page.setViewportSize({ width: 390, height: 844 });
   await page.reload();
-  await page.getByRole('button', { name: 'Аккаунт: EmailPlayer' }).click();
+  await account.getByRole('button', { name: 'Обзор' }).click();
   await expect(account.getByText('player@example.org')).toBeVisible();
 });
 test.afterEach(async () => {
@@ -144,6 +144,78 @@ async function openAccount(page: Page) {
   await page.getByRole('button', { name: /Аккаунт:/ }).click();
   return page.getByRole('dialog', { name: 'Личный кабинет' });
 }
+
+test('Telegram button is visible before its configuration arrives without moving the form', async ({
+  page,
+}) => {
+  let release!: () => void;
+  const waiting = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  await page.route('**/auth/telegram/config', async (route) => {
+    await waiting;
+    await route.fulfill({ json: { clientId: '8834741855', miniApp: true } });
+  });
+  const account = await openAccount(page);
+  const button = account.getByRole('button', { name: 'Войти через Telegram' });
+  await expect(button).toBeVisible();
+  await expect(button).toBeDisabled();
+  const input = account.getByLabel('Имя пользователя');
+  const before = (await input.boundingBox())!.y - (await account.boundingBox())!.y;
+  release();
+  await expect(button).toBeEnabled();
+  const after = (await input.boundingBox())!.y - (await account.boundingBox())!.y;
+  expect(after).toBeCloseTo(before, 0);
+});
+
+test('Profile removes duplicate controls and keeps the security tab when returning to a phone browser', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  const account = await openAccount(page);
+  await account.getByRole('button', { name: 'Войти через Telegram' }).click();
+  await finishLogin(page, 555444333, 'CleanProfile');
+  await account.getByRole('button', { name: 'Завершить регистрацию' }).click();
+  await expect(account.getByTestId('account-dashboard')).toBeVisible();
+  await expect(account.getByText('Telegram', { exact: true })).toHaveCount(0);
+  await expect(account.getByRole('button', { name: 'Привязать почту' })).toHaveCount(0);
+  await expect(account.getByText('Недавняя форма')).toHaveCount(0);
+  await expect(account.getByRole('button', { name: 'История', exact: true })).toHaveCount(0);
+  await expect(account.getByRole('button', { name: 'Вся история' })).toBeVisible();
+  await account.getByRole('button', { name: 'Безопасность' }).click();
+  await account.getByRole('button', { name: 'Привязать почту' }).click();
+  await account.getByLabel('Email', { exact: true }).fill('draft@example.org');
+  // Headless Chromium keeps every page visible, so deliver the mobile lifecycle explicitly.
+  await page.evaluate(() => {
+    Object.defineProperty(document, 'hidden', { configurable: true, value: true });
+    Object.defineProperty(document, 'visibilityState', { configurable: true, value: 'hidden' });
+    document.dispatchEvent(new Event('visibilitychange'));
+    window.dispatchEvent(new Event('blur'));
+  });
+  await page.evaluate(() => {
+    Reflect.deleteProperty(document, 'hidden');
+    Reflect.deleteProperty(document, 'visibilityState');
+    document.dispatchEvent(new Event('visibilitychange'));
+    window.dispatchEvent(new Event('focus'));
+  });
+  await expect(account).toBeVisible();
+  await expect(account.getByLabel('Email', { exact: true })).toHaveValue('draft@example.org');
+  // Reload simulates the OS discarding a background page. Restore navigation only.
+  await page.reload();
+  await expect(account).toBeVisible();
+  await expect(account.getByRole('button', { name: 'Безопасность' })).toHaveAttribute(
+    'aria-pressed',
+    'true',
+  );
+  await expect(account.getByRole('button', { name: 'Привязать почту' })).toHaveAttribute(
+    'aria-pressed',
+    'true',
+  );
+  await expect(account.getByLabel('Email', { exact: true })).toHaveValue('');
+  await account.getByRole('button', { name: 'Обзор' }).click();
+  await account.getByRole('button', { name: 'Вся история' }).click();
+  await expect(page.getByRole('dialog', { name: 'История партий' })).toBeVisible();
+});
 
 test('Telegram creates a playable account, survives reload, and permits an optional password', async ({
   page,
@@ -187,7 +259,7 @@ test('Telegram creates a playable account, survives reload, and permits an optio
   await expect(account.getByLabel('Текущий пароль')).toBeVisible();
   await page.reload();
   await expect(page.getByRole('button', { name: 'Аккаунт: ChosenBrowser' })).toBeVisible();
-  await page.getByRole('button', { name: /Аккаунт:/ }).click();
+  await account.getByRole('button', { name: 'Обзор' }).click();
   await account.getByRole('button', { name: 'Выйти' }).click();
   await expect(account.getByRole('button', { name: 'Войти через Telegram' })).toBeEnabled();
   await account.getByRole('button', { name: 'Войти через Telegram' }).click();

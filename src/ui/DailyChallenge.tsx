@@ -6,6 +6,9 @@ import { moveLabel } from '../game/levels';
 import type { DailyChallenge as Challenge } from '../game/daily';
 import styles from './DailyChallenge.module.css';
 import ui from './UI.module.css';
+import { useBackgroundState } from './useBackgroundState';
+
+type DailyTab = 'challenge' | 'results';
 
 export function DailyChallenge({
   onStart,
@@ -16,7 +19,11 @@ export function DailyChallenge({
 }) {
   const daily = useDaily();
   const username = useAccount((state) => state.username);
-  const [tab, setTab] = useState<'challenge' | 'results'>(results ? 'results' : 'challenge');
+  const [tab, setTab] = useBackgroundState<DailyTab>(
+    'four-ui-daily-tab',
+    results ? 'results' : 'challenge',
+    (value): value is DailyTab => value === 'challenge' || value === 'results',
+  );
   const [now, setNow] = useState(Date.now());
   useEffect(() => {
     void useDaily.getState().load();

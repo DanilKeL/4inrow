@@ -9,7 +9,8 @@ type Challenge = { nonce: string; clientId: string | null; miniApp: boolean };
 export function TelegramLogin({ purpose = 'login' }: { purpose?: 'login' | 'link' }) {
   const { username, loading, telegramLogin, clearMessages, telegramRegistration } = useAccount();
   const [challenge, setChallenge] = useState<Challenge | null>(null);
-  const [available, setAvailable] = useState(false);
+  // Render the button with the dialog; preparation only controls whether it is enabled.
+  const [available, setAvailable] = useState(true);
   const [error, setError] = useState('');
   const [active, setActive] = useState(false);
   const [generation, setGeneration] = useState(0);

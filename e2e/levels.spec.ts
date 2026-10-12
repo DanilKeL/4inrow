@@ -22,7 +22,8 @@ async function fits(page: Page) {
 async function openLevels(page: Page) {
   await page.goto('/');
   await expect(page.getByTestId('loading-screen')).not.toBeVisible();
-  await page.getByRole('button', { name: 'Уровни', exact: true }).click();
+  if (!(await page.getByRole('dialog', { name: 'Уровни' }).isVisible()))
+    await page.getByRole('button', { name: 'Уровни', exact: true }).click();
   await expect(page.getByRole('dialog', { name: 'Уровни' })).toBeVisible();
 }
 async function win(page: Page, id: number, touch = false) {
@@ -72,7 +73,8 @@ test('levels play offline with deterministic replies, preserve records and resta
     await context.setOffline(false);
   }
   await openLevels(page);
-  await page.getByRole('button', { name: 'Следующие уровни' }).click();
+  // The same level page is restored after navigation discards the document.
+  await expect(page.getByRole('button', { name: 'Уровень 9', exact: true })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Уровень 9', exact: true })).toContainText(
     'Рекорд: 3 хода',
   );

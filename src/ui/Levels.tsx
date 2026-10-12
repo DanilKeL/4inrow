@@ -1,8 +1,9 @@
-import { useEffect, useState } from 'react';
+import { useEffect } from 'react';
 import { Check, ChevronLeft, ChevronRight } from 'lucide-react';
 import { LEVELS, moveLabel } from '../game/levels';
 import { useLevelProgress } from '../store/levelStore';
 import styles from './Levels.module.css';
+import { useBackgroundState } from './useBackgroundState';
 
 export function Levels({
   onStart,
@@ -11,7 +12,15 @@ export function Levels({
   onStart: (id: number) => void;
   initialId?: number;
 }) {
-  const [page, setPage] = useState(Math.floor((initialId - 1) / 8));
+  const [page, setPage] = useBackgroundState(
+    'four-ui-levels-page',
+    Math.floor((initialId - 1) / 8),
+    (value): value is number =>
+      typeof value === 'number' &&
+      Number.isInteger(value) &&
+      value >= 0 &&
+      value < Math.ceil(LEVELS.length / 8),
+  );
   const best = useLevelProgress((state) => state.best);
   const progress = useLevelProgress();
   useEffect(() => {

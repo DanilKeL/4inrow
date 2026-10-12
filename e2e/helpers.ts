@@ -33,7 +33,7 @@ export async function openGame(page: Page, mode: 'local' | 'ai' = 'local') {
 
 export async function openHistory(page: Page) {
   await page.getByRole('button', { name: /^Аккаунт:/ }).click();
-  await page.getByRole('button', { name: 'История', exact: true }).click();
+  await page.getByRole('button', { name: 'Вся история', exact: true }).click();
   await expect(page.getByRole('dialog', { name: 'История партий' })).toBeVisible();
 }
 

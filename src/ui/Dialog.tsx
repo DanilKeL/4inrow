@@ -15,6 +15,18 @@ export function Dialog({
   wide?: boolean;
 }) {
   const ref = useRef<HTMLDivElement>(null);
+  const backdropPress = useRef<{ id: number; x: number; y: number } | null>(null);
+  useEffect(() => {
+    const cancelPress = () => {
+      backdropPress.current = null;
+    };
+    document.addEventListener('visibilitychange', cancelPress);
+    window.addEventListener('pagehide', cancelPress);
+    return () => {
+      document.removeEventListener('visibilitychange', cancelPress);
+      window.removeEventListener('pagehide', cancelPress);
+    };
+  }, []);
   useEffect(() => {
     const previous = document.activeElement as HTMLElement | null;
     const container = ref.current!;
@@ -56,7 +68,30 @@ export function Dialog({
     <div
       className={styles.backdrop}
       onPointerDown={(event) => {
-        if (event.target === event.currentTarget) onClose();
+        backdropPress.current =
+          event.target === event.currentTarget && event.isPrimary && event.button === 0
+            ? { id: event.pointerId, x: event.clientX, y: event.clientY }
+            : null;
+      }}
+      onPointerMove={(event) => {
+        const start = backdropPress.current;
+        if (start && Math.hypot(event.clientX - start.x, event.clientY - start.y) > 8)
+          backdropPress.current = null;
+      }}
+      onPointerCancel={() => {
+        backdropPress.current = null;
+      }}
+      onPointerUp={(event) => {
+        const start = backdropPress.current;
+        backdropPress.current = null;
+        if (
+          start &&
+          start.id === event.pointerId &&
+          event.target === event.currentTarget &&
+          Math.hypot(event.clientX - start.x, event.clientY - start.y) <= 8 &&
+          document.visibilityState === 'visible'
+        )
+          onClose();
       }}
     >
       <motion.div

@@ -6,6 +6,7 @@ import { tutorialExamples } from './tutorialExamples';
 import { tutorialVideoUrl } from '../network/tutorialMedia';
 import styles from './Tutorial.module.css';
 import ui from './UI.module.css';
+import { useBackgroundState } from './useBackgroundState';
 
 function LessonVideo({ id, title, autoPlay }: { id: string; title: string; autoPlay: boolean }) {
   const ref = useRef<HTMLVideoElement>(null);
@@ -130,7 +131,15 @@ function LessonVideo({ id, title, autoPlay }: { id: string; title: string; autoP
 }
 
 export function Tutorial({ onDone, starting = false }: { onDone: () => void; starting?: boolean }) {
-  const [selected, setSelected] = useState(0);
+  const [selected, setSelected] = useBackgroundState(
+    'four-ui-tutorial-example',
+    0,
+    (value): value is number =>
+      typeof value === 'number' &&
+      Number.isInteger(value) &&
+      value >= 0 &&
+      value < tutorialExamples.length,
+  );
   const reducedMotion = useReducedMotion();
   const animations = useSettings((state) => state.animations);
   const example = tutorialExamples[selected];

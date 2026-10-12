@@ -115,6 +115,19 @@ test('Telegram fullscreen, safe areas, navigation, moves and minimize work on a 
     confirm: true,
     haptics: 1,
   });
+  await page.getByRole('button', { name: /Аккаунт:/ }).click();
+  const account = page.getByRole('dialog', { name: 'Личный кабинет' });
+  await account.getByRole('button', { name: 'Вход', exact: true }).click();
+  await account.getByLabel('Имя пользователя').fill('KeepThisTab');
+  await page.evaluate(() =>
+    (window as unknown as { __telegramTest: { fire(name: string): void } }).__telegramTest.fire(
+      'deactivated',
+    ),
+  );
+  await expect(account).toBeVisible();
+  await expect(account.getByLabel('Имя пользователя')).toHaveValue('KeepThisTab');
+  await expect(account.getByRole('button', { name: 'Войти', exact: true })).toBeVisible();
+  await account.getByRole('button', { name: 'Закрыть' }).click();
   await page.evaluate(() =>
     (window as unknown as { __telegramTest: { fire(name: string): void } }).__telegramTest.fire(
       'deactivated',

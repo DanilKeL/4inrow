@@ -4,7 +4,6 @@ import {
   CalendarDays,
   CheckCircle2,
   ChevronRight,
-  History,
   KeyRound,
   LockKeyhole,
   LogOut,
@@ -20,9 +19,15 @@ import type { SavedMatch } from '../network/statistics';
 import accountStyles from './Account.module.css';
 import styles from './UI.module.css';
 import { TelegramLogin } from './TelegramLogin';
+import { useBackgroundState } from './useBackgroundState';
 
 type View = 'login' | 'register' | 'forgot' | 'reset';
 type SignedView = 'overview' | 'security';
+const isSignedView = (value: unknown): value is SignedView =>
+  value === 'overview' || value === 'security';
+const isBoolean = (value: unknown): value is boolean => typeof value === 'boolean';
+const isAuthView = (value: unknown): value is View =>
+  value === 'login' || value === 'register' || value === 'forgot';
 const modeLabels = { local: 'Вдвоём', ai: 'Против AI', online: 'Онлайн' };
 
 function ratingLeague(points: number) {
@@ -76,9 +81,22 @@ export function Account({ onOpenHistory }: { onOpenHistory?: () => void }) {
   const search = new URLSearchParams(window.location.search);
   const resetToken = search.get('reset');
   const verificationResult = search.get('emailVerified');
-  const [view, setView] = useState<View>(resetToken ? 'reset' : 'register');
-  const [signedView, setSignedView] = useState<SignedView>('overview');
-  const [emailBinding, setEmailBinding] = useState(false);
+  const [view, setView] = useBackgroundState<View>(
+    'four-ui-account-auth',
+    resetToken ? 'reset' : 'register',
+    isAuthView,
+    !resetToken,
+  );
+  const [signedView, setSignedView] = useBackgroundState(
+    'four-ui-account-section',
+    'overview' as SignedView,
+    isSignedView,
+  );
+  const [emailBinding, setEmailBinding] = useBackgroundState(
+    'four-ui-account-email',
+    false,
+    isBoolean,
+  );
   const [username, setUsername] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -205,29 +223,12 @@ export function Account({ onOpenHistory }: { onOpenHistory?: () => void }) {
               <div className={accountStyles.identity}>
                 <span>ПРОФИЛЬ ИГРОКА</span>
                 <h3>{signedIn}</h3>
-                <p>
-                  {profileEmail ? (
-                    <>
-                      <Mail size={13} /> {profileEmail}
-                      {emailVerified && <CheckCircle2 size={13} aria-label="Email подтверждён" />}
-                    </>
-                  ) : (
-                    <>
-                      <UserRound size={13} /> {telegramLinked ? 'Telegram' : 'Локальный аккаунт'}
-                      <button
-                        type="button"
-                        className={styles.textButton}
-                        onClick={() => {
-                          clearMessages();
-                          setSignedView('security');
-                          setEmailBinding(true);
-                        }}
-                      >
-                        Привязать почту
-                      </button>
-                    </>
-                  )}
-                </p>
+                {profileEmail && (
+                  <p>
+                    <Mail size={13} /> {profileEmail}
+                    {emailVerified && <CheckCircle2 size={13} aria-label="Email подтверждён" />}
+                  </p>
+                )}
               </div>
               <div className={accountStyles.memberSince}>
                 <CalendarDays size={16} />
@@ -302,7 +303,6 @@ export function Account({ onOpenHistory }: { onOpenHistory?: () => void }) {
               <div className={accountStyles.recentHeader}>
                 <div>
                   <span>ПОСЛЕДНИЕ ПАРТИИ</span>
-                  <strong>Недавняя форма</strong>
                 </div>
                 {onOpenHistory && (
                   <button onClick={onOpenHistory}>
@@ -356,11 +356,6 @@ export function Account({ onOpenHistory }: { onOpenHistory?: () => void }) {
             </section>
 
             <div className={accountStyles.accountActions}>
-              {onOpenHistory && (
-                <button onClick={onOpenHistory}>
-                  <History size={16} /> История
-                </button>
-              )}
               <button
                 aria-label="Выйти из аккаунта"
                 onClick={() => void logout()}

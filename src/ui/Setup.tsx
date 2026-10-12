@@ -5,6 +5,7 @@ import { secondGuestName, useAccount } from '../store/accountStore';
 import type { Difficulty } from '../game/ai';
 import styles from './UI.module.css';
 import { useOffline } from '../network/offline';
+import { useBackgroundState } from './useBackgroundState';
 
 export function Setup({
   onStart,
@@ -16,7 +17,11 @@ export function Setup({
   initialMode?: Mode;
 }) {
   const { online: networkAvailable } = useOffline();
-  const [mode, setMode] = useState<Mode>(initialMode);
+  const [mode, setMode] = useBackgroundState<Mode>(
+    'four-ui-setup-mode',
+    initialMode,
+    (value): value is Mode => value === 'local' || value === 'ai' || value === 'online',
+  );
   const [code, setCode] = useState('');
   const onlineStatus = useGame((state) => state.onlineStatus);
   const onlineError = useGame((state) => state.onlineError);

@@ -1,9 +1,17 @@
 // @vitest-environment jsdom
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { Dialog } from './Dialog';
 
 afterEach(cleanup);
+// jsdom does not implement PointerEvent yet.
+beforeAll(() => {
+  class TestPointerEvent extends MouseEvent {
+    pointerId = 1;
+    isPrimary = true;
+  }
+  vi.stubGlobal('PointerEvent', TestPointerEvent);
+});
 
 describe('keyboard dialog access', () => {
   it('focuses the dialog, traps Tab in both directions and restores the trigger', () => {
@@ -43,6 +51,31 @@ describe('keyboard dialog access', () => {
     fireEvent.pointerDown(screen.getByRole('textbox', { name: 'Имя' }));
     expect(close).not.toHaveBeenCalled();
     fireEvent.click(screen.getByRole('button', { name: 'Закрыть' }));
+    expect(close).toHaveBeenCalledOnce();
+  });
+
+  it('closes only after a completed backdrop tap, not a drag, cancelled or background gesture', () => {
+    const close = vi.fn();
+    render(
+      <Dialog title="Профиль" onClose={close}>
+        Профиль
+      </Dialog>,
+    );
+    const backdrop = screen.getByRole('dialog').parentElement!;
+    const position = { clientX: 20, clientY: 40, button: 0 };
+    fireEvent.pointerDown(backdrop, position);
+    expect(close).not.toHaveBeenCalled();
+    fireEvent.pointerCancel(backdrop, position);
+    fireEvent.pointerUp(backdrop, position);
+    fireEvent.pointerDown(backdrop, position);
+    fireEvent.pointerMove(backdrop, { ...position, clientY: 80 });
+    fireEvent.pointerUp(backdrop, position);
+    fireEvent.pointerDown(backdrop, position);
+    fireEvent(document, new Event('visibilitychange'));
+    fireEvent.pointerUp(backdrop, position);
+    expect(close).not.toHaveBeenCalled();
+    fireEvent.pointerDown(backdrop, position);
+    fireEvent.pointerUp(backdrop, position);
     expect(close).toHaveBeenCalledOnce();
   });
 });
