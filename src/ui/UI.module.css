@@ -353,6 +353,29 @@
 .quickMatch > svg {
   color: var(--accent);
 }
+.searchOrbit {
+  display: grid;
+  place-items: center;
+  width: 48px;
+  height: 48px;
+  color: var(--accent);
+}
+.searchOrbit > svg {
+  animation: searchOrbit 1.8s linear infinite;
+}
+@keyframes searchOrbit {
+  from {
+    transform: rotate(0deg) translateX(6px) rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg) translateX(6px) rotate(-360deg);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .searchOrbit > svg {
+    animation: none;
+  }
+}
 .quickMatch strong {
   font-size: 17px;
 }

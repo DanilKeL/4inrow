@@ -56,7 +56,9 @@ export function QuickMatch({ name, onCancel }: { name: string; onCancel: () => v
         </>
       ) : (
         <>
-          <Search size={32} aria-hidden="true" />
+          <span className={styles.searchOrbit} aria-hidden="true">
+            <Search size={32} />
+          </span>
           <strong>
             {onlineStatus === 'reconnecting' ? 'Восстанавливаем поиск…' : 'Ищем соперника…'}
           </strong>
