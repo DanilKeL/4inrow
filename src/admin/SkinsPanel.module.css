@@ -112,6 +112,9 @@
 }
 .scene {
   height: clamp(260px, 40vw, 440px);
+  border-radius: 12px;
+  overflow: hidden;
+  margin: 14px 0;
 }
 .preview .primary {
   width: 100%;
@@ -148,7 +151,29 @@
 .colors {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 18px 16px;
+}
+.colors fieldset {
+  min-width: 0;
+  margin: 0;
+  padding: 12px;
+  border: 1px solid #e1e3dc;
+  border-radius: 10px;
+}
+.colors legend {
+  padding: 0 5px;
+  font-size: 12px;
+  font-weight: 700;
+}
+.environment {
+  grid-column: 1 / -1;
+}
+.groupFields {
+  display: grid;
   gap: 12px;
+}
+.environment .groupFields {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 .colors label {
   display: flex;
@@ -214,7 +239,16 @@
     height: 280px;
   }
   .colors {
-    gap: 12px 6px;
+    gap: 14px 8px;
+  }
+  .colors fieldset {
+    padding: 10px 8px;
+  }
+  .colors legend {
+    font-size: 11px;
+  }
+  .environment .groupFields {
+    gap: 12px 8px;
   }
   .editor {
     padding: 15px;

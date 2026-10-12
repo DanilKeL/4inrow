@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
-import { defaultCatalog, type SkinCatalog } from '../skins/catalog';
+import { defaultCatalog, DEFAULT_ROOM_COLOR, type SkinCatalog } from '../skins/catalog';
 import { initializeAppearance, useAppearance } from './appearanceStore';
 
 class Stream extends EventTarget {
@@ -39,6 +39,22 @@ const changed = (id: string, revision: number): SkinCatalog => ({
   ...defaultCatalog(),
   activeSkinId: id,
   revision,
+});
+it('preserves the selected style in old offline catalogs and caches the added room field', () => {
+  const catalog = changed('coffee-pieces', 4);
+  const legacy = {
+    ...catalog,
+    skins: catalog.skins.map((skin) => {
+      const palette: Record<string, unknown> = { ...skin.palette };
+      delete palette.room;
+      return { ...skin, palette };
+    }),
+  };
+  useAppearance.getState().setCatalog(legacy);
+  expect(useAppearance.getState().catalog).toEqual(catalog);
+  expect(JSON.parse(localStorage.getItem('four-skins-v1')!).skins[2].palette.room).toBe(
+    DEFAULT_ROOM_COLOR,
+  );
 });
 
 it('updates live, caches valid skins for offline play, and ignores malformed events', async () => {

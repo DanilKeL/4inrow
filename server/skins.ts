@@ -4,7 +4,7 @@ import { AuthError } from './auth.ts';
 import {
   BUILTIN_SKINS,
   DEFAULT_SKIN_ID,
-  isPalette,
+  normalizePalette,
   isSkin,
   type Skin,
   type SkinCatalog,
@@ -18,7 +18,13 @@ export class SkinsStore {
   private read(): SavedCatalog {
     const row = this.db.prepare('SELECT value FROM game_settings WHERE key=?').get('skins.v1');
     if (!row) return { revision: 0, activeSkinId: DEFAULT_SKIN_ID, custom: [] };
-    return JSON.parse(String(row.value)) as SavedCatalog;
+    const saved = JSON.parse(String(row.value)) as SavedCatalog;
+    saved.custom = saved.custom.map((skin) => {
+      const palette = normalizePalette(skin.palette);
+      if (!palette) throw new Error('Stored skin palette is invalid');
+      return { ...skin, palette };
+    });
+    return saved;
   }
   get(): SkinCatalog {
     const saved = this.read();
@@ -61,18 +67,19 @@ export class SkinsStore {
   save(data: Record<string, unknown>, id?: string) {
     if (BUILTIN_SKINS.some((builtin) => builtin.id === id))
       throw new AuthError(403, 'Готовый стиль можно изменить только в собственной копии.');
+    const palette = normalizePalette(data.palette);
     if (
       typeof data.name !== 'string' ||
       !data.name.trim() ||
       data.name.trim().length > 48 ||
-      !isPalette(data.palette)
+      !palette
     )
       throw new AuthError(400, 'Проверьте название и цвета стиля.');
     const skin: Skin = {
       id: id ?? `custom-${randomBytes(16).toString('hex')}`,
       name: data.name.trim(),
       builtin: false,
-      palette: structuredClone(data.palette),
+      palette: structuredClone(palette),
     };
     if (!isSkin(skin)) throw new AuthError(400, 'Некорректный стиль.');
     const catalog = this.change(data.expectedRevision, (saved) => {

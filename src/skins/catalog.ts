@@ -1,5 +1,6 @@
 export type PiecePalette = { body: string; cap: string; mark: string };
 export type SkinPalette = {
+  room: string;
   board: { body: string; rim: string; dot: string };
   dark: PiecePalette;
   light: PiecePalette;
@@ -18,7 +19,9 @@ export type SkinCatalog = {
   skins: Skin[];
 };
 
+export const DEFAULT_ROOM_COLOR = '#ebeae7';
 const classic: SkinPalette = {
+  room: DEFAULT_ROOM_COLOR,
   board: { body: '#ede8dc', rim: '#aca18b', dot: '#979992' },
   dark: { body: '#24272c', cap: '#24292f', mark: '#858992' },
   light: { body: '#eee4d2', cap: '#f5edde', mark: '#969286' },
@@ -56,18 +59,25 @@ const record = (value: unknown): value is Record<string, unknown> =>
 const color = (value: unknown): value is string =>
   typeof value === 'string' && /^#[0-9a-f]{6}$/i.test(value);
 export function isPalette(value: unknown): value is SkinPalette {
-  if (!record(value) || Object.keys(value).sort().join() !== 'accent,board,dark,light')
+  if (!record(value) || Object.keys(value).sort().join() !== 'accent,board,dark,light,room')
     return false;
   const part = (value: unknown, keys: string[]) =>
     record(value) &&
     Object.keys(value).sort().join() === keys.sort().join() &&
     keys.every((key) => color(value[key]));
   return (
+    color(value.room) &&
     color(value.accent) &&
     part(value.board, ['body', 'rim', 'dot']) &&
     part(value.dark, ['body', 'cap', 'mark']) &&
     part(value.light, ['body', 'cap', 'mark'])
   );
+}
+// Older database rows and offline caches keep their palettes when a new field is added.
+export function normalizePalette(value: unknown): SkinPalette | null {
+  if (!record(value)) return null;
+  const palette = { room: DEFAULT_ROOM_COLOR, ...value };
+  return isPalette(palette) ? palette : null;
 }
 export function isSkin(value: unknown): value is Skin {
   return (
@@ -100,4 +110,15 @@ export function isCatalog(value: unknown): value is SkinCatalog {
 
 export function activeSkin(catalog: SkinCatalog): Skin {
   return catalog.skins.find((skin) => skin.id === catalog.activeSkinId) ?? BUILTIN_SKINS[1];
+}
+
+export function normalizeCatalog(value: unknown): SkinCatalog | null {
+  if (!record(value) || !Array.isArray(value.skins)) return null;
+  const catalog = {
+    ...value,
+    skins: value.skins.map((skin: unknown) =>
+      record(skin) ? { ...skin, palette: normalizePalette(skin.palette) } : skin,
+    ),
+  };
+  return isCatalog(catalog) ? catalog : null;
 }

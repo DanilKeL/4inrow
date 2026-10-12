@@ -762,9 +762,7 @@ export default function GameScene(props: GameSceneProps) {
           gl={{ antialias: true, alpha: true, powerPreference: 'high-performance' }}
           fallback={<SceneFallback />}
         >
-          {(props.background || props.demo) && (
-            <color attach="background" args={[props.background ?? '#ebeae7']} />
-          )}
+          <color attach="background" args={[props.background ?? skin.palette.room]} />
           <ScenePerformance pointerEvents={pointerEvents} onDprChange={setRenderDpr} />
           <ambientLight intensity={0.5} />
           <hemisphereLight args={['#ffffff', '#a4a09a', 1.2]} />

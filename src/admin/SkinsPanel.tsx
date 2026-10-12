@@ -19,6 +19,11 @@ const fields = [
   ['light', 'cap', 'Верх светлых фишек'],
   ['light', 'mark', 'Метка светлых фишек'],
 ] as const;
+const fieldGroups = [
+  ['board', 'Доска и окружение'],
+  ['dark', 'Тёмные фишки'],
+  ['light', 'Светлые фишки'],
+] as const;
 function previewGame() {
   let game = createGame();
   for (const [x, y] of [
@@ -43,6 +48,7 @@ function previewGame() {
 function Swatch({ skin }: { skin: Skin }) {
   return (
     <svg viewBox="0 0 200 105" aria-hidden="true">
+      <rect width="200" height="105" rx="10" fill={skin.palette.room} />
       <rect x="15" y="19" width="170" height="72" rx="15" fill="#343b3b" />
       <rect x="15" y="15" width="170" height="72" rx="15" fill={skin.palette.board.body} />
       {[0, 1, 2, 3, 4].map((column) =>
@@ -252,41 +258,69 @@ export default function SkinsPanel({ onUnauthorized }: { onUnauthorized: () => v
                 />
               </label>
               <div className={styles.colors}>
-                {fields.map(([group, key, label]) => (
-                  <label key={label}>
-                    <input
-                      type="color"
-                      aria-label={label}
-                      value={String(Reflect.get(draft.palette[group], key))}
-                      disabled={busy}
-                      onChange={(event) =>
-                        setDraft({
-                          ...draft,
-                          palette: {
-                            ...draft.palette,
-                            [group]: { ...draft.palette[group], [key]: event.target.value },
-                          },
-                        })
-                      }
-                    />
-                    <span>{label}</span>
-                  </label>
+                {fieldGroups.map(([group, title]) => (
+                  <fieldset
+                    key={group}
+                    className={group === 'board' ? styles.environment : undefined}
+                  >
+                    <legend>{title}</legend>
+                    <div className={styles.groupFields}>
+                      {fields
+                        .filter(([part]) => part === group)
+                        .map(([part, key, label]) => (
+                          <label key={label}>
+                            <input
+                              type="color"
+                              aria-label={label}
+                              value={String(Reflect.get(draft.palette[part], key))}
+                              disabled={busy}
+                              onChange={(event) =>
+                                setDraft({
+                                  ...draft,
+                                  palette: {
+                                    ...draft.palette,
+                                    [part]: { ...draft.palette[part], [key]: event.target.value },
+                                  },
+                                })
+                              }
+                            />
+                            <span>
+                              {group === 'board'
+                                ? label
+                                : key === 'body'
+                                  ? 'Корпус'
+                                  : key === 'cap'
+                                    ? 'Верх'
+                                    : 'Метка'}
+                            </span>
+                          </label>
+                        ))}
+                      {group === 'board' &&
+                        (
+                          [
+                            ['room', 'Цвет комнаты', 'Комната'],
+                            ['accent', 'Цвет подсветки', 'Подсветка и победа'],
+                          ] as const
+                        ).map(([key, label, text]) => (
+                          <label key={key}>
+                            <input
+                              type="color"
+                              aria-label={label}
+                              value={draft.palette[key]}
+                              disabled={busy}
+                              onChange={(event) =>
+                                setDraft({
+                                  ...draft,
+                                  palette: { ...draft.palette, [key]: event.target.value },
+                                })
+                              }
+                            />
+                            <span>{text}</span>
+                          </label>
+                        ))}
+                    </div>
+                  </fieldset>
                 ))}
-                <label>
-                  <input
-                    type="color"
-                    aria-label="Цвет подсветки"
-                    value={draft.palette.accent}
-                    disabled={busy}
-                    onChange={(event) =>
-                      setDraft({
-                        ...draft,
-                        palette: { ...draft.palette, accent: event.target.value },
-                      })
-                    }
-                  />
-                  <span>Подсветка и победа</span>
-                </label>
               </div>
               <button className={styles.primary} disabled={busy}>
                 <Save size={16} /> Сохранить стиль
@@ -313,7 +347,6 @@ export default function SkinsPanel({ onUnauthorized }: { onUnauthorized: () => v
                 animations={false}
                 hints={false}
                 demo
-                background="#ebeae7"
               />
             </Suspense>
           </div>

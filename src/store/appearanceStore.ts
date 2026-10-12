@@ -1,11 +1,12 @@
 import { create } from 'zustand';
-import { defaultCatalog, isCatalog, type SkinCatalog } from '../skins/catalog';
+import { defaultCatalog, normalizeCatalog, type SkinCatalog } from '../skins/catalog';
 
 const CACHE_KEY = 'four-skins-v1';
 function cachedCatalog(): SkinCatalog {
   try {
     const saved: unknown = JSON.parse(localStorage.getItem(CACHE_KEY) ?? 'null');
-    if (isCatalog(saved)) return saved;
+    const catalog = normalizeCatalog(saved);
+    if (catalog) return catalog;
   } catch {
     /* Offline play does not depend on storage. */
   }
@@ -17,14 +18,15 @@ export const useAppearance = create<{
 }>((set, get) => ({
   catalog: cachedCatalog(),
   setCatalog: (value) => {
-    if (!isCatalog(value)) return;
-    const unchanged = JSON.stringify(get().catalog) === JSON.stringify(value);
+    const catalog = normalizeCatalog(value);
+    if (!catalog) return;
+    const unchanged = JSON.stringify(get().catalog) === JSON.stringify(catalog);
     try {
-      localStorage.setItem(CACHE_KEY, JSON.stringify(value));
+      localStorage.setItem(CACHE_KEY, JSON.stringify(catalog));
     } catch {
       /* Optional cache. */
     }
-    if (!unchanged) set({ catalog: value });
+    if (!unchanged) set({ catalog });
   },
 }));
 

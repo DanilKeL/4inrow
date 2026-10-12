@@ -4,7 +4,7 @@ import { mkdtempSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { SkinsStore } from './skins';
-import { defaultCatalog, isCatalog } from '../src/skins/catalog';
+import { defaultCatalog, DEFAULT_ROOM_COLOR, isCatalog } from '../src/skins/catalog';
 
 const databases: DatabaseSync[] = [];
 const directories: string[] = [];
@@ -25,6 +25,7 @@ it('persists custom skins and the active selection in the backed-up SQLite datab
   expect(store.get().activeSkinId).toBe('coffee-board');
   const palette = structuredClone(defaultCatalog().skins[0].palette);
   palette.board.body = '#bb9988';
+  palette.room = '#9fabc1';
   const saved = store.save({ name: 'Тёплый камень', palette, expectedRevision: 0 });
   const activated = store.activate(saved.savedSkinId, saved.revision);
   databases.pop()!.close();
@@ -36,6 +37,29 @@ it('persists custom skins and the active selection in the backed-up SQLite datab
     saved.savedSkinId,
   );
   expect(updated.skins.find((skin) => skin.id === saved.savedSkinId)?.name).toBe('Камень');
+});
+it('retains pre-room database styles and accepts old clients without discarding their colors', () => {
+  const store = open();
+  const palette: Record<string, unknown> = structuredClone(defaultCatalog().skins[0].palette);
+  delete palette.room;
+  const saved = store.save({ name: 'Старый стиль', palette, expectedRevision: 0 });
+  const skin = saved.skins.find((skin) => skin.id === saved.savedSkinId)!;
+  expect(skin.palette.room).toBe(DEFAULT_ROOM_COLOR);
+  const legacy = { ...skin, palette };
+  databases
+    .at(-1)!
+    .prepare('UPDATE game_settings SET value=? WHERE key=?')
+    .run(JSON.stringify({ revision: 3, activeSkinId: skin.id, custom: [legacy] }), 'skins.v1');
+  const restored = store.get();
+  expect(restored.activeSkinId).toBe(skin.id);
+  expect(restored.revision).toBe(3);
+  expect(restored.skins.at(-1)?.palette).toEqual({ ...palette, room: DEFAULT_ROOM_COLOR });
+  expect(isCatalog(restored)).toBe(true);
+  const before = store.get();
+  expect(() =>
+    store.save({ name: 'bad', palette: { ...palette, room: 'red' }, expectedRevision: 3 }),
+  ).toThrow();
+  expect(store.get()).toEqual(before);
 });
 it('rejects stale writes, invalid colors and changes to built-ins without mutating the catalog', () => {
   const store = open();
