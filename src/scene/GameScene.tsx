@@ -215,7 +215,7 @@ function Piece({
       <mesh geometry={geometry}>
         <meshStandardMaterial
           ref={bodyMaterial}
-          color={dark ? '#24272c' : '#eee4d2'}
+          color={dark ? '#24272c' : '#cbb394'}
           roughness={dark ? 0.34 : 0.48}
           metalness={dark ? 0.2 : 0.08}
           onUpdate={(material) => setMaterialOpacity(material, fade.current.value)}
@@ -225,7 +225,7 @@ function Piece({
         <cylinderGeometry args={[0.317, 0.317, 0.009, 40]} />
         <meshStandardMaterial
           ref={capMaterial}
-          color={dark ? '#24292f' : '#f5edde'}
+          color={dark ? '#24292f' : '#dcc4a3'}
           roughness={0.52}
           onUpdate={(material) => setMaterialOpacity(material, fade.current.value)}
         />
@@ -234,7 +234,7 @@ function Piece({
         {dark ? <circleGeometry args={[0.052, 24]} /> : <ringGeometry args={[0.067, 0.085, 32]} />}
         <meshBasicMaterial
           ref={symbolMaterial}
-          color={dark ? '#858992' : '#969286'}
+          color={dark ? '#858992' : '#8f7b60'}
           transparent
           opacity={opacity * 0.85}
           depthWrite={false}
