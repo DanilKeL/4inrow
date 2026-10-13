@@ -1,7 +1,85 @@
 import { describe, expect, it } from 'vitest';
-import { PerspectiveCamera, Vector3 } from 'three';
+import { PerspectiveCamera, Spherical, Vector3 } from 'three';
 import { OrbitControls } from 'three-stdlib';
-import { preserveVictoryFraming, releaseVictoryOrbit } from './victoryCamera';
+import { fitVictoryCamera, preserveVictoryFraming, releaseVictoryOrbit } from './victoryCamera';
+import { DIRECTIONS } from '../game/core';
+
+describe('victory line framing', () => {
+  it.each([0.35, 0.6, 1, 2.8])(
+    'fits all line directions and the falling chip at aspect %s, regardless of prior zoom',
+    (aspect) => {
+      for (const direction of DIRECTIONS) {
+        const points = Array.from(
+          { length: 5 },
+          (_, index) =>
+            new Vector3(
+              ((direction.x < 0 ? 4 : 0) + index * direction.x - 2) * 1.09,
+              0.365 + ((direction.z < 0 ? 4 : 0) + index * direction.z) * 0.5,
+              ((direction.y < 0 ? 4 : 0) + index * direction.y - 2) * 1.09,
+            ),
+        );
+        for (const radius of [7, 23])
+          for (const theta of [0, 0.7, 2.6]) {
+            const framed = fitVictoryCamera(
+              points,
+              points.at(-1)!,
+              new Spherical(radius, 0.82, theta),
+              35,
+              aspect,
+            );
+            const camera = new PerspectiveCamera(35, aspect, 0.1, 100);
+            camera.position.copy(framed.target).add(new Vector3().setFromSpherical(framed.pose));
+            camera.lookAt(framed.target);
+            camera.updateMatrixWorld();
+            for (const point of [
+              ...points,
+              points
+                .at(-1)!
+                .clone()
+                .add(new Vector3(0, 2.2, 0)),
+            ])
+              for (const x of [-0.42, 0.42])
+                for (const y of [-0.3, 0.3])
+                  for (const z of [-0.42, 0.42]) {
+                    const projected = point
+                      .clone()
+                      .add(new Vector3(x, y, z))
+                      .project(camera);
+                    expect(Math.abs(projected.x)).toBeLessThanOrEqual(0.8000001);
+                    expect(Math.abs(projected.y)).toBeLessThanOrEqual(0.8000001);
+                    expect(projected.z).toBeGreaterThan(-1);
+                    expect(projected.z).toBeLessThan(1);
+                  }
+          }
+      }
+    },
+  );
+
+  it('frames simultaneous crossing winning lines together', () => {
+    const points = [
+      new Vector3(-2.18, 2.365, 0),
+      new Vector3(2.18, 2.365, 0),
+      new Vector3(0, 2.365, -2.18),
+      new Vector3(0, 2.365, 2.18),
+    ];
+    const framed = fitVictoryCamera(
+      points,
+      new Vector3(0, 2.365, 0),
+      new Spherical(7, 0.82, 0.6),
+      35,
+      0.5,
+    );
+    const camera = new PerspectiveCamera(35, 0.5);
+    camera.position.copy(framed.target).add(new Vector3().setFromSpherical(framed.pose));
+    camera.lookAt(framed.target);
+    camera.updateMatrixWorld();
+    for (const point of points) {
+      const projected = point.clone().project(camera);
+      expect(Math.abs(projected.x)).toBeLessThan(0.8);
+      expect(Math.abs(projected.y)).toBeLessThan(0.8);
+    }
+  });
+});
 
 describe('victory camera handoff', () => {
   it('keeps projected board size as the mobile result buttons take space, and restores it for a new game', () => {

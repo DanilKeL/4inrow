@@ -29,7 +29,7 @@ import {
 import type { Line2, LineSegments2, OrbitControls as OrbitControlsImpl } from 'three-stdlib';
 import type { GameState, Move, Position } from '../game/core';
 import { WIN_CAMERA_MS, WIN_FALL_MS, WIN_LINE_MS } from '../game/victoryPresentation';
-import { preserveVictoryFraming, releaseVictoryOrbit } from './victoryCamera';
+import { fitVictoryCamera, preserveVictoryFraming, releaseVictoryOrbit } from './victoryCamera';
 import { displayedHeight, visibleLineSegments } from './layers';
 import {
   rankedSegmentProgress,
@@ -122,6 +122,7 @@ type VictoryPresentationState = ReturnType<typeof rankedVictoryProgress> & {
   cameraTarget?: number[];
   cameraLocked?: boolean;
   cameraPixelScale?: number;
+  winningBounds?: number[][];
 };
 type VictoryDiagnostics = RefObject<(() => VictoryPresentationState | null) | null>;
 
@@ -621,9 +622,6 @@ function CameraRig({
     destination.current = null;
     if (cinematic.current?.key === victoryClock.key) return;
     const points = game.winningLines[0];
-    const center = points
-      .reduce<Vector3>((sum, p) => sum.add(new Vector3(...position(p))), new Vector3())
-      .divideScalar(points.length);
     const fromTarget = orbit.target.clone();
     const from = new Spherical().setFromVector3(camera.position.clone().sub(fromTarget));
     const direction = new Vector3(...position(points.at(-1)!)).sub(
@@ -639,16 +637,19 @@ function CameraRig({
             (a, b) => Math.abs(a) - Math.abs(b),
           )[0];
     const fit = Math.max(1, 0.9 / (size.width / size.height));
+    const framed = fitVictoryCamera(
+      game.winningLines.flat().map((point) => new Vector3(...position(point))),
+      new Vector3(...position(game.history.at(-1)!)),
+      new Spherical(Math.max(7, Math.min(from.radius * 0.9, 10.5 * fit)), 0.82, from.theta + turn),
+      camera instanceof PerspectiveCamera ? camera.fov : (cameraFov ?? 35),
+      size.width / size.height,
+    );
     cinematic.current = {
       key: victoryClock.key,
       from,
-      to: new Spherical(
-        Math.max(7, Math.min(from.radius * 0.9, 10.5 * fit)),
-        0.82,
-        from.theta + turn,
-      ),
+      to: framed.pose,
       fromTarget,
-      toTarget: center.multiplyScalar(0.65),
+      toTarget: framed.target,
       offset: new Vector3(),
       pose: new Spherical(),
       height: size.height,
@@ -745,6 +746,25 @@ function CameraRig({
               cameraPosition: camera.position.toArray(),
               cameraTarget: controls.current?.target.toArray(),
               cameraLocked: !controls.current?.enabled,
+              winningBounds: game.winningLines.flat().flatMap((point) => {
+                const move = game.history.find(
+                  (move) => move.x === point.x && move.y === point.y && move.z === point.z,
+                )!;
+                const piece = scene.getObjectByName(`game-piece-${move.index}`);
+                const center = new Vector3(...position(point));
+                if (piece) center.y = piece.position.y;
+                return [-0.42, 0.42].flatMap((x) =>
+                  [-0.3, 0.3].flatMap((y) =>
+                    [-0.42, 0.42].map((z) =>
+                      center
+                        .clone()
+                        .add(new Vector3(x, y, z))
+                        .project(camera)
+                        .toArray(),
+                    ),
+                  ),
+                );
+              }),
               cameraPixelScale:
                 camera instanceof PerspectiveCamera
                   ? size.height / (2 * Math.tan((camera.fov * Math.PI) / 360))
@@ -800,7 +820,17 @@ function CameraRig({
     return () => {
       if (window.__fourScene === api) delete window.__fourScene;
     };
-  }, [camera, gl, scene, game.heights, layers, victoryDiagnostics, size.height]);
+  }, [
+    camera,
+    gl,
+    scene,
+    game.heights,
+    game.history,
+    game.winningLines,
+    layers,
+    victoryDiagnostics,
+    size.height,
+  ]);
   useFrame((_, delta) => {
     const orbit = controls.current;
     if (!orbit) return;
