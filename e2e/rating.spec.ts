@@ -71,7 +71,8 @@ test('ranked quick game reveals the winning move before Elo, survives reload and
   browser,
   baseURL,
 }, info) => {
-  test.setTimeout(75000);
+  // Three simultaneous WebGL clients can take longer on the software renderer.
+  test.setTimeout(100000);
   const other = await browser.newPage({
     baseURL,
     viewport: { width: 320, height: 568 },

@@ -3,7 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createGame, replay } from '../game/core';
 import type { OnlineHandlers } from '../network/client';
 import type { LobbySnapshot } from '../network/protocol';
-import { RANKED_WIN_FALL_MS } from '../game/victoryPresentation';
+import { WIN_FALL_MS } from '../game/victoryPresentation';
 
 const mocked = vi.hoisted(() => ({
   sound: vi.fn(),
@@ -85,22 +85,25 @@ afterEach(() => {
 });
 
 describe('ranked victory landing', () => {
-  it('plays the victory sound at landing, even when the same board is broadcast again', () => {
-    const won = snapshot(true);
-    mocked.handlers!.onEvent({ type: 'state', snapshot: won });
-    vi.advanceTimersByTime(440);
-    expect(mocked.sound).not.toHaveBeenCalled();
-    mocked.handlers!.onEvent({ type: 'state', snapshot: { ...won, revision: 9, rematch: [2] } });
-    expect(useGame.getState().phase).toBe('animating');
-    vi.advanceTimersByTime(RANKED_WIN_FALL_MS - 441);
-    expect(mocked.sound).not.toHaveBeenCalled();
-    vi.advanceTimersByTime(1);
-    expect(mocked.sound).toHaveBeenCalledExactlyOnceWith('win');
-    expect(useGame.getState().phase).toBe('victory');
-    mocked.handlers!.onEvent({ type: 'state', snapshot: { ...won, revision: 10, rematch: [2] } });
-    vi.advanceTimersByTime(2000);
-    expect(mocked.sound).toHaveBeenCalledTimes(1);
-  });
+  it.each([true, false])(
+    'plays the victory sound at landing in rated=%s online, including repeated broadcasts',
+    (rated) => {
+      const won = { ...snapshot(true), ranking: { ...snapshot(true).ranking!, rated } };
+      mocked.handlers!.onEvent({ type: 'state', snapshot: won });
+      vi.advanceTimersByTime(440);
+      expect(mocked.sound).not.toHaveBeenCalled();
+      mocked.handlers!.onEvent({ type: 'state', snapshot: { ...won, revision: 9, rematch: [2] } });
+      expect(useGame.getState().phase).toBe('animating');
+      vi.advanceTimersByTime(WIN_FALL_MS - 441);
+      expect(mocked.sound).not.toHaveBeenCalled();
+      vi.advanceTimersByTime(1);
+      expect(mocked.sound).toHaveBeenCalledExactlyOnceWith('win');
+      expect(useGame.getState().phase).toBe('victory');
+      mocked.handlers!.onEvent({ type: 'state', snapshot: { ...won, revision: 10, rematch: [2] } });
+      vi.advanceTimersByTime(2000);
+      expect(mocked.sound).toHaveBeenCalledTimes(1);
+    },
+  );
 
   it('cancels the preceding victory when a new round starts', () => {
     mocked.handlers!.onEvent({ type: 'state', snapshot: snapshot(true) });

@@ -1,17 +1,17 @@
-import { RANKED_WIN_FALL_MS, RANKED_WIN_LINE_MS } from '../game/victoryPresentation';
+import { WIN_FALL_MS, WIN_LINE_MS } from '../game/victoryPresentation';
 
 const clamp = (value: number) => Math.max(0, Math.min(1, value));
 const smooth = (value: number) => value * value * (3 - 2 * value);
 
 /** The entire board shares one clock so rings never precede the final chip. */
 export function rankedVictoryProgress(elapsedMs: number) {
-  const fall = clamp(elapsedMs / RANKED_WIN_FALL_MS);
-  const reveal = clamp((elapsedMs - RANKED_WIN_FALL_MS) / RANKED_WIN_LINE_MS);
+  const fall = clamp(elapsedMs / WIN_FALL_MS);
+  const reveal = clamp((elapsedMs - WIN_FALL_MS) / WIN_LINE_MS);
   return {
     fallOffset: 2.2 * (1 - fall * fall),
     lineProgress: smooth(reveal),
     dimProgress: smooth(reveal),
-    ringProgress: smooth(clamp((elapsedMs - RANKED_WIN_FALL_MS) / 320)),
+    ringProgress: smooth(clamp((elapsedMs - WIN_FALL_MS) / 320)),
   };
 }
 

@@ -3,7 +3,7 @@ import { Clock3, Eye, Home, RotateCcw, TrendingDown, TrendingUp } from 'lucide-r
 import { motion, useReducedMotion } from 'motion/react';
 import { useGame } from '../store/gameStore';
 import { useSettings } from '../store/settingsStore';
-import { rankedResultDelay } from '../game/victoryPresentation';
+import { resultDelay } from '../game/victoryPresentation';
 import { useAnimatedInteger, useResultReveal } from './useRankedPresentation';
 import styles from './RankedResult.module.css';
 
@@ -33,7 +33,7 @@ export function RankedResult({
       : null;
   const revealed = useResultReveal(
     resultKey,
-    snapshot ? rankedResultDelay(snapshot, !reducedMotion) : 0,
+    snapshot ? resultDelay(snapshot.game, !reducedMotion, snapshot.endReason) : 0,
     boardReady,
   );
   const visible = Boolean(!blocked && !dismissed && revealed);

@@ -25,7 +25,7 @@ import {
 } from 'three';
 import type { Line2, LineSegments2, OrbitControls as OrbitControlsImpl } from 'three-stdlib';
 import type { GameState, Move, Position } from '../game/core';
-import { RANKED_WIN_FALL_MS, RANKED_WIN_LINE_MS } from '../game/victoryPresentation';
+import { WIN_FALL_MS, WIN_LINE_MS } from '../game/victoryPresentation';
 import { displayedHeight, visibleLineSegments } from './layers';
 import {
   rankedSegmentProgress,
@@ -61,7 +61,8 @@ export interface GameSceneProps {
   background?: string;
   cameraFov?: number;
   skin?: Skin;
-  rankedVictory?: boolean;
+  victoryPresentation?: boolean;
+  victoryId?: string;
 }
 
 const SPACING = 1.09;
@@ -414,7 +415,7 @@ function Piece({
       !latest &&
       !winner &&
       (!victory ||
-        (victoryAge >= RANKED_WIN_FALL_MS + RANKED_WIN_LINE_MS &&
+        (victoryAge >= WIN_FALL_MS + WIN_LINE_MS &&
           appliedOpacity.current === opacity * (opacity === 1 ? 0.52 : 1))) &&
       introFinished &&
       fade.current.elapsed >= 0.15 &&
@@ -469,7 +470,7 @@ function Piece({
       ringMaterial.current.emissiveIntensity =
         winner && animate
           ? victory
-            ? 0.5 + Math.sin((Math.max(0, victoryAge - RANKED_WIN_FALL_MS) / 1000) * 1.8) * 0.12
+            ? 0.5 + Math.sin((Math.max(0, victoryAge - WIN_FALL_MS) / 1000) * 1.8) * 0.12
             : 0.6 + Math.sin(state.clock.elapsedTime * 3) * 0.3
           : 0.35;
   });
@@ -535,11 +536,11 @@ function CameraRig({
   game,
   layers,
   demo,
-  rankedVictory,
+  victoryPresentation,
   victoryDiagnostics,
 }: Pick<
   GameSceneProps,
-  'cameraView' | 'cameraReset' | 'animations' | 'game' | 'layers' | 'demo' | 'rankedVictory'
+  'cameraView' | 'cameraReset' | 'animations' | 'game' | 'layers' | 'demo' | 'victoryPresentation'
 > & {
   victoryDiagnostics: VictoryDiagnostics;
 }) {
@@ -636,7 +637,7 @@ function CameraRig({
   }, [camera, gl, scene, game.heights, layers, victoryDiagnostics]);
   useFrame((_, delta) => {
     if (!destination.current || !controls.current) return;
-    const speed = animations ? 1 - Math.exp(-delta * (rankedVictory ? 1.8 : 6)) : 1;
+    const speed = animations ? 1 - Math.exp(-delta * (victoryPresentation ? 1.8 : 6)) : 1;
     camera.position.lerp(destination.current, speed);
     controls.current.target.lerp(targetDestination.current, speed);
     controls.current.update();
@@ -751,7 +752,8 @@ function Board({
   skin,
   gesture,
   clearHover,
-  rankedVictory,
+  victoryPresentation,
+  victoryId,
   victoryDiagnostics,
 }: GameSceneProps & {
   skin: Skin;
@@ -793,13 +795,17 @@ function Board({
   const winners = new Set(game.winningLines.flat().map((p) => `${p.x},${p.y},${p.z}`));
   const last = game.history.at(-1);
   const victoryKey =
-    rankedVictory && animations && !demo && last
-      ? `${last.index}-${last.x}-${last.y}-${last.z}-${last.player}`
+    animations && !demo
+      ? (victoryId ??
+        (victoryPresentation && last
+          ? `${last.index}-${last.x}-${last.y}-${last.z}-${last.player}`
+          : null))
       : null;
-  const victoryClock = useMemo(
+  const presentationClock = useMemo(
     () => (victoryKey ? { key: victoryKey, startedAt: performance.now() } : null),
     [victoryKey],
   );
+  const victoryClock = victoryPresentation ? presentationClock : null;
   const lastPiece = useRef<Group | null>(null);
   const lastY = last ? position(last)[1] : 0;
   useEffect(() => {

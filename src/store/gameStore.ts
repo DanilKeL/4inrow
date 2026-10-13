@@ -28,7 +28,7 @@ import {
   type DailyChallenge,
 } from '../game/daily';
 import { useDaily } from './dailyStore';
-import { hasRankedWinningLine, RANKED_WIN_FALL_MS } from '../game/victoryPresentation';
+import { moveAnimationDelay } from '../game/victoryPresentation';
 
 export type Phase =
   | 'menu'
@@ -191,12 +191,12 @@ function receiveOnline(snapshot: LobbySnapshot, player?: Player) {
           playSound(snapshot.game.status === 'won' ? 'win' : 'place');
         useGame.getState().settle();
       },
-      useSettings.getState().animations
-        ? hasRankedWinningLine(snapshot) &&
-          !window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
-          ? RANKED_WIN_FALL_MS
-          : 440
-        : 80,
+      moveAnimationDelay(
+        snapshot.game,
+        useSettings.getState().animations,
+        Boolean(window.matchMedia?.('(prefers-reduced-motion: reduce)').matches),
+        snapshot.endReason,
+      ),
     );
 }
 
@@ -316,7 +316,11 @@ function commit(x: number, y: number) {
       if (useSettings.getState().sound) playSound(result.state.status === 'won' ? 'win' : 'place');
       useGame.getState().settle();
     },
-    useSettings.getState().animations ? 440 : 80,
+    moveAnimationDelay(
+      result.state,
+      useSettings.getState().animations,
+      Boolean(window.matchMedia?.('(prefers-reduced-motion: reduce)').matches),
+    ),
   );
 }
 

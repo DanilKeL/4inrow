@@ -2,7 +2,7 @@
 import { act, cleanup, renderHook } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { useAnimatedInteger, useResultReveal } from './useRankedPresentation';
-import { rankedResultDelay } from '../game/victoryPresentation';
+import { resultDelay } from '../game/victoryPresentation';
 import { replay } from '../game/core';
 import type { LobbySnapshot } from '../network/protocol';
 
@@ -88,10 +88,10 @@ describe('ranked result timing', () => {
       { x: 3, y: 0 },
     ]);
     const snapshot = { game, ranking: { rated: true } } as LobbySnapshot;
-    expect(rankedResultDelay(snapshot, true)).toBe(3600);
-    expect(rankedResultDelay(snapshot, false)).toBe(1600);
-    expect(rankedResultDelay({ ...snapshot, endReason: 'Соперник сдался' }, true)).toBe(600);
-    expect(rankedResultDelay({ ...snapshot, game: { ...game, status: 'draw' } }, true)).toBe(1100);
+    expect(resultDelay(snapshot.game, true)).toBe(3600);
+    expect(resultDelay(snapshot.game, false)).toBe(1600);
+    expect(resultDelay(snapshot.game, true, 'Соперник сдался')).toBe(600);
+    expect(resultDelay({ ...game, status: 'draw' }, true)).toBe(1100);
   });
 });
 

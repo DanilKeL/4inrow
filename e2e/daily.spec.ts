@@ -31,8 +31,11 @@ function dailyFixture(date: string): Promise<GeneratedDailyChallenge> {
 async function openDaily(page: Page) {
   await page.goto('/');
   await expect(page.getByTestId('loading-screen')).toBeHidden();
-  await page.getByRole('button', { name: 'Задача дня', exact: true }).click();
   const dialog = page.getByRole('dialog', { name: 'Задача дня', exact: true });
+  // The open dialog and its results tab can be restored after a real reload.
+  if (!(await dialog.isVisible()))
+    await page.getByRole('button', { name: 'Задача дня', exact: true }).click();
+  await dialog.getByRole('button', { name: 'Задача', exact: true }).click();
   await expect(dialog.getByRole('button', { name: 'Играть', exact: true })).toBeEnabled();
   return dialog;
 }

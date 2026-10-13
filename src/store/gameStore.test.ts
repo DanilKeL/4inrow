@@ -10,6 +10,7 @@ import { useMatchHistory } from './matchHistory';
 import { readSavedGame } from './savedGame';
 import { useAccount } from './accountStore';
 import { DAILY_BOT_OPTIONS, dailyExpiresAt } from '../game/daily';
+import { WIN_FALL_MS } from '../game/victoryPresentation';
 
 const mocked = vi.hoisted(() => ({
   bot: vi.fn(),
@@ -220,7 +221,10 @@ describe('input and animation coordination', () => {
     useGame.setState({ game: replay(winMoves, 6), phase: 'playing' });
     state().place(3, 0);
     expect(state().phase).toBe('animating');
-    await vi.advanceTimersByTimeAsync(440);
+    await vi.advanceTimersByTimeAsync(WIN_FALL_MS - 1);
+    expect(state().phase).toBe('animating');
+    expect(mocked.sound).not.toHaveBeenCalledWith('win');
+    await vi.advanceTimersByTimeAsync(1);
     expect(state().phase).toBe('victory');
     expect(mocked.sound).toHaveBeenLastCalledWith('win');
     state().place(4, 4);
@@ -229,6 +233,38 @@ describe('input and animation coordination', () => {
 });
 
 describe('AI turn lifecycle', () => {
+  it.each(['ai', 'level', 'daily'] as const)(
+    'slows a winning bot reply in %s and locks input until it lands',
+    async (mode) => {
+      mocked.bot.mockResolvedValue({ x: 3, y: 0 });
+      useGame.setState({
+        mode,
+        game: replay([
+          { x: 0, y: 4 },
+          { x: 0, y: 0 },
+          { x: 1, y: 4 },
+          { x: 1, y: 0 },
+          { x: 2, y: 4 },
+          { x: 2, y: 0 },
+          { x: 4, y: 4 },
+        ]),
+        phase: 'playing',
+        levelId: null,
+        dailyChallenge: null,
+      });
+      state().settle();
+      await vi.advanceTimersByTimeAsync(420);
+      expect(state().game.winner).toBe(2);
+      expect(state().phase).toBe('animating');
+      state().place(4, 0);
+      expect(state().game.history).toHaveLength(8);
+      await vi.advanceTimersByTimeAsync(WIN_FALL_MS - 1);
+      expect(mocked.sound).not.toHaveBeenCalledWith('win');
+      await vi.advanceTimersByTimeAsync(1);
+      expect(mocked.sound).toHaveBeenCalledExactlyOnceWith('win');
+      expect(state().phase).toBe('victory');
+    },
+  );
   it('waits for animation and thinking delay; locks human input through the AI turn', async () => {
     const pending = pendingBot();
     await beginBotTurn();

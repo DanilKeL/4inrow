@@ -53,7 +53,7 @@ import { Account } from '../ui/Account';
 import { Levels } from '../ui/Levels';
 import { TurnTimer } from '../ui/TurnTimer';
 import { RankedResult } from '../ui/RankedResult';
-import { hasRankedWinningLine } from '../game/victoryPresentation';
+import { hasWinningLine } from '../game/victoryPresentation';
 import { Leaderboard } from '../ui/Leaderboard';
 import { useLevelProgress } from '../store/levelStore';
 import { useMatchHistory } from '../store/matchHistory';
@@ -233,8 +233,10 @@ export default function App() {
     else setOverlay((current) => (current === 'online-pause' ? null : current));
   }, [pauseIdentity, setOverlay]);
   const isMenu = state.phase === 'menu';
-  const rankedVictory =
-    !isMenu && state.phase !== 'replay' && hasRankedWinningLine(state.online?.snapshot);
+  const victoryPresentation =
+    !isMenu &&
+    state.phase !== 'replay' &&
+    hasWinningLine(state.game, state.online?.snapshot.endReason);
   const showResumeBanner = ready && identityReady && isMenu && canContinue && !overlay;
   const savedRecordId = saved?.recordId;
   const discardSaved = useCallback(() => {
@@ -546,7 +548,7 @@ export default function App() {
             </div>
             <div
               className={styles.canvasWrap}
-              data-testid={rankedVictory ? 'victory-presentation' : undefined}
+              data-testid={victoryPresentation ? 'victory-presentation' : undefined}
               onContextMenu={(event) => event.preventDefault()}
             >
               <ErrorBoundary onError={handleSceneError}>
@@ -560,7 +562,12 @@ export default function App() {
                 >
                   <GameScene
                     game={shown}
-                    rankedVictory={rankedVictory}
+                    victoryPresentation={victoryPresentation}
+                    victoryId={
+                      hasWinningLine(state.game, state.online?.snapshot.endReason)
+                        ? state.recordId
+                        : undefined
+                    }
                     onPlace={state.place}
                     interactive={!isMenu && canPlace(state) && !overlay}
                     xray={!isMenu && state.xray}

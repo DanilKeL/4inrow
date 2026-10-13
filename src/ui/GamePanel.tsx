@@ -13,6 +13,10 @@ import { getLevel, LEVELS, levelMoveCount, moveLabel } from '../game/levels';
 import { useLevelProgress } from '../store/levelStore';
 import { useDaily } from '../store/dailyStore';
 import { dailyMoveCount } from '../game/daily';
+import { useReducedMotion } from 'motion/react';
+import { useSettings } from '../store/settingsStore';
+import { resultDelay } from '../game/victoryPresentation';
+import { useResultReveal } from './useRankedPresentation';
 
 export function timeLabel(seconds: number) {
   return `${Math.floor(seconds / 60)
@@ -32,6 +36,13 @@ export function GamePanel({
   const state = useGame();
   const { game, phase } = state;
   const finished = game.status !== 'playing';
+  const animations = useSettings((settings) => settings.animations);
+  const reducedMotion = useReducedMotion();
+  const showResult = useResultReveal(
+    finished && phase !== 'menu' && phase !== 'replay' ? state.recordId : null,
+    resultDelay(game, animations && !reducedMotion, state.online?.snapshot.endReason),
+    true,
+  );
   const level = getLevel(state.levelId);
   const daily = useDaily();
   const challenge = state.mode === 'daily' ? state.dailyChallenge : null;
@@ -43,7 +54,9 @@ export function GamePanel({
       : 0;
   const result = daily.result?.id === state.recordId ? daily.result : null;
   return (
-    <aside className={styles.gamePanel}>
+    <aside
+      className={`${styles.gamePanel} ${showResult && animations ? styles.resultRevealed : ''}`}
+    >
       <div className={styles.panelEyebrow}>
         {challenge
           ? 'ЗАДАЧА ДНЯ'
@@ -59,7 +72,7 @@ export function GamePanel({
         <>
           <h2>Повтор партии</h2>
         </>
-      ) : finished ? (
+      ) : showResult ? (
         <>
           <Trophy size={30} className={styles.trophy} />
           <h2>
@@ -195,7 +208,7 @@ export function GamePanel({
             Завершить просмотр
           </button>
         </>
-      ) : finished && challenge ? (
+      ) : showResult && challenge ? (
         <>
           <button className={styles.primary} onClick={state.restart}>
             <RotateCcw size={17} /> Повторить задачу
@@ -207,7 +220,7 @@ export function GamePanel({
             Главное меню
           </button>
         </>
-      ) : finished && level ? (
+      ) : showResult && level ? (
         <>
           {game.winner === 1 && level.id < LEVELS.length && (
             <button className={styles.primary} onClick={() => state.startLevel(level.id + 1)}>
@@ -226,7 +239,7 @@ export function GamePanel({
             К уровням
           </button>
         </>
-      ) : finished ? (
+      ) : showResult ? (
         <>
           <button
             className={styles.primary}
