@@ -1,3 +1,4 @@
+import { skinImageUrl } from '../skins/imageAssets';
 import { lazy, Suspense, useCallback, useEffect, useMemo, useState } from 'react';
 import { Check, Palette, Pencil, Plus, RefreshCw, Save, Trash2, X } from 'lucide-react';
 import { createGame, makeMove } from '../game/core';
@@ -6,6 +7,7 @@ import {
   blankDesign,
   nocturneDesign,
   pickmiDesign,
+  animeDesign,
   type SkinDesign,
   type SurfaceDesign,
 } from '../skins/design';
@@ -71,6 +73,9 @@ function SwatchDecoration({ surface }: { surface: SurfaceDesign }) {
     heart: '♥',
     bow: '⋈',
     blossom: '✿',
+    sakura: '✿',
+    kitsune: '◇',
+    crest: '☽',
   };
   return (
     <g>
@@ -106,6 +111,17 @@ function SwatchDecoration({ surface }: { surface: SurfaceDesign }) {
               transform={`rotate(${angle} 100 51)`}
             />
           ))}
+        {surface.pattern === 'sakura-waves' && (
+          <>
+            <path d="M17 75Q42 15 58 37T93 21M164 17Q150 72 120 60T79 83" />
+            <path d="M19 56Q54 35 96 51T181 57M18 64Q60 43 98 59T183 65" />
+            <g fill="#ed99b0" stroke="none">
+              {[34, 53, 154, 126].map((x, i) => (
+                <circle key={x} cx={x} cy={28 + i * 13} r="3" />
+              ))}
+            </g>
+          </>
+        )}
         {surface.pattern === 'gingham' && (
           <g fill={surface.ink} stroke="none" opacity="0.6">
             {Array.from({ length: 9 }, (_, i) => (
@@ -143,7 +159,7 @@ function SwatchDecoration({ surface }: { surface: SurfaceDesign }) {
           >
             {layer.kind === 'image' ? (
               <image
-                href={`/appearance/assets/${layer.imageId}`}
+                href={skinImageUrl(layer.imageId)}
                 x={-layer.size * 36}
                 y={-layer.size * 36}
                 width={layer.size * 72}
@@ -557,6 +573,23 @@ export default function SkinsPanel({ onUnauthorized }: { onUnauthorized: () => v
                   >
                     <Palette size={15} />
                     Пикми
+                  </button>
+                  <button
+                    type="button"
+                    disabled={locked}
+                    data-testid="anime-design-preset"
+                    onClick={() => {
+                      const template = catalog.skins.find((skin) => skin.id === 'sakura-nocturne');
+                      setDraft({
+                        ...draft,
+                        artwork: undefined,
+                        palette: template ? structuredClone(template.palette) : draft.palette,
+                        design: animeDesign(),
+                      });
+                    }}
+                  >
+                    <Palette size={15} />
+                    Лунная сакура
                   </button>
                 </div>
                 {draft.design && (

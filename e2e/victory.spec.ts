@@ -1,5 +1,5 @@
 import { test, expect, type Page } from '@playwright/test';
-import { columnPosition, openGame, place } from './helpers';
+import { openGame, place } from './helpers';
 
 interface Sample {
   elapsedMs: number;
@@ -11,6 +11,7 @@ interface Sample {
   cameraPosition?: number[];
   cameraTarget?: number[];
   cameraPixelScale?: number;
+  winningBounds?: number[][];
 }
 interface Timeline {
   early: Sample | null;
@@ -110,6 +111,16 @@ async function checkVictory(page: Page, title: RegExp | string) {
   expect(timeline.line!.renderedWinningLines).toBeGreaterThanOrEqual(1);
   expect(timeline.line!.controls).toBe(false);
   expect(timeline.line!.canvasHeight).toBeCloseTo(timeline.drop!.canvasHeight, 0);
+  // Check the actual chip bounds, including the raised final chip, after the orbit.
+  for (const sample of [timeline.settled!, timeline.dragged!, timeline.line!]) {
+    expect(sample.winningBounds!.length).toBeGreaterThanOrEqual(32);
+    for (const [x, y, z] of sample.winningBounds!) {
+      expect(Math.abs(x)).toBeLessThan(0.81);
+      expect(Math.abs(y)).toBeLessThan(0.81);
+      expect(z).toBeGreaterThan(-1);
+      expect(z).toBeLessThan(1);
+    }
+  }
   await expect(page.getByRole('heading', { name: title })).toBeVisible();
   await expect(page.getByRole('dialog')).toHaveCount(0);
   await expect(page.getByTestId('ranked-result')).toHaveCount(0);
@@ -117,6 +128,10 @@ async function checkVictory(page: Page, title: RegExp | string) {
   expect(finalFrame.cameraPixelScale).toBeCloseTo(timeline.settled!.cameraPixelScale!, 5);
   for (const [index, value] of timeline.settled!.cameraPosition!.entries())
     expect(finalFrame.cameraPosition![index]).toBeCloseTo(value, 6);
+  for (const [x, y] of finalFrame.winningBounds!) {
+    expect(Math.abs(x)).toBeLessThan(1);
+    expect(Math.abs(y)).toBeLessThan(1);
+  }
   const finishedPose = await page.evaluate(
     () => window.__fourScene!.getVictoryPresentationState()!.cameraPosition,
   );
@@ -136,7 +151,7 @@ async function checkVictory(page: Page, title: RegExp | string) {
   ).not.toEqual(finishedPose);
 }
 
-test('a local win shows the slow final move on mobile, keeping the board size and inline result', async ({
+test('a local win frames the whole line after maximum mobile zoom, keeping the board size and inline result', async ({
   page,
 }) => {
   await page.setViewportSize({ width: 390, height: 844 });
@@ -150,9 +165,18 @@ test('a local win shows the slow final move on mobile, keeping the board size an
     [2, 4],
   ].entries())
     await place(page, x, y, index + 1);
+  const canvas = await page.getByTestId('game-canvas').boundingBox();
+  await page.mouse.move(canvas!.x + canvas!.width / 2, canvas!.y + canvas!.height / 2);
+  await page.mouse.wheel(0, -12000);
+  await page.waitForTimeout(300);
   await observeVictory(page);
-  const point = await columnPosition(page, 3, 0);
-  await page.mouse.click(point.screenX, point.screenY);
+  // The far edge can be outside the zoomed viewport. Complete the same legal move
+  // through the store, then verify the real camera and rendered falling piece.
+  await page.evaluate(async () => {
+    const storePath = '/src/store/gameStore.ts';
+    const { useGame } = await import(storePath);
+    useGame.getState().place(3, 0);
+  });
   await checkVictory(page, /Победа:/);
   await page.getByRole('button', { name: 'Ещё партия', exact: true }).click();
   await expect(page.getByTestId('move-count')).toHaveText('0 / 125');

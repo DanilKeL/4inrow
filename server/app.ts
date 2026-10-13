@@ -1,7 +1,8 @@
-import { randomBytes, randomInt, randomUUID, timingSafeEqual } from 'node:crypto';
+import { builtinSkinImageUrl } from '../src/skins/builtinAssets.ts';
+import { createHash, randomBytes, randomInt, randomUUID, timingSafeEqual } from 'node:crypto';
 import { createServer, type Server } from 'node:http';
 import { createReadStream } from 'node:fs';
-import { stat } from 'node:fs/promises';
+import { stat, readFile } from 'node:fs/promises';
 import { resolve, sep, extname } from 'node:path';
 import { WebSocket, WebSocketServer } from 'ws';
 import { createGame, makeMove, SIZE, type Player } from '../src/game/core/index.ts';
@@ -227,7 +228,18 @@ export function createOnlineServer(options: OnlineServerOptions = {}) {
           res.writeHead(405).end();
           return;
         }
-        const asset = statistics.skinAssets.get(pathname.slice('/appearance/assets/'.length));
+        const id = pathname.slice('/appearance/assets/'.length);
+        let asset = statistics.skinAssets.get(id);
+        const builtinUrl = builtinSkinImageUrl(id);
+        if (!asset && builtinUrl && staticRoot) {
+          try {
+            const bytes = await readFile(resolve(staticRoot, builtinUrl.slice(1)));
+            if (createHash('sha256').update(bytes).digest('hex') === id)
+              asset = { id, bytes, mime: 'image/webp', width: 1024, height: 1024 };
+          } catch {
+            // Missing stock artwork uses the same 404 contract as a missing upload.
+          }
+        }
         if (!asset) {
           res.setHeader('Cache-Control', 'no-store');
           res.writeHead(404).end();
@@ -237,7 +249,12 @@ export function createOnlineServer(options: OnlineServerOptions = {}) {
         res.setHeader('Content-Type', asset.mime);
         res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
         res.setHeader('ETag', etag);
-        if (req.headers['if-none-match']?.split(',').map((value) => value.trim()).includes(etag)) {
+        if (
+          req.headers['if-none-match']
+            ?.split(',')
+            .map((value) => value.trim())
+            .includes(etag)
+        ) {
           res.writeHead(304).end();
           return;
         }

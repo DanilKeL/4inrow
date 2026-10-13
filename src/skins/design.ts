@@ -1,3 +1,5 @@
+import { ANIME_HEROINE_IMAGE_ID } from './builtinAssets.ts';
+
 export const SURFACES = ['board', 'darkCap', 'darkBody', 'lightCap', 'lightBody'] as const;
 export type SurfaceName = (typeof SURFACES)[number];
 export const PATTERNS = [
@@ -8,6 +10,7 @@ export const PATTERNS = [
   'guilloche',
   'marble',
   'gingham',
+  'sakura-waves',
 ] as const;
 export type Pattern = (typeof PATTERNS)[number];
 export const MOTIFS = [
@@ -21,6 +24,9 @@ export const MOTIFS = [
   'heart',
   'bow',
   'blossom',
+  'sakura',
+  'kitsune',
+  'crest',
 ] as const;
 export type Motif = (typeof MOTIFS)[number];
 export type Placement = 'single' | 'corners' | 'grid';
@@ -305,6 +311,72 @@ export function pickmiDesign(): SkinDesign {
       size: 0.14,
       placement: 'grid',
       opacity: 0.75,
+    },
+  ];
+  return design;
+}
+/** Moonlit Sakura: original anime artwork paired with editable lacquer and foil ornaments. */
+export function animeDesign(): SkinDesign {
+  const design = blankDesign('#abcce2');
+  const { board, darkCap, lightCap, darkBody, lightBody } = design.surfaces;
+  Object.assign(board, {
+    pattern: 'sakura-waves',
+    patternScale: 0.95,
+    patternOpacity: 0.6,
+    border: true,
+    roughness: 0.31,
+    metalness: 0.22,
+  });
+  board.layers = [
+    {
+      ...motifLayer('crest', '#b3d7ef', 'silver-seals'),
+      size: 0.13,
+      opacity: 0.85,
+      placement: 'corners',
+    },
+    { ...motifLayer('kitsune', '#ee9fab', 'fox-seal'), x: 0.5, y: 0.935, size: 0.07 },
+  ];
+  Object.assign(darkCap, { ink: '#c6e4f4', border: true, roughness: 0.3, metalness: 0.1 });
+  darkCap.layers = [
+    { ...imageLayer(ANIME_HEROINE_IMAGE_ID, '#ffffff', 'moonlit-heroine'), size: 0.86, y: 0.48 },
+  ];
+  Object.assign(lightCap, { ink: '#93718e', border: true, roughness: 0.34, metalness: 0.08 });
+  lightCap.layers = [
+    { ...motifLayer('kitsune', '#34436b', 'silver-fox'), size: 0.66 },
+    { ...motifLayer('sakura', '#d3779d', 'sakura-mark'), x: 0.74, y: 0.25, size: 0.18 },
+  ];
+  Object.assign(darkBody, {
+    pattern: 'sakura-waves',
+    ink: '#a7cbe7',
+    patternScale: 1.4,
+    patternOpacity: 0.24,
+    border: true,
+    roughness: 0.34,
+    metalness: 0.12,
+  });
+  darkBody.layers = [
+    {
+      ...motifLayer('sakura', '#ec9ab3', 'falling-sakura'),
+      size: 0.2,
+      placement: 'grid',
+      opacity: 0.68,
+    },
+  ];
+  Object.assign(lightBody, {
+    pattern: 'sakura-waves',
+    ink: '#7d89b4',
+    patternScale: 1.6,
+    patternOpacity: 0.17,
+    border: true,
+    roughness: 0.35,
+    metalness: 0.07,
+  });
+  lightBody.layers = [
+    {
+      ...motifLayer('crest', '#4b5b87', 'moon-ribbon'),
+      size: 0.15,
+      placement: 'grid',
+      opacity: 0.6,
     },
   ];
   return design;

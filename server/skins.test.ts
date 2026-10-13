@@ -5,7 +5,13 @@ import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { SkinsStore } from './skins';
 import { BUILTIN_SKINS, defaultCatalog, DEFAULT_ROOM_COLOR, isCatalog } from '../src/skins/catalog';
-import { blankDesign, imageLayer, motifLayer, nocturneDesign } from '../src/skins/design';
+import {
+  animeDesign,
+  blankDesign,
+  imageLayer,
+  motifLayer,
+  nocturneDesign,
+} from '../src/skins/design';
 
 const databases: DatabaseSync[] = [];
 const directories: string[] = [];
@@ -168,4 +174,51 @@ it('activates Pickmi, preserves its editable ornaments in copies, and keeps the 
     ),
   ).toThrow();
   expect(store.get().activeSkinId).toBe('pickmi');
+});
+
+it('copies Sakura without uploads, edits its composition independently and restores it from SQLite', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'four-sakura-'));
+  directories.push(dir);
+  const file = join(dir, 'statistics.sqlite');
+  const store = open(file);
+  const template = store.get().skins.find((skin) => skin.id === 'sakura-nocturne')!;
+  expect(template.design).toEqual(animeDesign());
+  const active = store.activate(template.id, 0);
+  const copied = store.save({
+    name: 'Моя лунная сакура',
+    palette: template.palette,
+    design: template.design,
+    expectedRevision: active.revision,
+  });
+  expect(copied.skins.find((skin) => skin.id === copied.savedSkinId)?.design).toEqual(
+    template.design,
+  );
+  const design = structuredClone(template.design!);
+  design.surfaces.board.ink = '#d8b7ff';
+  design.surfaces.darkCap.layers.push(motifLayer('crest', '#d8b7ff', 'my-crest'));
+  const palette = structuredClone(template.palette);
+  palette.room = '#e8dcf0';
+  const edited = store.save(
+    { name: 'Моя лунная сакура', palette, design, expectedRevision: copied.revision },
+    copied.savedSkinId,
+  );
+  const selected = store.activate(copied.savedSkinId, edited.revision);
+  expect(selected.skins.find((skin) => skin.id === template.id)).toEqual(template);
+  expect(selected.skins.find((skin) => skin.id === copied.savedSkinId)).toMatchObject({
+    builtin: false,
+    palette,
+    design,
+  });
+  expect(() =>
+    store.save(
+      { name: 'Change template', palette, design, expectedRevision: selected.revision },
+      template.id,
+    ),
+  ).toThrow('собственной копии');
+  expect(() => store.remove(template.id, selected.revision)).toThrow('удалять нельзя');
+  expect(store.get()).toEqual(selected);
+  databases.pop()!.close();
+  const restored = open(file);
+  expect(restored.get()).toEqual(selected);
+  expect(isCatalog(restored.get())).toBe(true);
 });

@@ -29,7 +29,7 @@ import {
 import type { Line2, LineSegments2, OrbitControls as OrbitControlsImpl } from 'three-stdlib';
 import type { GameState, Move, Position } from '../game/core';
 import { WIN_CAMERA_MS, WIN_FALL_MS, WIN_LINE_MS } from '../game/victoryPresentation';
-import { preserveVictoryFraming, releaseVictoryOrbit } from './victoryCamera';
+import { fitVictoryCamera, preserveVictoryFraming, releaseVictoryOrbit } from './victoryCamera';
 import { displayedHeight, visibleLineSegments } from './layers';
 import {
   rankedSegmentProgress,
@@ -97,6 +97,12 @@ declare global {
         screenY: number;
       }>;
       getVictoryPresentationState: () => VictoryPresentationState | null;
+      getRenderedPieces: () => Array<{
+        index: number;
+        opacities: number[];
+        transparent: boolean[];
+        depthWrite: boolean[];
+      }>;
       getRenderedWinningLines: () => Array<{
         visible: boolean;
         materialVisible: boolean;
@@ -116,6 +122,7 @@ type VictoryPresentationState = ReturnType<typeof rankedVictoryProgress> & {
   cameraTarget?: number[];
   cameraLocked?: boolean;
   cameraPixelScale?: number;
+  winningBounds?: number[][];
 };
 type VictoryDiagnostics = RefObject<(() => VictoryPresentationState | null) | null>;
 
@@ -419,15 +426,16 @@ function Piece({
       introduction === undefined ||
       !animate ||
       (revealed && introAge.current >= introduction + 0.8);
+    // Preset pieces survive retries. A finished victory may have dimmed their
+    // materials even when the opacity prop stays at 1 in the next attempt.
+    const settledOpacity = opacity * (victory && opacity === 1 ? 0.52 : 1);
     if (
       !latest &&
       !winner &&
-      (!victory ||
-        (victoryAge >= WIN_CAMERA_MS + WIN_FALL_MS + WIN_LINE_MS &&
-          appliedOpacity.current === opacity * (opacity === 1 ? 0.52 : 1))) &&
+      (!victory || victoryAge >= WIN_CAMERA_MS + WIN_FALL_MS + WIN_LINE_MS) &&
       introFinished &&
       fade.current.elapsed >= 0.15 &&
-      appliedOpacity.current !== null &&
+      appliedOpacity.current === settledOpacity &&
       group.current?.visible === visible &&
       Math.abs((group.current?.position.y ?? settledY) - settledY) < 0.0001
     )
@@ -441,7 +449,9 @@ function Piece({
     if (transition.elapsed < 0.15) {
       transition.elapsed = animate ? Math.min(0.15, transition.elapsed + delta) : 0.15;
       transition.value =
-        transition.from + (transition.target - transition.from) * (transition.elapsed / 0.15);
+        transition.elapsed === 0.15
+          ? transition.target
+          : transition.from + (transition.target - transition.from) * (transition.elapsed / 0.15);
     }
     const dimming = victory && !winner && opacity === 1 ? 1 - 0.48 * victory.dimProgress : 1;
     const renderedOpacity = transition.value * entranceOpacity * dimming;
@@ -484,7 +494,12 @@ function Piece({
           : 0.35;
   });
   return (
-    <group ref={group} position={pos} visible={visible && (introduction === undefined || !animate)}>
+    <group
+      ref={group}
+      name={import.meta.env.DEV && !ghost ? `game-piece-${move.index}` : undefined}
+      position={pos}
+      visible={visible && (introduction === undefined || !animate)}
+    >
       <mesh geometry={geometry}>
         <meshStandardMaterial
           ref={bodyMaterial}
@@ -607,9 +622,6 @@ function CameraRig({
     destination.current = null;
     if (cinematic.current?.key === victoryClock.key) return;
     const points = game.winningLines[0];
-    const center = points
-      .reduce<Vector3>((sum, p) => sum.add(new Vector3(...position(p))), new Vector3())
-      .divideScalar(points.length);
     const fromTarget = orbit.target.clone();
     const from = new Spherical().setFromVector3(camera.position.clone().sub(fromTarget));
     const direction = new Vector3(...position(points.at(-1)!)).sub(
@@ -625,16 +637,19 @@ function CameraRig({
             (a, b) => Math.abs(a) - Math.abs(b),
           )[0];
     const fit = Math.max(1, 0.9 / (size.width / size.height));
+    const framed = fitVictoryCamera(
+      game.winningLines.flat().map((point) => new Vector3(...position(point))),
+      new Vector3(...position(game.history.at(-1)!)),
+      new Spherical(Math.max(7, Math.min(from.radius * 0.9, 10.5 * fit)), 0.82, from.theta + turn),
+      camera instanceof PerspectiveCamera ? camera.fov : (cameraFov ?? 35),
+      size.width / size.height,
+    );
     cinematic.current = {
       key: victoryClock.key,
       from,
-      to: new Spherical(
-        Math.max(7, Math.min(from.radius * 0.9, 10.5 * fit)),
-        0.82,
-        from.theta + turn,
-      ),
+      to: framed.pose,
       fromTarget,
-      toTarget: center.multiplyScalar(0.65),
+      toTarget: framed.target,
       offset: new Vector3(),
       pose: new Spherical(),
       height: size.height,
@@ -698,6 +713,31 @@ function CameraRig({
   useEffect(() => {
     if (!import.meta.env.DEV) return;
     const api = {
+      getRenderedPieces: () => {
+        const pieces: Array<{
+          index: number;
+          opacities: number[];
+          transparent: boolean[];
+          depthWrite: boolean[];
+        }> = [];
+        scene.traverse((object) => {
+          if (!object.name.startsWith('game-piece-')) return;
+          const materials = object.children
+            .slice(0, 2)
+            .flatMap((child) =>
+              child instanceof Mesh && child.material instanceof MeshStandardMaterial
+                ? [child.material]
+                : [],
+            );
+          pieces.push({
+            index: Number(object.name.slice('game-piece-'.length)),
+            opacities: materials.map((material) => material.opacity),
+            transparent: materials.map((material) => material.transparent),
+            depthWrite: materials.map((material) => material.depthWrite),
+          });
+        });
+        return pieces;
+      },
       getVictoryPresentationState: () => {
         const state = victoryDiagnostics.current?.();
         return state
@@ -706,6 +746,25 @@ function CameraRig({
               cameraPosition: camera.position.toArray(),
               cameraTarget: controls.current?.target.toArray(),
               cameraLocked: !controls.current?.enabled,
+              winningBounds: game.winningLines.flat().flatMap((point) => {
+                const move = game.history.find(
+                  (move) => move.x === point.x && move.y === point.y && move.z === point.z,
+                )!;
+                const piece = scene.getObjectByName(`game-piece-${move.index}`);
+                const center = new Vector3(...position(point));
+                if (piece) center.y = piece.position.y;
+                return [-0.42, 0.42].flatMap((x) =>
+                  [-0.3, 0.3].flatMap((y) =>
+                    [-0.42, 0.42].map((z) =>
+                      center
+                        .clone()
+                        .add(new Vector3(x, y, z))
+                        .project(camera)
+                        .toArray(),
+                    ),
+                  ),
+                );
+              }),
               cameraPixelScale:
                 camera instanceof PerspectiveCamera
                   ? size.height / (2 * Math.tan((camera.fov * Math.PI) / 360))
@@ -761,7 +820,17 @@ function CameraRig({
     return () => {
       if (window.__fourScene === api) delete window.__fourScene;
     };
-  }, [camera, gl, scene, game.heights, layers, victoryDiagnostics, size.height]);
+  }, [
+    camera,
+    gl,
+    scene,
+    game.heights,
+    game.history,
+    game.winningLines,
+    layers,
+    victoryDiagnostics,
+    size.height,
+  ]);
   useFrame((_, delta) => {
     const orbit = controls.current;
     if (!orbit) return;

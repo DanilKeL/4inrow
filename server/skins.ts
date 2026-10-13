@@ -1,3 +1,4 @@
+import { builtinSkinImageUrl } from '../src/skins/builtinAssets.ts';
 import type { DatabaseSync } from 'node:sqlite';
 import { randomBytes } from 'node:crypto';
 import { AuthError } from './auth.ts';
@@ -90,7 +91,11 @@ export class SkinsStore {
         : { design: structuredClone(data.design) as Skin['design'] }),
     };
     if (!isSkin(skin)) throw new AuthError(400, 'Некорректный стиль.');
-    if (designImageIds(skin.design).some((image) => !this.hasAsset(image)))
+    if (
+      designImageIds(skin.design).some(
+        (image) => !builtinSkinImageUrl(image) && !this.hasAsset(image),
+      )
+    )
       throw new AuthError(400, 'Сначала загрузите все картинки стиля.');
     const catalog = this.change(data.expectedRevision, (saved) => {
       if (id && !saved.custom.some((current) => current.id === id))

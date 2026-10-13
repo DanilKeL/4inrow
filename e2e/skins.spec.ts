@@ -1,6 +1,9 @@
 import { expect, test } from '@playwright/test';
 import { spawn, type ChildProcess } from 'node:child_process';
 import { createHash } from 'node:crypto';
+import type { Skin } from '../src/skins/catalog';
+import { designImageIds } from '../src/skins/design';
+import { skinImageUrl } from '../src/skins/imageAssets';
 let server: ChildProcess;
 let url: string;
 test.beforeAll(async () => {
@@ -299,6 +302,124 @@ test('Pickmi renders editable hearts and ribbons, is a reusable admin template a
     const canvas = (await player.locator('canvas').boundingBox())!;
     await player.mouse.click(canvas.x + canvas.width / 2, canvas.y + canvas.height / 2);
     await expect(player.getByTestId('move-count')).toHaveText('1 / 125');
+    expect(errors).toEqual([]);
+  } finally {
+    await players.close();
+    await adminContext.close();
+  }
+});
+
+test('Sakura renders on desktop and mobile, copies as an editable template and survives offline play', async ({
+  browser,
+}, info) => {
+  test.setTimeout(90000);
+  const adminContext = await browser.newContext({ viewport: { width: 1440, height: 1000 } });
+  const players = await browser.newContext({ viewport: { width: 1440, height: 1000 } });
+  const admin = await adminContext.newPage();
+  const player = await players.newPage();
+  const errors: string[] = [];
+  for (const page of [admin, player]) page.on('pageerror', (error) => errors.push(error.message));
+  const appearance = (): Promise<Skin> =>
+    player.evaluate(() => {
+      const catalog = JSON.parse(localStorage.getItem('four-skins-v1')!);
+      return catalog.skins.find((skin: { id: string }) => skin.id === catalog.activeSkinId);
+    });
+  const signature = async () =>
+    createHash('sha256')
+      .update(await player.getByTestId('game-canvas').screenshot())
+      .digest('hex');
+  try {
+    await player.goto(url);
+    await expect(player.getByTestId('loading-screen')).toBeHidden();
+    await player.waitForTimeout(1700);
+    const previousRender = await signature();
+    await admin.goto(url + '/admin');
+    await admin.getByLabel('Пароль').fill('skin-browser-test-123');
+    await admin.getByRole('button', { name: 'Войти', exact: true }).click();
+    await admin.getByRole('button', { name: 'Оформление', exact: true }).click();
+    await admin.getByRole('button', { name: /Лунная сакура/ }).click();
+    await admin.getByRole('button', { name: 'Применить для всех', exact: true }).click();
+    await expect.poll(async () => (await appearance()).id).toBe('sakura-nocturne');
+    const template = await appearance();
+    expect(template.design!.surfaces.board.pattern).toBe('sakura-waves');
+    const imageIds = designImageIds(template.design);
+    for (const id of imageIds) {
+      await expect
+        .poll(() =>
+          player.evaluate(
+            async (assetUrl) => Boolean(await caches.match(assetUrl)),
+            skinImageUrl(id),
+          ),
+        )
+        .toBe(true);
+    }
+    await player.waitForTimeout(2000);
+    expect(await signature()).not.toBe(previousRender);
+    await player
+      .getByTestId('game-canvas')
+      .screenshot({ path: info.outputPath('anime-detail.png') });
+    await player.screenshot({ path: info.outputPath('anime-desktop.png') });
+    await player.setViewportSize({ width: 390, height: 844 });
+    await player.waitForTimeout(800);
+    await player.screenshot({ path: info.outputPath('anime-mobile.png') });
+
+    await admin.getByRole('button', { name: 'Новый стиль', exact: true }).click();
+    await admin.getByLabel('Название стиля').fill('Моя лунная сакура');
+    const editor = admin.getByTestId('skin-design-editor');
+    await expect(editor.getByLabel('Узор поверхности')).toHaveValue('sakura-waves');
+    await editor.getByLabel('Цвет узора').fill('#d8b7ff');
+    await editor.getByTestId('skin-surface-darkCap').click();
+    await editor.getByLabel('Добавляемая фигура').selectOption('sakura');
+    await editor.getByRole('button', { name: 'Добавить фигуру', exact: true }).click();
+    await editor.getByLabel('Фигура слоя').selectOption('crest');
+    await editor.getByLabel('Цвет декора').fill('#d8b7ff');
+    await admin.getByRole('button', { name: 'Сохранить стиль', exact: true }).click();
+    await expect(admin.getByRole('status')).toHaveText('Стиль сохранён.');
+    await admin.getByRole('button', { name: 'Применить для всех', exact: true }).click();
+    await expect.poll(async () => (await appearance()).name).toBe('Моя лунная сакура');
+    const copy = await appearance();
+    expect(copy.id).toMatch(/^custom-/);
+    expect(copy.builtin).toBe(false);
+    expect(copy.design!.surfaces.board.ink).toBe('#d8b7ff');
+    expect(copy.design!.surfaces.darkCap.layers.at(-1)).toMatchObject({
+      kind: 'motif',
+      motif: 'crest',
+      color: '#d8b7ff',
+    });
+    expect(designImageIds(copy.design)).toEqual(imageIds);
+    const savedTemplate = await player.evaluate(() => {
+      const catalog = JSON.parse(localStorage.getItem('four-skins-v1')!);
+      return catalog.skins.find((skin: { id: string }) => skin.id === 'sakura-nocturne');
+    });
+    expect(savedTemplate).toEqual(template);
+    await expect
+      .poll(
+        () => player.evaluate(async () => Boolean(await caches.match('/__four_offline_ready__'))),
+        { timeout: 20000 },
+      )
+      .toBe(true);
+    await players.setOffline(true);
+    await player.reload();
+    await expect(player.getByTestId('loading-screen')).toBeHidden();
+    expect(await appearance()).toEqual(copy);
+    for (const id of imageIds) {
+      const asset = await player.evaluate(async (assetUrl) => {
+        const response = await fetch(assetUrl);
+        return { status: response.status, type: response.headers.get('content-type') };
+      }, skinImageUrl(id));
+      expect(asset.status).toBe(200);
+      expect(asset.type).toMatch(/^image\/(png|jpeg|webp)/);
+    }
+    await player.waitForTimeout(2000);
+    await player.screenshot({ path: info.outputPath('anime-offline.png') });
+    await player.getByRole('button', { name: 'Вдвоём', exact: true }).click();
+    await player.getByRole('button', { name: 'Начать игру', exact: true }).click();
+    await player.getByRole('button', { name: /Начать/ }).click();
+    await player.waitForTimeout(1200);
+    const canvas = (await player.locator('canvas').boundingBox())!;
+    await player.mouse.click(canvas.x + canvas.width / 2, canvas.y + canvas.height / 2);
+    await expect(player.getByTestId('move-count')).toHaveText('1 / 125');
+    await player.screenshot({ path: info.outputPath('anime-offline-mobile.png') });
     expect(errors).toEqual([]);
   } finally {
     await players.close();

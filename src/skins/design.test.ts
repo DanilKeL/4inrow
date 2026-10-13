@@ -1,5 +1,6 @@
 import { expect, it } from 'vitest';
 import {
+  animeDesign,
   blankDesign,
   designImageIds,
   MAX_DESIGN_IMAGES,
@@ -118,4 +119,56 @@ it('upgrades old offline catalogs with Pickmi while keeping the selected skin an
   expect(restored.skins.find((skin) => skin.id === 'pickmi')?.design).toEqual(pickmiDesign());
   expect(isSkinDesign(pickmiDesign())).toBe(true);
   expect(designImageIds(pickmiDesign())).toEqual([]);
+});
+
+it('accepts the Sakura composition and gives each editable copy independent surfaces and layers', () => {
+  const original = animeDesign();
+  const copy = animeDesign();
+  expect(isSkinDesign(original)).toBe(true);
+  expect(copy).toEqual(original);
+  expect(original.surfaces.board.pattern).toBe('sakura-waves');
+  const motifs = SURFACES.flatMap((surface) =>
+    original.surfaces[surface].layers.flatMap((layer) =>
+      layer.kind === 'motif' ? [layer.motif] : [],
+    ),
+  );
+  expect(motifs).toEqual(expect.arrayContaining(['sakura', 'kitsune', 'crest']));
+  for (const surface of SURFACES) {
+    expect(copy.surfaces[surface]).not.toBe(original.surfaces[surface]);
+    expect(copy.surfaces[surface].layers).not.toBe(original.surfaces[surface].layers);
+  }
+  copy.surfaces.board.ink = '#abcdef';
+  copy.surfaces.darkCap.layers.push(motifLayer('sakura', '#abcdef', 'my-sakura'));
+  expect(original).toEqual(animeDesign());
+  expect(isSkinDesign(copy)).toBe(true);
+});
+
+it('adds Sakura to an old catalog without resetting a selected custom composition or its colors', () => {
+  const before = defaultCatalog();
+  before.skins = before.skins.filter((skin) => skin.id !== 'sakura-nocturne');
+  const custom = {
+    ...structuredClone(before.skins[0]),
+    id: `custom-${'d'.repeat(32)}`,
+    builtin: false,
+    name: 'Мой сохранённый стиль',
+    design: pickmiDesign(),
+  };
+  custom.palette.room = '#e8dcf0';
+  custom.design.surfaces.board.ink = '#a778be';
+  before.skins.push(custom);
+  before.activeSkinId = custom.id;
+  before.revision = 23;
+  const saved = structuredClone(before);
+  const restored = normalizeCatalog(before)!;
+  expect(restored.activeSkinId).toBe(custom.id);
+  expect(restored.revision).toBe(23);
+  expect(restored.skins.find((skin) => skin.id === custom.id)).toEqual(custom);
+  expect(restored.skins.find((skin) => skin.id === 'sakura-nocturne')).toMatchObject({
+    name: 'Лунная сакура',
+    builtin: true,
+    design: animeDesign(),
+  });
+  expect(isCatalog(restored)).toBe(true);
+  expect(normalizeCatalog(restored)).toEqual(restored);
+  expect(before).toEqual(saved);
 });

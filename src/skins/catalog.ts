@@ -1,4 +1,4 @@
-import { isSkinDesign, pickmiDesign, type SkinDesign } from './design.ts';
+import { isSkinDesign, pickmiDesign, animeDesign, type SkinDesign } from './design.ts';
 export type PiecePalette = { body: string; cap: string; mark: string };
 export type SkinPalette = {
   room: string;
@@ -72,6 +72,19 @@ export const BUILTIN_SKINS: readonly Skin[] = [
       accent: '#d7749e',
     },
     design: pickmiDesign(),
+  },
+  {
+    id: 'sakura-nocturne',
+    name: 'Лунная сакура',
+    builtin: true,
+    palette: {
+      room: '#e1e4ec',
+      board: { body: '#1b2848', rim: '#a9c8df', dot: '#8199c7' },
+      dark: { body: '#1c2a4a', cap: '#26375c', mark: '#d7e2f9' },
+      light: { body: '#e4e2f0', cap: '#f9ebed', mark: '#896780' },
+      accent: '#f08dac',
+    },
+    design: animeDesign(),
   },
 ];
 export const DEFAULT_SKIN_ID = 'coffee-board';

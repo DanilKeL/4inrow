@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { defaultCatalog, DEFAULT_ROOM_COLOR, type SkinCatalog } from '../skins/catalog';
+import { animeDesign, motifLayer } from '../skins/design';
 import { initializeAppearance, useAppearance } from './appearanceStore';
 
 class Stream extends EventTarget {
@@ -67,6 +68,49 @@ it('adds a newly shipped template without resetting an old offline selection', (
   expect(
     useAppearance.getState().catalog.skins.find((skin) => skin.id === 'nocturne')?.artwork,
   ).toBe('nocturne');
+});
+
+it('caches a newly shipped Sakura template while preserving an old offline custom selection', () => {
+  const old = changed('coffee-pieces', 14);
+  old.skins = old.skins.filter((skin) => skin.id !== 'sakura-nocturne');
+  const custom = {
+    ...structuredClone(old.skins[0]),
+    id: `custom-${'e'.repeat(32)}`,
+    builtin: false,
+    name: 'Сохранённая палитра',
+  };
+  custom.palette.board.body = '#b8a0d2';
+  old.skins.push(custom);
+  old.activeSkinId = custom.id;
+  useAppearance.getState().setCatalog(old);
+  const cached = JSON.parse(localStorage.getItem('four-skins-v1')!) as SkinCatalog;
+  expect(cached).toEqual(useAppearance.getState().catalog);
+  expect(cached.activeSkinId).toBe(custom.id);
+  expect(cached.revision).toBe(14);
+  expect(cached.skins.find((skin) => skin.id === custom.id)).toEqual(custom);
+  expect(cached.skins.find((skin) => skin.id === 'sakura-nocturne')?.design).toEqual(animeDesign());
+});
+
+it('retains the edited Sakura copy when appearance requests fail offline', async () => {
+  const catalog = changed('sakura-nocturne', 19);
+  const template = catalog.skins.find((skin) => skin.id === 'sakura-nocturne')!;
+  const copy = {
+    ...structuredClone(template),
+    id: `custom-${'f'.repeat(32)}`,
+    name: 'Моя лунная сакура',
+    builtin: false,
+  };
+  copy.design!.surfaces.board.ink = '#d8b7ff';
+  copy.design!.surfaces.darkCap.layers.push(motifLayer('crest', '#d8b7ff', 'my-crest'));
+  catalog.skins.push(copy);
+  catalog.activeSkinId = copy.id;
+  useAppearance.getState().setCatalog(catalog);
+  vi.mocked(fetch).mockRejectedValue(new TypeError('Failed to fetch'));
+  stop = initializeAppearance();
+  await vi.waitFor(() => expect(Stream.instances).toHaveLength(1));
+  expect(useAppearance.getState().catalog).toEqual(catalog);
+  expect(JSON.parse(localStorage.getItem('four-skins-v1')!)).toEqual(catalog);
+  expect(template.design).toEqual(animeDesign());
 });
 
 it('updates live, caches valid skins for offline play, and ignores malformed events', async () => {
