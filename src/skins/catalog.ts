@@ -1,4 +1,4 @@
-import { isSkinDesign, type SkinDesign } from './design.ts';
+import { isSkinDesign, pickmiDesign, type SkinDesign } from './design.ts';
 export type PiecePalette = { body: string; cap: string; mark: string };
 export type SkinPalette = {
   room: string;
@@ -59,6 +59,19 @@ export const BUILTIN_SKINS: readonly Skin[] = [
       light: { body: '#e3dac5', cap: '#f2ead8', mark: '#76532e' },
       accent: '#d2b473',
     },
+  },
+  {
+    id: 'pickmi',
+    name: 'Пикми',
+    builtin: true,
+    palette: {
+      room: '#eee6e8',
+      board: { body: '#f4dce3', rim: '#c19aa3', dot: '#aa7389' },
+      dark: { body: '#9f4263', cap: '#ae4c71', mark: '#ffe5e4' },
+      light: { body: '#fff0dc', cap: '#fff7e9', mark: '#bd8297' },
+      accent: '#d7749e',
+    },
+    design: pickmiDesign(),
   },
 ];
 export const DEFAULT_SKIN_ID = 'coffee-board';

@@ -7,9 +7,21 @@ export const PATTERNS = [
   'artdeco',
   'guilloche',
   'marble',
+  'gingham',
 ] as const;
 export type Pattern = (typeof PATTERNS)[number];
-export const MOTIFS = ['moon', 'sun', 'star', 'lotus', 'laurel', 'diamond', 'rings'] as const;
+export const MOTIFS = [
+  'moon',
+  'sun',
+  'star',
+  'lotus',
+  'laurel',
+  'diamond',
+  'rings',
+  'heart',
+  'bow',
+  'blossom',
+] as const;
 export type Motif = (typeof MOTIFS)[number];
 export type Placement = 'single' | 'corners' | 'grid';
 type LayerBase = {
@@ -216,6 +228,85 @@ export function nocturneDesign(): SkinDesign {
     roughness: 0.44,
     metalness: 0.08,
   });
+  return design;
+}
+/** A porcelain-and-ribbon composition; every ornament remains editable. */
+export function pickmiDesign(): SkinDesign {
+  const design = blankDesign('#cf91a1');
+  const { board, darkCap, lightCap, darkBody, lightBody } = design.surfaces;
+  Object.assign(board, {
+    pattern: 'gingham',
+    patternScale: 1.1,
+    patternOpacity: 0.18,
+    border: true,
+    roughness: 0.34,
+    metalness: 0.04,
+  });
+  board.layers = [
+    {
+      ...motifLayer('bow', '#b96583', 'corner-ribbons'),
+      size: 0.11,
+      placement: 'corners',
+      opacity: 0.9,
+    },
+    { ...motifLayer('heart', '#bd718c', 'little-heart'), x: 0.5, y: 0.927, size: 0.073 },
+    {
+      ...motifLayer('blossom', '#fffbf3', 'porcelain-flowers'),
+      size: 0.05,
+      placement: 'grid',
+      opacity: 0.72,
+    },
+  ];
+  Object.assign(darkCap, { ink: '#ffe8ec', border: true, roughness: 0.28, metalness: 0.02 });
+  darkCap.layers = [
+    { ...motifLayer('heart', '#ffecdf', 'cream-heart'), size: 0.5 },
+    {
+      ...motifLayer('star', '#ffe7e9', 'tiny-sparkle'),
+      x: 0.74,
+      y: 0.26,
+      size: 0.11,
+      opacity: 0.8,
+    },
+  ];
+  Object.assign(lightCap, { ink: '#bf8599', border: true, roughness: 0.3, metalness: 0.02 });
+  lightCap.layers = [
+    { ...motifLayer('bow', '#b65074', 'berry-bow'), size: 0.58 },
+    { ...motifLayer('blossom', '#d58aa2', 'tiny-flower'), x: 0.27, y: 0.26, size: 0.13 },
+  ];
+  Object.assign(darkBody, {
+    pattern: 'gingham',
+    ink: '#fff0e8',
+    patternOpacity: 0.12,
+    patternScale: 1.5,
+    border: true,
+    roughness: 0.32,
+    metalness: 0.03,
+  });
+  darkBody.layers = [
+    {
+      ...motifLayer('heart', '#ffdfdf', 'ribbon-hearts'),
+      size: 0.13,
+      placement: 'grid',
+      opacity: 0.7,
+    },
+  ];
+  Object.assign(lightBody, {
+    pattern: 'gingham',
+    ink: '#d694aa',
+    patternOpacity: 0.24,
+    patternScale: 1.5,
+    border: true,
+    roughness: 0.32,
+    metalness: 0.03,
+  });
+  lightBody.layers = [
+    {
+      ...motifLayer('blossom', '#b97b96', 'ribbon-flowers'),
+      size: 0.14,
+      placement: 'grid',
+      opacity: 0.75,
+    },
+  ];
   return design;
 }
 export function designImageIds(design?: SkinDesign): string[] {

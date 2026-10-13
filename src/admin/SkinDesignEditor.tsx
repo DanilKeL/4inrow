@@ -34,6 +34,7 @@ const patternNames: Record<Pattern, string> = {
   artdeco: 'Арт-деко',
   guilloche: 'Гильоше',
   marble: 'Мрамор',
+  gingham: 'Клеточка',
 };
 const motifNames: Record<Motif, string> = {
   moon: 'Луна',
@@ -43,6 +44,9 @@ const motifNames: Record<Motif, string> = {
   laurel: 'Лавр',
   diamond: 'Ромб',
   rings: 'Кольца',
+  heart: 'Сердечко',
+  bow: 'Бантик',
+  blossom: 'Цветок',
 };
 const layerName = (layer: DesignLayer) =>
   layer.kind === 'motif' ? motifNames[layer.motif] : 'Изображение';
@@ -398,6 +402,9 @@ export default function SkinDesignEditor({
                           laurel: '❦',
                           diamond: '◇',
                           rings: '◎',
+                          heart: '♥',
+                          bow: '⋈',
+                          blossom: '✿',
                         }[layer.motif]}
                     </span>
                   )}

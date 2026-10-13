@@ -244,3 +244,64 @@ test('admin creates skins, previews without changing the game, applies live and 
     await adminContext.close();
   }
 });
+
+test('Pickmi renders editable hearts and ribbons, is a reusable admin template and works offline', async ({
+  browser,
+}, info) => {
+  test.setTimeout(90000);
+  const adminContext = await browser.newContext({ viewport: { width: 1440, height: 1000 } });
+  const players = await browser.newContext({ viewport: { width: 1440, height: 1000 } });
+  const admin = await adminContext.newPage();
+  const player = await players.newPage();
+  const errors: string[] = [];
+  for (const page of [admin, player]) page.on('pageerror', (error) => errors.push(error.message));
+  const appearance = () =>
+    player.evaluate(() => {
+      const catalog = JSON.parse(localStorage.getItem('four-skins-v1')!);
+      return catalog.skins.find((skin: { id: string }) => skin.id === catalog.activeSkinId);
+    });
+  try {
+    await player.goto(url);
+    await expect(player.getByTestId('loading-screen')).toBeHidden();
+    await admin.goto(url + '/admin');
+    await admin.getByLabel('Пароль').fill('skin-browser-test-123');
+    await admin.getByRole('button', { name: 'Войти', exact: true }).click();
+    await admin.getByRole('button', { name: 'Оформление', exact: true }).click();
+    await admin.getByRole('button', { name: /Пикми/ }).click();
+    await admin.getByRole('button', { name: 'Применить для всех' }).click();
+    await expect.poll(async () => (await appearance()).id).toBe('pickmi');
+    await player.waitForTimeout(2000);
+    await player
+      .getByTestId('game-canvas')
+      .screenshot({ path: info.outputPath('pickmi-detail.png') });
+    await player.screenshot({ path: info.outputPath('pickmi-desktop.png') });
+    await player.setViewportSize({ width: 390, height: 844 });
+    await player.waitForTimeout(800);
+    await player.screenshot({ path: info.outputPath('pickmi-mobile.png') });
+    await admin.getByRole('button', { name: 'Новый стиль', exact: true }).click();
+    await admin.getByLabel('Название стиля').fill('My Pickmi');
+    await admin.getByTestId('pickmi-design-preset').click();
+    await admin.getByLabel('Добавляемая фигура').selectOption('bow');
+    await expect(admin.getByLabel('Добавляемая фигура')).toHaveValue('bow');
+    await admin.getByRole('button', { name: 'Сохранить стиль', exact: true }).click();
+    await admin.getByRole('button', { name: 'Применить для всех' }).click();
+    await expect.poll(async () => (await appearance()).name).toBe('My Pickmi');
+    expect((await appearance()).design.surfaces.darkCap.layers[0].motif).toBe('heart');
+    await players.setOffline(true);
+    await player.reload();
+    await expect(player.getByTestId('loading-screen')).toBeHidden();
+    expect((await appearance()).name).toBe('My Pickmi');
+    await players.setOffline(false);
+    await player.getByRole('button', { name: 'Вдвоём', exact: true }).click();
+    await player.getByRole('button', { name: 'Начать игру', exact: true }).click();
+    await player.getByRole('button', { name: /Начать/ }).click();
+    await player.waitForTimeout(1200);
+    const canvas = (await player.locator('canvas').boundingBox())!;
+    await player.mouse.click(canvas.x + canvas.width / 2, canvas.y + canvas.height / 2);
+    await expect(player.getByTestId('move-count')).toHaveText('1 / 125');
+    expect(errors).toEqual([]);
+  } finally {
+    await players.close();
+    await adminContext.close();
+  }
+});

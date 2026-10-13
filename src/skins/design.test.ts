@@ -7,6 +7,7 @@ import {
   imageLayer,
   motifLayer,
   nocturneDesign,
+  pickmiDesign,
   SURFACES,
 } from './design';
 import { defaultCatalog, isCatalog, normalizeCatalog } from './catalog';
@@ -105,4 +106,16 @@ it('bounds decoded image memory while allowing repeated references across all su
   expect(isSkinDesign(design)).toBe(false);
   design.surfaces.darkCap.layers.pop();
   expect(isSkinDesign(design)).toBe(true);
+});
+
+it('upgrades old offline catalogs with Pickmi while keeping the selected skin and its saved colors', () => {
+  const before = defaultCatalog();
+  before.skins = before.skins.filter((skin) => skin.id !== 'pickmi');
+  before.skins[0].palette.board.body = '#eedddd';
+  const restored = normalizeCatalog(before)!;
+  expect(restored.activeSkinId).toBe(before.activeSkinId);
+  expect(restored.skins[0].palette.board.body).toBe('#eedddd');
+  expect(restored.skins.find((skin) => skin.id === 'pickmi')?.design).toEqual(pickmiDesign());
+  expect(isSkinDesign(pickmiDesign())).toBe(true);
+  expect(designImageIds(pickmiDesign())).toEqual([]);
 });

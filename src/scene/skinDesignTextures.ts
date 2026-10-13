@@ -81,6 +81,76 @@ function branch(c: Painter, length: number, bend = 0) {
 export function paintMotif(c: Painter, motif: Motif, size: number) {
   const r = size / 2;
   c.lineWidth = Math.max(1, size * 0.009);
+  if (motif === 'heart') {
+    c.save();
+    c.beginPath();
+    c.moveTo(0, r * 0.82);
+    c.bezierCurveTo(-r * 0.28, r * 0.51, -r * 0.92, r * 0.12, -r * 0.86, -r * 0.35);
+    c.bezierCurveTo(-r * 0.8, -r * 0.91, -r * 0.22, -r * 0.97, 0, -r * 0.51);
+    c.bezierCurveTo(r * 0.22, -r * 0.97, r * 0.8, -r * 0.91, r * 0.86, -r * 0.35);
+    c.bezierCurveTo(r * 0.92, r * 0.12, r * 0.28, r * 0.51, 0, r * 0.82);
+    c.closePath();
+    c.fill();
+    c.strokeStyle = '#fff9f1';
+    c.globalAlpha *= 0.5;
+    c.lineWidth = size * 0.023;
+    c.lineCap = 'round';
+    c.beginPath();
+    c.moveTo(-r * 0.65, -r * 0.22);
+    c.bezierCurveTo(-r * 0.7, -r * 0.58, -r * 0.42, -r * 0.76, -r * 0.25, -r * 0.61);
+    c.stroke();
+    c.restore();
+    return;
+  }
+  if (motif === 'bow') {
+    c.save();
+    for (const side of [-1, 1]) {
+      c.save();
+      c.scale(side, 1);
+      c.beginPath();
+      c.moveTo(0, 0);
+      c.bezierCurveTo(r * 0.35, -r * 0.52, r * 0.96, -r * 0.7, r * 0.92, -r * 0.32);
+      c.bezierCurveTo(r * 0.9, r * 0.2, r * 0.52, r * 0.32, 0, 0);
+      c.closePath();
+      c.fill();
+      c.beginPath();
+      c.moveTo(r * 0.02, r * 0.01);
+      c.lineTo(r * 0.61, r * 0.76);
+      c.lineTo(r * 0.61, r * 0.42);
+      c.lineTo(r * 0.34, r * 0.52);
+      c.lineTo(-r * 0.06, r * 0.07);
+      c.closePath();
+      c.fill();
+      c.strokeStyle = '#fff1eb';
+      c.globalAlpha *= 0.42;
+      c.lineWidth = size * 0.012;
+      c.beginPath();
+      c.moveTo(r * 0.13, -r * 0.02);
+      c.quadraticCurveTo(r * 0.52, -r * 0.27, r * 0.77, -r * 0.26);
+      c.stroke();
+      c.restore();
+    }
+    c.beginPath();
+    c.ellipse(0, 0, r * 0.19, r * 0.23, 0, 0, Math.PI * 2);
+    c.fill();
+    c.restore();
+    return;
+  }
+  if (motif === 'blossom') {
+    c.save();
+    for (let petal = 0; petal < 6; petal++) {
+      c.rotate(Math.PI / 3);
+      c.beginPath();
+      c.ellipse(0, -r * 0.52, r * 0.28, r * 0.44, 0, 0, Math.PI * 2);
+      c.fill();
+    }
+    c.fillStyle = '#e7bf7d';
+    c.beginPath();
+    c.arc(0, 0, r * 0.23, 0, Math.PI * 2);
+    c.fill();
+    c.restore();
+    return;
+  }
   if (motif === 'star') {
     star(c, 0, 0, r * 0.85);
     circle(c, 0, 0, r * 0.97);
@@ -257,6 +327,15 @@ function artdeco(c: Painter, w: number, h: number, scale: number) {
     }
 }
 
+function gingham(c: Painter, w: number, h: number, scale: number) {
+  const step = (Math.min(w, h) * 0.12) / scale;
+  c.save();
+  c.globalAlpha *= 0.6;
+  for (let x = 0; x < w; x += step * 2) c.fillRect(x, 0, step, h);
+  for (let y = 0; y < h; y += step * 2) c.fillRect(0, y, w, step);
+  c.restore();
+}
+
 function guilloche(c: Painter, w: number, h: number, scale: number) {
   const s = Math.min(w, h);
   c.save();
@@ -400,6 +479,7 @@ export function makeSurfaceTexture(
   if (design.pattern === 'artdeco') artdeco(c, width, height, design.patternScale);
   if (design.pattern === 'guilloche') guilloche(c, width, height, design.patternScale);
   if (design.pattern === 'marble') marble(c, width, height, design.patternScale);
+  if (design.pattern === 'gingham') gingham(c, width, height, design.patternScale);
   c.restore();
   if (design.border) {
     c.strokeStyle = c.fillStyle = design.ink;

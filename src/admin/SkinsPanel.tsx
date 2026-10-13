@@ -2,7 +2,13 @@ import { lazy, Suspense, useCallback, useEffect, useMemo, useState } from 'react
 import { Check, Palette, Pencil, Plus, RefreshCw, Save, Trash2, X } from 'lucide-react';
 import { createGame, makeMove } from '../game/core';
 import { activeSkin, type Skin, type SkinCatalog, type SkinPalette } from '../skins/catalog';
-import { blankDesign, nocturneDesign, type SkinDesign, type SurfaceDesign } from '../skins/design';
+import {
+  blankDesign,
+  nocturneDesign,
+  pickmiDesign,
+  type SkinDesign,
+  type SurfaceDesign,
+} from '../skins/design';
 import { useAppearance } from '../store/appearanceStore';
 import { adminApi } from './api';
 import SkinDesignEditor from './SkinDesignEditor';
@@ -62,6 +68,9 @@ function SwatchDecoration({ surface }: { surface: SurfaceDesign }) {
     laurel: '❦',
     diamond: '◇',
     rings: '◎',
+    heart: '♥',
+    bow: '⋈',
+    blossom: '✿',
   };
   return (
     <g>
@@ -97,6 +106,16 @@ function SwatchDecoration({ surface }: { surface: SurfaceDesign }) {
               transform={`rotate(${angle} 100 51)`}
             />
           ))}
+        {surface.pattern === 'gingham' && (
+          <g fill={surface.ink} stroke="none" opacity="0.6">
+            {Array.from({ length: 9 }, (_, i) => (
+              <rect key={`v-${i}`} x={15 + i * 20} y="15" width="10" height="72" />
+            ))}
+            {Array.from({ length: 4 }, (_, i) => (
+              <rect key={`h-${i}`} x="15" y={15 + i * 20} width="170" height="10" />
+            ))}
+          </g>
+        )}
         {surface.pattern === 'marble' && (
           <>
             <path d="M15 36Q55 60 81 27T157 35L185 25M15 71Q56 43 94 65T185 40M23 78Q58 50 84 76T174 69" />
@@ -521,6 +540,23 @@ export default function SkinsPanel({ onUnauthorized }: { onUnauthorized: () => v
                   >
                     <Palette size={15} />
                     Редактируемый Ноктюрн
+                  </button>
+                  <button
+                    type="button"
+                    disabled={locked}
+                    data-testid="pickmi-design-preset"
+                    onClick={() => {
+                      const template = catalog.skins.find((skin) => skin.id === 'pickmi');
+                      setDraft({
+                        ...draft,
+                        artwork: undefined,
+                        palette: template ? structuredClone(template.palette) : draft.palette,
+                        design: pickmiDesign(),
+                      });
+                    }}
+                  >
+                    <Palette size={15} />
+                    Пикми
                   </button>
                 </div>
                 {draft.design && (

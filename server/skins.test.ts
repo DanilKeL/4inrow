@@ -147,3 +147,25 @@ it('requires uploaded assets before saving and deduplicates references across su
   ).toThrow('загрузите');
   expect(store.get().revision).toBe(saved.revision);
 });
+
+it('activates Pickmi, preserves its editable ornaments in copies, and keeps the original immutable', () => {
+  const store = open();
+  const template = store.get().skins.find((skin) => skin.id === 'pickmi')!;
+  const selected = store.activate(template.id, 0);
+  const copied = store.save({
+    name: 'Pickmi copy',
+    palette: template.palette,
+    design: template.design,
+    expectedRevision: selected.revision,
+  });
+  const saved = copied.skins.find((skin) => skin.id === copied.savedSkinId)!;
+  expect(saved.design).toEqual(template.design);
+  expect(saved.design?.surfaces.lightCap.layers[0]).toMatchObject({ motif: 'bow' });
+  expect(() =>
+    store.save(
+      { name: 'change builtin', palette: template.palette, expectedRevision: copied.revision },
+      template.id,
+    ),
+  ).toThrow();
+  expect(store.get().activeSkinId).toBe('pickmi');
+});

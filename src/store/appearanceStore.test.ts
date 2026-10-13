@@ -45,7 +45,7 @@ it('preserves the selected style in old offline catalogs and caches the added ro
   const legacy = {
     ...catalog,
     skins: catalog.skins
-      .filter((skin) => !skin.artwork)
+      .filter((skin) => !skin.artwork && !skin.design)
       .map((skin) => {
         const palette: Record<string, unknown> = { ...skin.palette };
         delete palette.room;
