@@ -5,6 +5,7 @@ import './styles/global.css';
 import { initializeAnalytics } from './network/analytics';
 import { initializeOffline } from './network/offline';
 import { initializeTelegram, loadTelegramSDK } from './telegram/bridge';
+import { installGameTouchGuard } from './telegram/touchGuard';
 import { initializeAppearance } from './store/appearanceStore';
 
 const AdminApp = lazy(() => import('./admin/AdminApp'));
@@ -25,6 +26,8 @@ updateStandalone();
 initializeAppearance();
 standalone.addEventListener('change', updateStandalone);
 if (!window.location.pathname.startsWith('/admin')) {
+  document.getElementById('root')!.dataset.gameInterface = 'true';
+  installGameTouchGuard();
   initializeOffline();
   initializeAnalytics();
 }

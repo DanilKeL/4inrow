@@ -92,23 +92,21 @@ input {
 html[data-telegram] body {
   overscroll-behavior: none;
 }
-/* Keep native text selection and smart zoom off the game surface in WKWebView.
-   Form fields retain their native caret, selection and copy controls. */
-html[data-telegram],
-html[data-telegram] body,
-html[data-telegram] #root {
+/* Suppress native selection and the iOS magnifier on every game label.
+   Editable fields keep native caret, paste and text selection. */
+#root[data-game-interface] {
   touch-action: manipulation;
 }
-html[data-telegram] #root,
-html[data-telegram] #root * {
+#root[data-game-interface],
+#root[data-game-interface] * {
   -webkit-user-select: none;
   user-select: none;
   -webkit-touch-callout: none;
 }
-html[data-telegram] #root input,
-html[data-telegram] #root textarea,
-html[data-telegram] #root [contenteditable]:not([contenteditable='false']),
-html[data-telegram] #root [contenteditable]:not([contenteditable='false']) * {
+#root[data-game-interface] input,
+#root[data-game-interface] textarea,
+#root[data-game-interface] [contenteditable]:not([contenteditable='false']),
+#root[data-game-interface] [contenteditable]:not([contenteditable='false']) * {
   -webkit-user-select: text;
   user-select: text;
   -webkit-touch-callout: default;

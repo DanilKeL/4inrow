@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react';
+import { useState } from 'react';
 import { Copy, Globe2, LogOut } from 'lucide-react';
 import { useGame } from '../store/gameStore';
 import styles from './UI.module.css';
@@ -7,7 +7,6 @@ import { copyText } from './clipboard';
 export function OnlineLobby({ onLeave }: { onLeave: () => void }) {
   const { online, onlineStatus, onlineError, onlineKind } = useGame();
   const [copyStatus, setCopyStatus] = useState('');
-  const codeElement = useRef<HTMLElement>(null);
   const code = online?.snapshot.code;
   const opponent = online?.snapshot.players[online.player === 1 ? 1 : 0];
   const ranking = online?.snapshot.ranking;
@@ -30,13 +29,7 @@ export function OnlineLobby({ onLeave }: { onLeave: () => void }) {
     if (await copyText(code)) {
       setCopyStatus('Код скопирован');
     } else {
-      if (codeElement.current) {
-        const range = document.createRange();
-        range.selectNodeContents(codeElement.current);
-        window.getSelection()?.removeAllRanges();
-        window.getSelection()?.addRange(range);
-      }
-      setCopyStatus('Код выделен — нажмите «Копировать»');
+      setCopyStatus('Не удалось скопировать код');
     }
   }
   return (
@@ -44,11 +37,7 @@ export function OnlineLobby({ onLeave }: { onLeave: () => void }) {
       <div className={styles.lobbyHeading}>
         <Globe2 size={17} />
         <span>{onlineKind === 'quick' ? 'РЕЙТИНГОВАЯ ИГРА' : 'ЛОББИ'}</span>
-        {code && onlineKind !== 'quick' && (
-          <strong ref={codeElement} style={{ userSelect: 'text' }} data-testid="lobby-code">
-            {code}
-          </strong>
-        )}
+        {code && onlineKind !== 'quick' && <strong data-testid="lobby-code">{code}</strong>}
         {code && onlineKind !== 'quick' && (
           <button
             className={styles.iconButton}
