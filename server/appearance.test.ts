@@ -1,3 +1,5 @@
+import { ANIME_HEROINE_IMAGE_ID, builtinSkinImageUrl } from '../src/skins/builtinAssets';
+import { createHash } from 'node:crypto';
 import { afterEach, expect, it } from 'vitest';
 import type { AddressInfo } from 'node:net';
 import { createOnlineServer } from './app';
@@ -13,9 +15,9 @@ afterEach(async () => {
   streams.splice(0).forEach((stream) => stream.abort());
   await app?.close();
 });
-async function start() {
+async function start(staticDir: string | null = null) {
   app = createOnlineServer({
-    staticDir: null,
+    staticDir,
     authFile: null,
     statsFile: null,
     telegram: null,
@@ -151,4 +153,24 @@ it('saves a full composition beyond the legacy body limit and validates uploaded
   });
   expect(bad.status).toBe(400);
   expect((await fetch(url + '/appearance').then((r) => r.json())).revision).toBe(saved.revision);
+});
+
+it('serves shipped anime artwork through the existing SHA asset API without redirecting or accepting arbitrary paths', async () => {
+  await start('public');
+  const path = `/appearance/assets/${ANIME_HEROINE_IMAGE_ID}`;
+  const response = await fetch(url + path, { redirect: 'error' });
+  expect(response.status).toBe(200);
+  expect(response.headers.get('content-type')).toBe('image/webp');
+  expect(response.headers.get('etag')).toBe(`"${ANIME_HEROINE_IMAGE_ID}"`);
+  const bytes = Buffer.from(await response.arrayBuffer());
+  expect(createHash('sha256').update(bytes).digest('hex')).toBe(ANIME_HEROINE_IMAGE_ID);
+  expect(bytes).toEqual(readFileSync('public' + builtinSkinImageUrl(ANIME_HEROINE_IMAGE_ID)!));
+  expect((await fetch(url + path, { method: 'HEAD' })).headers.get('content-length')).toBe(
+    String(bytes.length),
+  );
+  expect(
+    (await fetch(url + path, { headers: { 'If-None-Match': `"${ANIME_HEROINE_IMAGE_ID}"` } }))
+      .status,
+  ).toBe(304);
+  expect((await fetch(url + '/appearance/assets/' + 'f'.repeat(64))).status).toBe(404);
 });
