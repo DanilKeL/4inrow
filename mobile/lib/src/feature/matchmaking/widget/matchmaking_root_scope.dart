@@ -97,6 +97,12 @@ String _failureText(
   if (remoteMessage.isNotEmpty) return remoteMessage;
   return switch (failure) {
     MatchmakingFailure.invalidCode => context.l10n.enterFiveLetterCode,
+    MatchmakingFailure.roomNotFound => context.l10n.roomNotFound,
+    MatchmakingFailure.roomFull => context.l10n.roomFull,
+    MatchmakingFailure.matchExpired => context.l10n.matchExpired,
+    MatchmakingFailure.accountBusy => context.l10n.accountBusy,
+    MatchmakingFailure.alreadyMatching => context.l10n.alreadyMatching,
+    MatchmakingFailure.serverFull => context.l10n.serverFull,
     MatchmakingFailure.moveNotSent => context.l10n.moveNotSent,
     MatchmakingFailure.invalidServerResponse =>
       context.l10n.invalidServerResponse,

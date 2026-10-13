@@ -36,7 +36,7 @@ final class MatchmakingBloc extends Bloc<MatchmakingEvent, MatchmakingState> {
         emit(const MatchmakingState$Connecting());
         await _transport.connect({'type': 'create', 'name': name});
       case MatchmakingEvent$Join(:final name, :final code):
-        final String normalized = code.trim().toUpperCase();
+        final String normalized = normalizeRoomCode(code);
         if (!RegExp(r'^[A-Z]{5}$').hasMatch(normalized)) {
           emit(
             const MatchmakingState$Failure(
@@ -219,7 +219,13 @@ final class MatchmakingBloc extends Bloc<MatchmakingEvent, MatchmakingState> {
               ),
             );
           case 'queue':
-            emit(const MatchmakingState$Searching());
+            emit(
+              MatchmakingState$Searching(
+                startedAt: json['startedAt'] is int
+                    ? json['startedAt'] as int
+                    : DateTime.now().millisecondsSinceEpoch,
+              ),
+            );
           case 'match_found':
             emit(
               MatchmakingState$Found(
@@ -233,16 +239,26 @@ final class MatchmakingBloc extends Bloc<MatchmakingEvent, MatchmakingState> {
               ),
             );
           case 'queue_removed':
-            emit(
-              MatchmakingState$Idle(message: json['message']?.toString() ?? ''),
-            );
+            if (json['reason'] == 'cancelled') {
+              emit(
+                MatchmakingState$Idle(
+                  message: json['message']?.toString() ?? '',
+                  notice: MatchmakingNotice.searchCancelled,
+                ),
+              );
+            } else {
+              emit(
+                MatchmakingState$Failure(
+                  json['message']?.toString() ?? '',
+                  failure: MatchmakingFailure.matchExpired,
+                ),
+              );
+            }
           case 'error':
             emit(
               MatchmakingState$Failure(
                 json['message']?.toString() ?? '',
-                failure: json['message'] == null
-                    ? MatchmakingFailure.generic
-                    : null,
+                failure: matchmakingFailureFromCode(json['code']?.toString()),
               ),
             );
           case 'closed':
@@ -264,3 +280,17 @@ final class MatchmakingBloc extends Bloc<MatchmakingEvent, MatchmakingState> {
     return super.close();
   }
 }
+
+String normalizeRoomCode(String value) =>
+    value.replaceAll(RegExp(r'[\s-]+'), '').toUpperCase();
+
+MatchmakingFailure matchmakingFailureFromCode(String? code) => switch (code) {
+  'LOBBY_NOT_FOUND' => MatchmakingFailure.roomNotFound,
+  'LOBBY_FULL' => MatchmakingFailure.roomFull,
+  'MATCH_NOT_FOUND' => MatchmakingFailure.matchExpired,
+  'ACCOUNT_BUSY' => MatchmakingFailure.accountBusy,
+  'ALREADY_MATCHING' ||
+  'ALREADY_IN_LOBBY' => MatchmakingFailure.alreadyMatching,
+  'SERVER_FULL' => MatchmakingFailure.serverFull,
+  _ => MatchmakingFailure.generic,
+};

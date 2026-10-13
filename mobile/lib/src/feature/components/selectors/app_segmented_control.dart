@@ -32,7 +32,7 @@ class AppSegmentedControl<T> extends StatelessWidget {
       mainAxisSize: pill ? MainAxisSize.min : MainAxisSize.max,
       children: [
         for (var index = 0; index < options.length; index++) ...[
-          if (index > 0) SizedBox(width: pill ? 5 : 7),
+          if (index > 0 && pill) const SizedBox(width: 5),
           if (pill)
             _AppSegmentItem<T>(
               option: options[index],
@@ -52,7 +52,18 @@ class AppSegmentedControl<T> extends StatelessWidget {
         ],
       ],
     );
-    if (!pill) return row;
+    if (!pill) {
+      return Container(
+        constraints: const BoxConstraints(minHeight: 44),
+        clipBehavior: Clip.antiAlias,
+        decoration: BoxDecoration(
+          color: Colors.white,
+          border: Border.all(color: context.colors.controlBorder),
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: row,
+      );
+    }
     return Align(
       alignment: Alignment.centerLeft,
       child: Container(
@@ -84,6 +95,9 @@ class _AppSegmentItem<T> extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final bool active = option.value == selected;
+    final Duration duration = MediaQuery.disableAnimationsOf(context)
+        ? Duration.zero
+        : const Duration(milliseconds: 180);
     return Semantics(
       selected: active,
       button: true,
@@ -92,24 +106,14 @@ class _AppSegmentItem<T> extends StatelessWidget {
         borderRadius: BorderRadius.circular(7),
         child: AnimatedContainer(
           constraints: const BoxConstraints(minHeight: 44),
-          duration: const Duration(milliseconds: 180),
+          duration: duration,
           curve: Curves.easeOut,
-          padding: EdgeInsets.symmetric(
-            horizontal: pill ? 14 : 8,
-            vertical: pill ? 8 : 10,
-          ),
+          padding: EdgeInsets.symmetric(horizontal: pill ? 14 : 8, vertical: 8),
           decoration: BoxDecoration(
             color: active
-                ? (pill ? Colors.white : const Color(0xFFE8EDFE))
-                : (pill ? Colors.transparent : Colors.white),
-            border: pill
-                ? null
-                : Border.all(
-                    color: active
-                        ? context.colors.accent
-                        : context.colors.controlBorder,
-                  ),
-            borderRadius: BorderRadius.circular(7),
+                ? (pill ? Colors.white : context.colors.accentSubtle)
+                : Colors.transparent,
+            borderRadius: BorderRadius.circular(pill ? 7 : 11),
             boxShadow: active && pill
                 ? const [
                     BoxShadow(
@@ -121,7 +125,7 @@ class _AppSegmentItem<T> extends StatelessWidget {
                 : null,
           ),
           child: AnimatedDefaultTextStyle(
-            duration: const Duration(milliseconds: 180),
+            duration: duration,
             style: context.textStyle.captionStrong.copyWith(
               color: active ? context.colors.accent : context.colors.muted,
             ),

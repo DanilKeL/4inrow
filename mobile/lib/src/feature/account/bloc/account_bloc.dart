@@ -30,7 +30,11 @@ final class AccountBloc extends Bloc<AccountEvent, AccountState> {
         emit(AccountState$Loading(profile));
         emit(AccountState$Ready(await _repository.load()));
       case AccountEvent$Login(:final username, :final password):
-        await _action(emit, () => _repository.login(username.trim(), password));
+        await _action(
+          emit,
+          () => _repository.login(username.trim(), password),
+          captureVerificationRequired: true,
+        );
       case AccountEvent$Register(
         :final username,
         :final email,
@@ -108,6 +112,7 @@ final class AccountBloc extends Bloc<AccountEvent, AccountState> {
     Future<AccountProfile> Function() operation, {
     String notice = '',
     AccountNotice? clientNotice,
+    bool captureVerificationRequired = false,
   }) async {
     emit(AccountState$Loading(profile));
     try {
@@ -120,7 +125,14 @@ final class AccountBloc extends Bloc<AccountEvent, AccountState> {
       );
     } on RestClientException catch (error) {
       emit(
-        AccountState$Failure(profile, error.message, failure: error.failure),
+        AccountState$Failure(
+          profile,
+          error.message,
+          failure: error.failure,
+          verificationRequired:
+              captureVerificationRequired &&
+              error.data?['verificationRequired'] == true,
+        ),
       );
     } on Exception {
       emit(

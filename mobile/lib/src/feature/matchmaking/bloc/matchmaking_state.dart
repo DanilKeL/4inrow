@@ -34,7 +34,12 @@ final class MatchmakingState$Connecting extends MatchmakingState {
 }
 
 final class MatchmakingState$Searching extends MatchmakingState {
-  const new();
+  const new({required this.startedAt});
+
+  final int startedAt;
+
+  @override
+  List<Object> get props => [startedAt];
 }
 
 final class MatchmakingState$Found extends MatchmakingState {

@@ -3,6 +3,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:four3/l10n/generated/app_localizations.dart';
 import 'package:four3/src/feature/app_theme/utils/app_theme.dart';
 import 'package:four3/src/feature/components/modals/app_dialog.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 void main() {
   testWidgets('dialog flow changes content in place and returns with back', (
@@ -63,8 +64,8 @@ void main() {
 
     expect(find.text('Details'), findsOneWidget);
     expect(find.text('Details content'), findsOneWidget);
-    expect(find.byIcon(Icons.arrow_back_rounded), findsOneWidget);
-    expect(find.byIcon(Icons.close_rounded), findsOneWidget);
+    expect(find.byIcon(LucideIcons.arrowLeft), findsOneWidget);
+    expect(find.byIcon(LucideIcons.x), findsOneWidget);
 
     await tester.binding.handlePopRoute();
     await tester.pump();
@@ -77,11 +78,45 @@ void main() {
     expect(find.text('Account'), findsOneWidget);
     expect(find.text('Open details'), findsOneWidget);
     expect(find.text('Count 1'), findsOneWidget);
-    expect(find.byIcon(Icons.arrow_back_rounded), findsNothing);
-    expect(find.byIcon(Icons.close_rounded), findsOneWidget);
+    expect(find.byIcon(LucideIcons.arrowLeft), findsNothing);
+    expect(find.byIcon(LucideIcons.x), findsOneWidget);
 
-    await tester.tap(find.byIcon(Icons.close_rounded));
+    await tester.tap(find.byIcon(LucideIcons.x));
     await tester.pumpAndSettle();
+  });
+
+  testWidgets('dialog returns focus to its opener', (tester) async {
+    final FocusNode opener = FocusNode();
+    addTearDown(opener.dispose);
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: AppTheme.light,
+        locale: const Locale('en'),
+        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        supportedLocales: AppLocalizations.supportedLocales,
+        home: Builder(
+          builder: (context) => Scaffold(
+            body: TextButton(
+              focusNode: opener,
+              onPressed: () => showAppDialog<void>(
+                context: context,
+                titleBuilder: (_) => 'Dialog',
+                builder: (_) => const Text('Body'),
+              ),
+              child: const Text('Open'),
+            ),
+          ),
+        ),
+      ),
+    );
+
+    opener.requestFocus();
+    await tester.pump();
+    await tester.tap(find.text('Open'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byIcon(LucideIcons.x));
+    await tester.pumpAndSettle();
+    expect(opener.hasFocus, isTrue);
   });
 
   testWidgets('backdrop dismiss does not tap the control below it', (
@@ -131,6 +166,55 @@ void main() {
 
     expect(find.text('Dialog body'), findsNothing);
     expect(underlyingTaps, 0);
+  });
+
+  testWidgets('dialog remains scrollable with keyboard and 200% text', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(320, 568);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: AppTheme.light,
+        locale: const Locale('en'),
+        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        supportedLocales: AppLocalizations.supportedLocales,
+        builder: (context, child) => MediaQuery(
+          data: MediaQuery.of(context).copyWith(
+            textScaler: const TextScaler.linear(2),
+            viewInsets: const EdgeInsets.only(bottom: 220),
+          ),
+          child: child!,
+        ),
+        home: Builder(
+          builder: (context) => Scaffold(
+            body: TextButton(
+              onPressed: () => showAppDialog<void>(
+                context: context,
+                titleBuilder: (_) => 'Long dialog title',
+                builder: (_) => const Column(
+                  children: [
+                    TextField(decoration: InputDecoration(labelText: 'One')),
+                    SizedBox(height: 16),
+                    TextField(decoration: InputDecoration(labelText: 'Two')),
+                    SizedBox(height: 16),
+                    TextField(decoration: InputDecoration(labelText: 'Three')),
+                  ],
+                ),
+              ),
+              child: const Text('Open'),
+            ),
+          ),
+        ),
+      ),
+    );
+
+    await tester.tap(find.text('Open'));
+    await tester.pumpAndSettle();
+    expect(find.text('Long dialog title'), findsOneWidget);
+    expect(find.byType(SingleChildScrollView), findsOneWidget);
   });
 }
 

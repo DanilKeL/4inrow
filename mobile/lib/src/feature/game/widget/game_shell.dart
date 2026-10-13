@@ -14,6 +14,7 @@ import 'package:four3/src/feature/app_theme/utils/app_theme.dart';
 import 'package:four3/src/feature/app_theme/utils/theme_context_extension.dart';
 import 'package:four3/src/feature/appearance/domain/model/skin_catalog.dart';
 import 'package:four3/src/feature/appearance/widget/appearance_root_scope.dart';
+import 'package:four3/src/feature/components/buttons/app_action_button.dart';
 import 'package:four3/src/feature/components/modals/app_dialog.dart';
 import 'package:four3/src/feature/components/progress/app_circular_progress_indicator.dart';
 import 'package:four3/src/feature/daily/bloc/daily_bloc.dart';
@@ -117,16 +118,21 @@ class _GameShellBody extends StatelessWidget {
         body: Stack(
           children: [
             SafeArea(
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 12),
-                child: Column(
-                  children: [
-                    _Header(
+              child: Column(
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    child: _Header(
                       onBrand: () {
                         if (!isMenu) _requestGameMenu(context, data);
                       },
                     ),
-                    Expanded(
+                  ),
+                  Expanded(
+                    child: Padding(
+                      padding: EdgeInsets.symmetric(
+                        horizontal: isMenu ? 16 : 0,
+                      ),
                       child: LayoutBuilder(
                         builder: (context, constraints) {
                           final Widget sceneView = GameSceneView(
@@ -177,7 +183,12 @@ class _GameShellBody extends StatelessWidget {
                                 ? Column(
                                     children: [
                                       Expanded(child: board),
-                                      _GamePanel(data: data),
+                                      Padding(
+                                        padding: const EdgeInsets.symmetric(
+                                          horizontal: 16,
+                                        ),
+                                        child: _GamePanel(data: data),
+                                      ),
                                     ],
                                   )
                                 : board;
@@ -223,13 +234,38 @@ class _GameShellBody extends StatelessWidget {
                             onRated: () => _openRated(context),
                           );
                           if (landscape) {
+                            final bool scrollMenu =
+                                MediaQuery.sizeOf(context).height < 360;
                             return Padding(
                               padding: const EdgeInsets.symmetric(vertical: 7),
                               child: Row(
                                 children: [
-                                  SizedBox(width: 230, child: menu),
+                                  SizedBox(
+                                    width: 280,
+                                    child: scrollMenu
+                                        ? SingleChildScrollView(child: menu)
+                                        : menu,
+                                  ),
                                   const SizedBox(width: 10),
                                   Expanded(child: scene),
+                                ],
+                              ),
+                            );
+                          }
+                          if (MediaQuery.textScalerOf(context).scale(1) > 1.3) {
+                            return SingleChildScrollView(
+                              padding: const EdgeInsets.fromLTRB(0, 8, 0, 10),
+                              child: Column(
+                                children: [
+                                  SizedBox(
+                                    height: (constraints.maxHeight * .42).clamp(
+                                      180,
+                                      260,
+                                    ),
+                                    child: scene,
+                                  ),
+                                  const SizedBox(height: 10),
+                                  menu,
                                 ],
                               ),
                             );
@@ -247,8 +283,8 @@ class _GameShellBody extends StatelessWidget {
                         },
                       ),
                     ),
-                  ],
-                ),
+                  ),
+                ],
               ),
             ),
             if (data.onlineSnapshot?.pause case final pause?)
@@ -284,7 +320,12 @@ class _GameShellBody extends StatelessWidget {
     MatchmakingRootScope.of(context).add(MatchmakingEvent$Find(name));
     showAppDialog<void>(
       context: context,
-      titleBuilder: (context) => context.l10n.rankedGame,
+      titleBuilder: (context) =>
+          AccountRootScope.of(context).profile?.username == null
+          ? context.l10n.quickGame
+          : context.l10n.rankedGame,
+      showCloseButton: false,
+      barrierDismissible: false,
       builder: (_) => const OnlineSetupView(quickOnly: true),
     );
   }
@@ -304,7 +345,7 @@ class _Header extends StatelessWidget {
             constraints.maxWidth >= 650 &&
             MediaQuery.sizeOf(context).height > 550;
         return Container(
-          height: expanded ? 68 : 52,
+          height: expanded ? 68 : 56,
           decoration: const BoxDecoration(
             border: Border(bottom: BorderSide(color: AppColors.border)),
           ),
@@ -364,12 +405,6 @@ class _Header extends StatelessWidget {
                     },
                   ),
                 ),
-              ),
-              Container(
-                width: 1,
-                height: 20,
-                margin: EdgeInsets.symmetric(horizontal: expanded ? 10 : 2),
-                color: AppColors.border,
               ),
               _HeaderAction(
                 icon: settingsBloc.settings.sound
@@ -432,6 +467,19 @@ class _Header extends StatelessWidget {
 
 enum _AccountDialogPage { account, history }
 
+void _openProfileFromLevels(BuildContext context) {
+  Navigator.pop(context);
+  WidgetsBinding.instance.addPostFrameCallback((_) {
+    if (!context.mounted) return;
+    showAppDialog<void>(
+      context: context,
+      titleBuilder: (context) => context.l10n.account,
+      wide: true,
+      builder: (_) => const AccountView(),
+    );
+  });
+}
+
 class _HeaderAction extends StatelessWidget {
   const new({
     required this.icon,
@@ -450,15 +498,19 @@ class _HeaderAction extends StatelessWidget {
     message: label,
     child: InkWell(
       onTap: onTap,
-      borderRadius: BorderRadius.circular(8),
+      borderRadius: BorderRadius.circular(AppRadii.control),
+      overlayColor: WidgetStatePropertyAll(context.colors.accentSubtle),
+      splashFactory: InkRipple.splashFactory,
       child: SizedBox(
+        width: showLabel ? null : 44,
         height: 44,
         child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 10),
+          padding: EdgeInsets.symmetric(horizontal: showLabel ? 10 : 0),
           child: Row(
             mainAxisSize: MainAxisSize.min,
+            mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Icon(icon, size: 19),
+              Icon(icon, size: 23),
               if (showLabel) ...[
                 const SizedBox(width: 7),
                 ConstrainedBox(
@@ -490,12 +542,12 @@ class _SceneCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => ClipRRect(
-    borderRadius: BorderRadius.circular(menu ? 14 : 12),
+    borderRadius: BorderRadius.circular(menu ? 16 : 12),
     child: DecoratedBox(
       decoration: BoxDecoration(
         color: _appearanceColor(room),
-        borderRadius: BorderRadius.circular(menu ? 14 : 12),
-        border: Border.all(color: const Color(0xFFE1E2DD)),
+        borderRadius: BorderRadius.circular(menu ? 16 : 12),
+        border: Border.all(color: const Color(0xFFE7E8E2)),
       ),
       child: Stack(
         fit: StackFit.expand,
@@ -503,25 +555,26 @@ class _SceneCard extends StatelessWidget {
           child,
           if (menu)
             Positioned(
-              top: 8,
-              right: 8,
+              top: 12,
+              right: 12,
               child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                height: 36,
+                padding: const EdgeInsets.symmetric(horizontal: 12),
                 decoration: BoxDecoration(
                   color: const Color(0xEFFFFFFF),
-                  borderRadius: BorderRadius.circular(9),
+                  borderRadius: BorderRadius.circular(10),
                   border: Border.all(color: const Color(0x8CFFFFFF)),
                 ),
                 child: const Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Icon(LucideIcons.cuboid, size: 13),
-                    SizedBox(width: 6),
+                    Icon(LucideIcons.cuboid, size: 18),
+                    SizedBox(width: 8),
                     Text(
                       '5 × 5 × 5',
                       style: TextStyle(
                         fontSize: 9,
-                        fontWeight: FontWeight.w700,
+                        fontWeight: FontWeight.w600,
                       ),
                     ),
                   ],
@@ -551,10 +604,10 @@ class _MenuHero extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Container(
     width: double.infinity,
-    padding: EdgeInsets.all(compact ? 12 : 13),
+    padding: const EdgeInsets.all(16),
     decoration: BoxDecoration(
       color: AppColors.surface,
-      borderRadius: BorderRadius.circular(compact ? 13 : 14),
+      borderRadius: BorderRadius.circular(16),
       border: Border.all(color: const Color(0xFFE4E6DF)),
     ),
     child: Column(
@@ -566,44 +619,48 @@ class _MenuHero extends StatelessWidget {
         ],
         Text(
           context.l10n.gameName,
-          style: TextStyle(
-            fontSize: compact ? 20 : 21,
-            height: 1.1,
-            fontWeight: FontWeight.w800,
-            letterSpacing: -.8,
-          ),
+          style: context.textStyle.title.copyWith(fontSize: compact ? 20 : 21),
         ),
         if (compact) const SizedBox(height: 8),
         if (compact)
           Text(
             context.l10n.gameTagline,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
             style: const TextStyle(
               color: AppColors.muted,
               fontSize: 12,
               height: 1.35,
             ),
           ),
-        SizedBox(height: compact ? 7 : 12),
-        SizedBox(
-          width: double.infinity,
-          height: compact ? 39 : 45,
-          child: FilledButton(
-            onPressed: onRated,
-            style: FilledButton.styleFrom(
-              padding: const EdgeInsets.symmetric(horizontal: 13),
-            ),
-            child: Row(
-              children: [
-                const Icon(LucideIcons.search, size: 18),
-                const SizedBox(width: 11),
-                Text(context.l10n.rankedGame),
-                const Spacer(),
-                const Icon(LucideIcons.arrowRight, size: 18),
-              ],
+        SizedBox(height: compact ? 14 : 16),
+        BlocBuilder<AccountBloc, AccountState>(
+          bloc: AccountRootScope.of(context),
+          builder: (context, _) => SizedBox(
+            width: double.infinity,
+            height: 48,
+            child: FilledButton(
+              onPressed: onRated,
+              style: FilledButton.styleFrom(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+              ),
+              child: Row(
+                children: [
+                  const Icon(LucideIcons.search, size: 20),
+                  const SizedBox(width: 12),
+                  Text(
+                    AccountRootScope.of(context).profile?.username == null
+                        ? context.l10n.quickGame
+                        : context.l10n.rankedGame,
+                  ),
+                  const Spacer(),
+                  const Icon(LucideIcons.arrowRight, size: 20),
+                ],
+              ),
             ),
           ),
         ),
-        SizedBox(height: compact ? 5 : 6),
+        const SizedBox(height: 8),
         Row(
           children: [
             Expanded(
@@ -615,22 +672,27 @@ class _MenuHero extends StatelessWidget {
                   context: context,
                   titleBuilder: (context) => context.l10n.levels,
                   wide: true,
-                  builder: (_) => const LevelsView(),
+                  builder: (_) => LevelsView(
+                    onSignIn: () => _openProfileFromLevels(context),
+                  ),
                 ),
               ),
             ),
-            const SizedBox(width: 6),
+            const SizedBox(width: 8),
             Expanded(
               child: _ModeButton(
                 compact: compact,
                 icon: LucideIcons.cpu,
-                label: context.l10n.versusAi,
+                label: compact
+                    ? context.l10n.versusAiCompact
+                    : context.l10n.versusAi,
+                semanticLabel: context.l10n.playVersusAi,
                 onTap: () => onMode(GameMode.ai),
               ),
             ),
           ],
         ),
-        SizedBox(height: compact ? 5 : 6),
+        const SizedBox(height: 8),
         Row(
           children: [
             Expanded(
@@ -641,7 +703,7 @@ class _MenuHero extends StatelessWidget {
                 onTap: () => onMode(GameMode.local),
               ),
             ),
-            const SizedBox(width: 6),
+            const SizedBox(width: 8),
             Expanded(
               child: _ModeButton(
                 compact: compact,
@@ -652,9 +714,12 @@ class _MenuHero extends StatelessWidget {
             ),
           ],
         ),
-        SizedBox(height: compact ? 4 : 5),
-        SizedBox(
-          height: compact ? 32 : 35,
+        const SizedBox(height: 8),
+        ConstrainedBox(
+          constraints: BoxConstraints(
+            minHeight: compact ? 40 : 44,
+            maxHeight: compact ? 40 : double.infinity,
+          ),
           child: Row(
             children: <Widget>[
               Expanded(
@@ -668,7 +733,7 @@ class _MenuHero extends StatelessWidget {
                   ),
                 ),
               ),
-              const SizedBox(width: 6),
+              const SizedBox(width: 8),
               Expanded(
                 child: _MenuLink(
                   icon: LucideIcons.trophy,
@@ -789,7 +854,8 @@ class _MenuLink extends StatelessWidget {
     onPressed: onTap,
     style: TextButton.styleFrom(
       padding: const EdgeInsets.symmetric(horizontal: 4),
-      foregroundColor: const Color(0xFF697163),
+      foregroundColor: AppColors.ink,
+      overlayColor: context.colors.accentSubtle,
       textStyle: context.textStyle.buttonSmall,
     ),
     icon: Icon(icon, size: 16),
@@ -803,25 +869,54 @@ class _ModeButton extends StatelessWidget {
     required this.label,
     required this.onTap,
     required this.compact,
+    this.semanticLabel,
   });
   final IconData icon;
   final String label;
   final VoidCallback onTap;
   final bool compact;
+  final String? semanticLabel;
 
   @override
-  Widget build(BuildContext context) => SizedBox(
-    height: compact ? 37 : 42,
-    child: OutlinedButton.icon(
+  Widget build(BuildContext context) => ConstrainedBox(
+    constraints: BoxConstraints(minHeight: compact ? 48 : 46),
+    child: OutlinedButton(
       onPressed: onTap,
       style: OutlinedButton.styleFrom(
-        padding: const EdgeInsets.symmetric(horizontal: 6),
+        padding: EdgeInsets.symmetric(horizontal: compact ? 8 : 6),
         backgroundColor: Colors.white,
         foregroundColor: AppColors.ink,
-        textStyle: context.textStyle.buttonSmall,
+        textStyle: compact
+            ? context.textStyle.button.copyWith(
+                fontSize: 14,
+                height: 18 / 14,
+                fontWeight: FontWeight.w600,
+              )
+            : context.textStyle.buttonSmall,
       ),
-      icon: Icon(icon, size: 16, color: AppColors.accent),
-      label: Text(label, maxLines: 1),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 20, color: AppColors.accent),
+          SizedBox(width: compact ? 6 : 8),
+          if (compact)
+            Text(
+              label,
+              maxLines: 1,
+              softWrap: false,
+              semanticsLabel: semanticLabel,
+            )
+          else
+            Flexible(
+              child: Text(
+                label,
+                maxLines: 1,
+                softWrap: false,
+                semanticsLabel: semanticLabel,
+              ),
+            ),
+        ],
+      ),
     ),
   );
 }
@@ -894,71 +989,78 @@ class _TurnStatusState extends State<_TurnStatus> {
   @override
   Widget build(BuildContext context) {
     final GameViewData data = widget.data;
-    return Container(
-      padding: EdgeInsets.symmetric(
-        horizontal: widget.compact ? 9 : 12,
-        vertical: 9,
-      ),
-      decoration: BoxDecoration(
-        color: const Color(0xF5FAFBF6),
-        borderRadius: BorderRadius.circular(30),
-        border: Border.all(color: const Color(0xFFE6E9DE)),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Container(
-            width: 13,
-            height: 13,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              color: data.snapshot.currentPlayer == Player.one
-                  ? const Color(0xFF30383A)
-                  : const Color(0xFFF3ECDD),
-              border: Border.all(
-                color: data.snapshot.currentPlayer == Player.one
-                    ? const Color(0xFF5E6868)
-                    : const Color(0xFFC8BEA8),
-                width: 2,
-              ),
-            ),
-          ),
-          const SizedBox(width: 8),
-          Flexible(
-            child: Text(
-              '${data.levelId == null ? '' : '${context.l10n.levelNumber(data.levelId!)} · '}${_text(context)}',
-              overflow: TextOverflow.ellipsis,
-              style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w600),
-            ),
-          ),
-          if (data.mode == GameMode.online) ...[
+    final String status =
+        '${data.levelId == null ? '' : '${context.l10n.levelNumber(data.levelId!)} · '}${_text(context)}';
+    return Semantics(
+      liveRegion: true,
+      label: status,
+      child: Container(
+        height: 36,
+        padding: EdgeInsets.symmetric(horizontal: widget.compact ? 9 : 12),
+        decoration: BoxDecoration(
+          color: const Color(0xF5FAFBF6),
+          borderRadius: BorderRadius.circular(30),
+          border: Border.all(color: const Color(0xFFE6E9DE)),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
             Container(
-              height: 18,
-              width: 1,
-              margin: const EdgeInsets.symmetric(horizontal: 8),
-              color: AppColors.border,
-            ),
-            Text.rich(
-              TextSpan(
-                text: _remaining == null ? '—' : '${_remaining!}',
-                style: const TextStyle(
-                  fontSize: 11,
-                  fontWeight: FontWeight.w700,
+              width: 13,
+              height: 13,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: data.snapshot.currentPlayer == Player.one
+                    ? const Color(0xFF30383A)
+                    : const Color(0xFFF3ECDD),
+                border: Border.all(
+                  color: data.snapshot.currentPlayer == Player.one
+                      ? const Color(0xFF5E6868)
+                      : const Color(0xFFC8BEA8),
+                  width: 2,
                 ),
-                children: [
-                  TextSpan(
-                    text: context.l10n.secondsShort,
-                    style: const TextStyle(
-                      color: Color(0xFF858D7B),
-                      fontSize: 9,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ],
               ),
             ),
+            const SizedBox(width: 8),
+            Flexible(
+              child: Text(
+                status,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  fontSize: 10,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+            if (data.mode == GameMode.online) ...[
+              Container(
+                height: 18,
+                width: 1,
+                margin: const EdgeInsets.symmetric(horizontal: 8),
+                color: AppColors.border,
+              ),
+              Text.rich(
+                TextSpan(
+                  text: _remaining == null ? '—' : '${_remaining!}',
+                  style: const TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w700,
+                  ),
+                  children: [
+                    TextSpan(
+                      text: context.l10n.secondsShort,
+                      style: const TextStyle(
+                        color: Color(0xFF858D7B),
+                        fontSize: 9,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
           ],
-        ],
+        ),
       ),
     );
   }
@@ -1055,7 +1157,6 @@ class _OnlineBannerState extends State<_OnlineBanner> {
                   ),
                 ),
                 IconButton(
-                  visualDensity: VisualDensity.compact,
                   tooltip: context.l10n.copyLobbyCode,
                   onPressed: () async {
                     await Clipboard.setData(ClipboardData(text: snapshot.code));
@@ -1067,7 +1168,6 @@ class _OnlineBannerState extends State<_OnlineBanner> {
                 ),
               ],
               IconButton(
-                visualDensity: VisualDensity.compact,
                 tooltip: context.l10n.leaveLobby,
                 onPressed: () => _confirmOnlineLeave(context, data),
                 icon: const Icon(LucideIcons.logOut, size: 15),
@@ -1126,13 +1226,13 @@ class _PortraitGameBoard extends StatelessWidget {
         children: [
           if (data.mode == GameMode.online)
             Padding(
-              padding: const EdgeInsets.fromLTRB(12, 5, 12, 0),
+              padding: const EdgeInsets.fromLTRB(16, 5, 16, 0),
               child: _OnlineBanner(data: data),
             ),
           SizedBox(
-            height: 48,
+            height: 56,
             child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 7),
+              padding: const EdgeInsets.symmetric(horizontal: 16),
               child: Row(
                 children: [
                   Expanded(
@@ -1144,7 +1244,7 @@ class _PortraitGameBoard extends StatelessWidget {
                   IconButton(
                     tooltip: context.l10n.pause,
                     onPressed: () => _showPauseDialog(context, data),
-                    icon: const Icon(LucideIcons.pause, size: 19),
+                    icon: const Icon(LucideIcons.pause, size: 22),
                   ),
                 ],
               ),
@@ -1160,9 +1260,15 @@ class _PortraitGameBoard extends StatelessWidget {
               ],
             ),
           ),
-          _PlayerStrip(data: data),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: _PlayerStrip(data: data),
+          ),
           const Divider(height: 1),
-          _ToolBar(data: data, labels: true),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: _ToolBar(data: data, labels: true),
+          ),
         ],
       ),
     ),
@@ -1175,15 +1281,13 @@ class _PlayerStrip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => SizedBox(
-    height: 38,
+    height: 44,
     child: Row(
       children: [
         Expanded(
-          child: Text(
-            '● ${data.names[0]}',
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: const TextStyle(fontSize: 9),
+          child: Padding(
+            padding: const EdgeInsets.only(left: 16, right: 8),
+            child: _PlayerName(name: data.names[0], player: Player.one),
           ),
         ),
         if (data.mode == GameMode.daily)
@@ -1210,23 +1314,28 @@ class _PlayerStrip extends StatelessWidget {
             },
           )
         else
-          Text(
-            data.mode == GameMode.level
-                ? context.l10n.moves(data.challengeMoves)
-                : context.l10n.moves(
-                    data.phase == GamePhase.replay
-                        ? data.replayIndex
-                        : data.snapshot.history.length,
-                  ),
-            style: const TextStyle(fontSize: 9),
+          ConstrainedBox(
+            constraints: const BoxConstraints(minWidth: 64),
+            child: Text(
+              data.mode == GameMode.level
+                  ? context.l10n.moves(data.challengeMoves)
+                  : context.l10n.moveNumber(
+                      data.phase == GamePhase.replay
+                          ? data.replayIndex
+                          : data.snapshot.history.length,
+                    ),
+              textAlign: TextAlign.center,
+              style: context.textStyle.caption.copyWith(fontSize: 9),
+            ),
           ),
         Expanded(
-          child: Text(
-            '○ ${data.names[1]}',
-            textAlign: TextAlign.right,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: const TextStyle(fontSize: 9),
+          child: Padding(
+            padding: const EdgeInsets.only(left: 8, right: 16),
+            child: _PlayerName(
+              name: data.names[1],
+              player: Player.two,
+              trailing: true,
+            ),
           ),
         ),
       ],
@@ -1242,31 +1351,88 @@ class _ToolBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final GameBloc bloc = GameRootScope.of(context);
-    return Row(
-      children: [
-        if (data.mode != GameMode.level && data.mode != GameMode.daily)
+    return SizedBox(
+      height: 64,
+      child: Row(
+        children: [
           _Tool(
+            key: const ValueKey<String>('game-toolbar-undo'),
             icon: LucideIcons.rotateCcw,
-            label: labels ? context.l10n.undo : '',
+            label: context.l10n.undo,
             enabled:
                 data.mode != GameMode.online &&
                 data.phase == GamePhase.playing &&
                 data.snapshot.history.isNotEmpty,
             onTap: () => bloc.add(const GameEvent$Undo()),
           ),
-        _Tool(
-          icon: LucideIcons.eye,
-          label: labels ? context.l10n.xray : '',
-          selected: data.xray,
-          onTap: () => bloc.add(const GameEvent$ToggleXray()),
+          _Tool(
+            key: const ValueKey<String>('game-toolbar-xray'),
+            icon: LucideIcons.eye,
+            label: context.l10n.xray,
+            selected: data.xray,
+            onTap: () => bloc.add(const GameEvent$ToggleXray()),
+          ),
+          _ViewTool(
+            key: const ValueKey<String>('game-toolbar-view'),
+            label: context.l10n.view,
+          ),
+          _Tool(
+            key: const ValueKey<String>('game-toolbar-reset'),
+            icon: LucideIcons.focus,
+            label: context.l10n.camera,
+            tooltip: context.l10n.resetCamera,
+            onTap: () => bloc.add(const GameEvent$View(CameraView.perspective)),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _PlayerName extends StatelessWidget {
+  const new({required this.name, required this.player, this.trailing = false});
+
+  final String name;
+  final Player player;
+  final bool trailing;
+
+  @override
+  Widget build(BuildContext context) {
+    final Widget dot = Container(
+      width: 13,
+      height: 13,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        color: player == Player.one
+            ? const Color(0xFF30383A)
+            : const Color(0xFFF3ECDD),
+        border: Border.all(
+          width: 1.5,
+          color: player == Player.one
+              ? const Color(0xFF5E6868)
+              : const Color(0xFFC8BEA8),
         ),
-        _ViewTool(label: labels ? context.l10n.view : ''),
-        _Tool(
-          icon: LucideIcons.maximize,
-          label: '',
-          onTap: () => bloc.add(const GameEvent$View(CameraView.perspective)),
+      ),
+    );
+    final Widget text = Flexible(
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 120),
+        child: Text(
+          name,
+          textAlign: trailing ? TextAlign.right : TextAlign.left,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: context.textStyle.caption.copyWith(fontSize: 9),
         ),
-      ],
+      ),
+    );
+    return Row(
+      mainAxisAlignment: trailing
+          ? MainAxisAlignment.end
+          : MainAxisAlignment.start,
+      children: trailing
+          ? <Widget>[text, const SizedBox(width: 8), dot]
+          : <Widget>[dot, const SizedBox(width: 8), text],
     );
   }
 }
@@ -1364,7 +1530,7 @@ class _OnlinePauseOverlayState extends State<_OnlinePauseOverlay> {
                       IconButton(
                         tooltip: context.l10n.close,
                         onPressed: () => setState(() => _dismissed = true),
-                        icon: const Icon(Icons.close_rounded, size: 20),
+                        icon: const Icon(LucideIcons.x, size: 20),
                       ),
                     ],
                   ),
@@ -1772,7 +1938,6 @@ void _showViewControls(BuildContext context) {
                             ),
                             IconButton(
                               tooltip: context.l10n.closeViewMenu,
-                              visualDensity: VisualDensity.compact,
                               onPressed: () => Navigator.pop(context),
                               icon: const Icon(LucideIcons.x, size: 18),
                             ),
@@ -1996,20 +2161,16 @@ class _ConfirmationActions extends StatelessWidget {
   Widget build(BuildContext context) => Column(
     crossAxisAlignment: CrossAxisAlignment.stretch,
     children: [
-      FilledButton(
+      AppActionButton(
         onPressed: () => Navigator.pop(context, true),
-        style: FilledButton.styleFrom(
-          padding: const EdgeInsets.symmetric(horizontal: 6),
-        ),
-        child: Text(confirmLabel, textAlign: TextAlign.center),
+        style: AppActionStyle.danger,
+        label: confirmLabel,
       ),
       const SizedBox(height: 8),
-      OutlinedButton(
+      AppActionButton(
         onPressed: () => Navigator.pop(context, false),
-        style: OutlinedButton.styleFrom(
-          padding: const EdgeInsets.symmetric(horizontal: 6),
-        ),
-        child: Text(context.l10n.stayInGame, textAlign: TextAlign.center),
+        style: AppActionStyle.secondary,
+        label: context.l10n.cancel,
       ),
     ],
   );
@@ -2068,7 +2229,7 @@ void _showPauseDialog(BuildContext appContext, GameViewData data) {
           children: [
             Text(context.l10n.onlineContinuesInMenu),
             const SizedBox(height: 14),
-            FilledButton(
+            OutlinedButton(
               onPressed: data.onlineSnapshot?.pause?.used == true
                   ? null
                   : () {
@@ -2126,8 +2287,7 @@ void _showPauseDialog(BuildContext appContext, GameViewData data) {
       firstChild: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Text(context.l10n.timeStopped),
-          const SizedBox(height: 16),
+          const SizedBox(height: 4),
           FilledButton.icon(
             onPressed: () {
               resumeAfterDismiss = false;
@@ -2138,7 +2298,7 @@ void _showPauseDialog(BuildContext appContext, GameViewData data) {
             icon: const Icon(LucideIcons.arrowRight, size: 18),
             label: Text(context.l10n.continueAction),
           ),
-          const SizedBox(height: 6),
+          const SizedBox(height: 8),
           OutlinedButton.icon(
             onPressed: () {
               resumeAfterDismiss = false;
@@ -2165,7 +2325,10 @@ void _showPauseDialog(BuildContext appContext, GameViewData data) {
                     context: appContext,
                     titleBuilder: (context) => context.l10n.levels,
                     wide: true,
-                    builder: (_) => LevelsView(initialId: initialId),
+                    builder: (_) => LevelsView(
+                      initialId: initialId,
+                      onSignIn: () => _openProfileFromLevels(appContext),
+                    ),
                   ),
                 );
               },
@@ -2218,6 +2381,11 @@ class _GamePanel extends StatelessWidget {
               (player) => player?.connected ?? false,
             ) ??
             false);
+    final Size viewport = MediaQuery.sizeOf(context);
+    final bool portraitResult =
+        data.phase != GamePhase.replay &&
+        viewport.width < 651 &&
+        viewport.height >= viewport.width;
     void openLevels() {
       final int initialId = data.levelId ?? 1;
       bloc.add(const GameEvent$Menu());
@@ -2225,7 +2393,10 @@ class _GamePanel extends StatelessWidget {
         context: context,
         titleBuilder: (context) => context.l10n.levels,
         wide: true,
-        builder: (_) => LevelsView(initialId: initialId),
+        builder: (_) => LevelsView(
+          initialId: initialId,
+          onSignIn: () => _openProfileFromLevels(context),
+        ),
       );
     }
 
@@ -2251,7 +2422,7 @@ class _GamePanel extends StatelessWidget {
         ? context.l10n.draw
         : context.l10n.winnerName(data.names[winner.index]);
     return Container(
-      padding: const EdgeInsets.fromLTRB(0, 6, 0, 0),
+      padding: EdgeInsets.only(top: portraitResult ? AppSpacing.md : 6),
       decoration: const BoxDecoration(
         border: Border(top: BorderSide(color: AppColors.border)),
       ),
@@ -2349,7 +2520,9 @@ class _GamePanel extends StatelessWidget {
                   ),
                 if (data.mode == GameMode.daily && winner == Player.one)
                   _DailyGameResult(data: data),
-                const SizedBox(height: 4),
+                SizedBox(
+                  height: portraitResult ? AppSpacing.md : AppSpacing.xxs,
+                ),
                 if (data.mode == GameMode.daily) ...[
                   Row(
                     children: <Widget>[
@@ -2546,7 +2719,7 @@ class _ReplayButton extends StatelessWidget {
 }
 
 class _ViewTool extends StatelessWidget {
-  const new({required this.label});
+  const new({required this.label, super.key});
 
   final String label;
 
@@ -2557,16 +2730,21 @@ class _ViewTool extends StatelessWidget {
         onTap: () => _showViewControls(anchorContext),
         borderRadius: BorderRadius.circular(12),
         child: SizedBox(
-          height: 44,
-          child: Row(
+          height: 64,
+          child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              const Icon(LucideIcons.layers3, size: 19),
+              const Icon(LucideIcons.layers3, size: 22),
               if (label.isNotEmpty) ...[
-                const SizedBox(width: 6),
-                Text(label, style: const TextStyle(fontSize: 10)),
-                const SizedBox(width: 3),
-                const Icon(LucideIcons.chevronDown, size: 13),
+                const SizedBox(height: 4),
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(label, style: const TextStyle(fontSize: 10)),
+                    const SizedBox(width: 3),
+                    const Icon(LucideIcons.chevronDown, size: 12),
+                  ],
+                ),
               ],
             ],
           ),
@@ -2583,41 +2761,52 @@ class _Tool extends StatelessWidget {
     required this.onTap,
     this.enabled = true,
     this.selected = false,
+    this.tooltip,
+    super.key,
   });
   final IconData icon;
   final String label;
   final VoidCallback onTap;
   final bool enabled;
   final bool selected;
+  final String? tooltip;
 
   @override
   Widget build(BuildContext context) => Expanded(
-    child: InkWell(
-      onTap: enabled ? onTap : null,
-      borderRadius: BorderRadius.circular(12),
-      child: Opacity(
-        opacity: enabled ? 1 : .35,
-        child: SizedBox(
-          height: 44,
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(
-                icon,
-                size: 19,
-                color: selected ? Theme.of(context).colorScheme.primary : null,
-              ),
-              if (label.isNotEmpty) ...[
-                const SizedBox(width: 6),
+    child: Tooltip(
+      message: tooltip ?? label,
+      child: InkWell(
+        onTap: enabled ? onTap : null,
+        borderRadius: BorderRadius.circular(12),
+        child: Opacity(
+          opacity: enabled ? 1 : .35,
+          child: SizedBox(
+            height: 64,
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(
+                  icon,
+                  size: 22,
+                  color: selected
+                      ? Theme.of(context).colorScheme.primary
+                      : null,
+                ),
+                const SizedBox(height: 4),
                 Flexible(
                   child: Text(
                     label,
-                    style: const TextStyle(fontSize: 10),
+                    style: TextStyle(
+                      fontSize: 10,
+                      color: selected
+                          ? Theme.of(context).colorScheme.primary
+                          : null,
+                    ),
                     maxLines: 1,
                   ),
                 ),
               ],
-            ],
+            ),
           ),
         ),
       ),

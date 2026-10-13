@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:four3/l10n/generated/app_localizations.dart';
@@ -49,19 +51,71 @@ class _AccountViewState extends State<AccountView> {
   final _newPassword = TextEditingController();
   final _newPasswordRepeat = TextEditingController();
   final _guestScrollController = ScrollController();
+  final _usernameFocus = FocusNode();
+  final _emailFocus = FocusNode();
+  final _passwordFocus = FocusNode();
+  final _passwordRepeatFocus = FocusNode();
+  final _currentPasswordFocus = FocusNode();
+  final _newPasswordFocus = FocusNode();
+  final _newPasswordRepeatFocus = FocusNode();
   _AccountMode _mode = _AccountMode.register;
   bool _security = false;
+  bool _verificationRequired = false;
+  int _resendCooldownSeconds = 0;
+  Timer? _resendCooldownTimer;
   _AccountLocalError? _localError;
 
   @override
   void initState() {
     super.initState();
-    _username.addListener(_refreshIdentityActions);
+    _username.addListener(_refreshUsernameActions);
     _email.addListener(_refreshIdentityActions);
+    _password.addListener(_refreshIdentityActions);
+    _usernameFocus.addListener(_validateUsernameAfterBlur);
+    _passwordFocus.addListener(_validatePasswordAfterBlur);
+  }
+
+  void _refreshUsernameActions() {
+    final bool clearVerification = _verificationRequired;
+    _refreshIdentityActions();
+    if (!mounted || !clearVerification) return;
+    _resendCooldownTimer?.cancel();
+    setState(() {
+      _verificationRequired = false;
+      _resendCooldownSeconds = 0;
+    });
+    AccountRootScope.of(context).add(const AccountEvent$ClearMessage());
   }
 
   void _refreshIdentityActions() {
-    if (mounted) setState(() {});
+    if (!mounted) return;
+    final bool usernameFixed =
+        _localError == _AccountLocalError.usernameValidation &&
+        RegExp(r'^[A-Za-z0-9_]{3,24}$').hasMatch(_username.text.trim());
+    final bool passwordFixed =
+        _localError == _AccountLocalError.passwordMinValidation &&
+        _password.text.length >= 8;
+    setState(() {
+      if (usernameFixed || passwordFixed) _localError = null;
+    });
+  }
+
+  void _validateUsernameAfterBlur() {
+    if (_usernameFocus.hasFocus || _mode != _AccountMode.register || !mounted) {
+      return;
+    }
+    if (!RegExp(r'^[A-Za-z0-9_]{3,24}$').hasMatch(_username.text.trim())) {
+      setState(() => _localError = _AccountLocalError.usernameValidation);
+    }
+  }
+
+  void _validatePasswordAfterBlur() {
+    if (_passwordFocus.hasFocus || _mode != _AccountMode.register || !mounted) {
+      return;
+    }
+    if (_password.text.length < 8) {
+      setState(() => _localError = _AccountLocalError.passwordMinValidation);
+    }
   }
 
   @override
@@ -70,8 +124,15 @@ class _AccountViewState extends State<AccountView> {
     return BlocConsumer<AccountBloc, AccountState>(
       bloc: bloc,
       listenWhen: (previous, current) =>
+          current is AccountState$Failure ||
           current is AccountState$Ready && current.registrationCompleted,
       listener: (context, state) {
+        if (state case AccountState$Failure(:final verificationRequired)) {
+          if (_verificationRequired != verificationRequired) {
+            setState(() => _verificationRequired = verificationRequired);
+          }
+          return;
+        }
         _password.clear();
         FocusManager.instance.primaryFocus?.unfocus();
         setState(() {
@@ -92,7 +153,9 @@ class _AccountViewState extends State<AccountView> {
         final AccountProfile? profile = bloc.profile;
         final bool loading = state is AccountState$Loading;
         final String failure = state is AccountState$Failure
-            ? _accountFailure(context, state)
+            ? state.verificationRequired && !_verificationRequired
+                  ? ''
+                  : _accountFailure(context, state)
             : _accountLocalError(context, _localError);
         final String notice = state is AccountState$Ready
             ? _accountNotice(context, state)
@@ -105,6 +168,8 @@ class _AccountViewState extends State<AccountView> {
             failure: failure,
             password: _password,
             passwordRepeat: _passwordRepeat,
+            passwordFocus: _passwordFocus,
+            passwordRepeatFocus: _passwordRepeatFocus,
             onComplete: _completeReset,
           );
         }
@@ -119,6 +184,10 @@ class _AccountViewState extends State<AccountView> {
             currentPassword: _currentPassword,
             newPassword: _newPassword,
             newPasswordRepeat: _newPasswordRepeat,
+            currentPasswordFocus: _currentPasswordFocus,
+            newPasswordFocus: _newPasswordFocus,
+            newPasswordRepeatFocus: _newPasswordRepeatFocus,
+            localError: _localError,
             onSecurityChanged: (value) => setState(() {
               _security = value;
               _localError = null;
@@ -137,13 +206,23 @@ class _AccountViewState extends State<AccountView> {
           username: _username,
           email: _email,
           password: _password,
+          localError: _localError,
+          usernameFocus: _usernameFocus,
+          emailFocus: _emailFocus,
+          passwordFocus: _passwordFocus,
           scrollController: _guestScrollController,
+          verificationRequired: _verificationRequired,
+          resendCooldownSeconds: _resendCooldownSeconds,
           onModeChanged: (value) => setState(() {
             _mode = value;
             _localError = null;
+            _verificationRequired = false;
+            _resendCooldownSeconds = 0;
+            _resendCooldownTimer?.cancel();
             bloc.add(const AccountEvent$ClearMessage());
           }),
           onSubmit: _submitGuest,
+          onResendVerification: () => _resendVerification(bloc),
         );
       },
     );
@@ -155,10 +234,12 @@ class _AccountViewState extends State<AccountView> {
       case _AccountMode.register:
         if (!RegExp(r'^[A-Za-z0-9_]{3,24}$').hasMatch(_username.text.trim())) {
           setState(() => _localError = _AccountLocalError.usernameValidation);
+          _usernameFocus.requestFocus();
         } else if (_password.text.length < 8) {
           setState(
             () => _localError = _AccountLocalError.passwordMinValidation,
           );
+          _passwordFocus.requestFocus();
         } else {
           bloc.add(
             AccountEvent$Register(_username.text, _email.text, _password.text),
@@ -169,6 +250,23 @@ class _AccountViewState extends State<AccountView> {
       case _AccountMode.forgot:
         bloc.add(AccountEvent$RequestPasswordReset(_email.text));
     }
+  }
+
+  void _resendVerification(AccountBloc bloc) {
+    if (_resendCooldownSeconds > 0) return;
+    bloc.add(AccountEvent$ResendVerification(_username.text.trim()));
+    _resendCooldownTimer?.cancel();
+    setState(() => _resendCooldownSeconds = 60);
+    _resendCooldownTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
+      if (!mounted) {
+        timer.cancel();
+        return;
+      }
+      setState(() {
+        _resendCooldownSeconds--;
+        if (_resendCooldownSeconds == 0) timer.cancel();
+      });
+    });
   }
 
   void _completeReset(AccountBloc bloc, String token) {
@@ -205,6 +303,7 @@ class _AccountViewState extends State<AccountView> {
 
   @override
   void dispose() {
+    _resendCooldownTimer?.cancel();
     for (final TextEditingController controller in [
       _username,
       _email,
@@ -217,6 +316,13 @@ class _AccountViewState extends State<AccountView> {
       controller.dispose();
     }
     _guestScrollController.dispose();
+    _usernameFocus.dispose();
+    _emailFocus.dispose();
+    _passwordFocus.dispose();
+    _passwordRepeatFocus.dispose();
+    _currentPasswordFocus.dispose();
+    _newPasswordFocus.dispose();
+    _newPasswordRepeatFocus.dispose();
     super.dispose();
   }
 }
@@ -232,9 +338,16 @@ class _AccountGuestView extends StatelessWidget {
     required this.username,
     required this.email,
     required this.password,
+    required this.localError,
+    required this.usernameFocus,
+    required this.emailFocus,
+    required this.passwordFocus,
     required this.scrollController,
+    required this.verificationRequired,
+    required this.resendCooldownSeconds,
     required this.onModeChanged,
     required this.onSubmit,
+    required this.onResendVerification,
   });
 
   final AccountBloc bloc;
@@ -246,96 +359,150 @@ class _AccountGuestView extends StatelessWidget {
   final TextEditingController username;
   final TextEditingController email;
   final TextEditingController password;
+  final _AccountLocalError? localError;
+  final FocusNode usernameFocus;
+  final FocusNode emailFocus;
+  final FocusNode passwordFocus;
   final ScrollController scrollController;
+  final bool verificationRequired;
+  final int resendCooldownSeconds;
   final ValueChanged<_AccountMode> onModeChanged;
   final ValueChanged<AccountBloc> onSubmit;
+  final VoidCallback onResendVerification;
 
   @override
   Widget build(BuildContext context) => SingleChildScrollView(
     controller: scrollController,
-    child: Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        _ProfileIntro(name: profile?.guestName ?? context.l10n.guest),
-        if (notice.isNotEmpty) _Notice(notice),
-        const SizedBox(height: 14),
-        if (mode != _AccountMode.forgot) ...[
-          _AuthTabs(mode: mode, onChanged: onModeChanged),
-          const SizedBox(height: 16),
-          _Field(
-            label: context.l10n.username,
-            controller: username,
-            autocorrect: false,
-          ),
-          if (mode == _AccountMode.register) ...[
-            const SizedBox(height: 5),
-            Text(context.l10n.usernameHint, style: context.textStyle.micro),
-            const SizedBox(height: 10),
+    keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+    child: AutofillGroup(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          _ProfileIntro(name: profile?.guestName ?? context.l10n.guest),
+          if (notice.isNotEmpty) _Notice(notice),
+          const SizedBox(height: 14),
+          if (mode != _AccountMode.forgot) ...[
+            _AuthTabs(mode: mode, onChanged: onModeChanged),
+            const SizedBox(height: 16),
             _Field(
-              label: 'Email',
+              label: context.l10n.username,
+              controller: username,
+              autocorrect: false,
+              focusNode: usernameFocus,
+              textInputAction: TextInputAction.next,
+              autofillHints: const <String>[AutofillHints.username],
+              hintText: mode == _AccountMode.register
+                  ? context.l10n.usernameExample
+                  : null,
+              helperText: mode == _AccountMode.register
+                  ? context.l10n.usernameHint
+                  : null,
+              errorText: localError == _AccountLocalError.usernameValidation
+                  ? context.l10n.usernameValidation
+                  : null,
+              onSubmitted: (_) => mode == _AccountMode.register
+                  ? emailFocus.requestFocus()
+                  : passwordFocus.requestFocus(),
+            ),
+            if (mode == _AccountMode.register) ...[
+              const SizedBox(height: 20),
+              _Field(
+                label: context.l10n.emailAddress,
+                controller: email,
+                keyboardType: TextInputType.emailAddress,
+                autocorrect: false,
+                focusNode: emailFocus,
+                textInputAction: TextInputAction.next,
+                autofillHints: const <String>[AutofillHints.email],
+                hintText: 'name@example.com',
+                onSubmitted: (_) => passwordFocus.requestFocus(),
+              ),
+            ],
+            const SizedBox(height: 20),
+            _Field(
+              label: context.l10n.password,
+              controller: password,
+              obscureText: true,
+              showPasswordToggle: true,
+              focusNode: passwordFocus,
+              textInputAction: TextInputAction.done,
+              autofillHints: <String>[
+                if (mode == _AccountMode.register)
+                  AutofillHints.newPassword
+                else
+                  AutofillHints.password,
+              ],
+              helperText: mode == _AccountMode.register
+                  ? context.l10n.passwordMinHint
+                  : null,
+              errorText: localError == _AccountLocalError.passwordMinValidation
+                  ? context.l10n.passwordMinValidation
+                  : null,
+              onSubmitted: (_) {
+                if (!loading) onSubmit(bloc);
+              },
+            ),
+          ] else ...[
+            Text(
+              context.l10n.forgotPasswordHint,
+              style: context.textStyle.caption.copyWith(height: 1.5),
+            ),
+            const SizedBox(height: 16),
+            _Field(
+              label: context.l10n.emailAddress,
               controller: email,
               keyboardType: TextInputType.emailAddress,
               autocorrect: false,
+              focusNode: emailFocus,
+              textInputAction: TextInputAction.done,
+              autofillHints: const <String>[AutofillHints.email],
+              hintText: 'name@example.com',
+              onSubmitted: (_) {
+                if (!loading) onSubmit(bloc);
+              },
             ),
           ],
-          const SizedBox(height: 10),
-          _Field(
-            label: context.l10n.password,
-            controller: password,
-            obscureText: true,
-          ),
-        ] else ...[
-          Text(
-            context.l10n.forgotPasswordHint,
-            style: context.textStyle.caption.copyWith(height: 1.5),
-          ),
+          if (failure.isNotEmpty && localError == null) _Error(failure),
           const SizedBox(height: 16),
-          _Field(
-            label: 'Email',
-            controller: email,
-            keyboardType: TextInputType.emailAddress,
-            autocorrect: false,
-          ),
-        ],
-        if (failure.isNotEmpty) _Error(failure),
-        const SizedBox(height: 16),
-        FilledButton(
-          onPressed: loading ? null : () => onSubmit(bloc),
-          child: Text(
-            loading
-                ? mode == _AccountMode.forgot
-                      ? context.l10n.sending
-                      : context.l10n.pleaseWait
-                : switch (mode) {
-                    _AccountMode.register => context.l10n.register,
-                    _AccountMode.login => context.l10n.signIn,
-                    _AccountMode.forgot => context.l10n.getLink,
-                  },
-          ),
-        ),
-        const SizedBox(height: 8),
-        if (mode == _AccountMode.login) ...[
-          OutlinedButton(
-            onPressed: () => onModeChanged(_AccountMode.forgot),
-            child: Text(context.l10n.forgotPassword),
-          ),
-          if (email.text.trim().isNotEmpty || username.text.trim().isNotEmpty)
-            TextButton(
-              onPressed: loading
-                  ? null
-                  : () => bloc.add(
-                      AccountEvent$ResendVerification(
-                        email.text.trim().isEmpty ? username.text : email.text,
-                      ),
-                    ),
-              child: Text(context.l10n.resendVerification),
+          FilledButton(
+            onPressed: loading ? null : () => onSubmit(bloc),
+            child: Text(
+              loading
+                  ? mode == _AccountMode.forgot
+                        ? context.l10n.sending
+                        : context.l10n.pleaseWait
+                  : switch (mode) {
+                      _AccountMode.register => context.l10n.register,
+                      _AccountMode.login => context.l10n.signIn,
+                      _AccountMode.forgot => context.l10n.getLink,
+                    },
             ),
-        ] else if (mode == _AccountMode.forgot)
-          OutlinedButton(
-            onPressed: () => onModeChanged(_AccountMode.login),
-            child: Text(context.l10n.returnToSignIn),
           ),
-      ],
+          const SizedBox(height: 8),
+          if (mode == _AccountMode.login) ...[
+            TextButton(
+              onPressed: () => onModeChanged(_AccountMode.forgot),
+              child: Text(context.l10n.forgotPassword),
+            ),
+            if (verificationRequired)
+              TextButton(
+                onPressed: loading || resendCooldownSeconds > 0
+                    ? null
+                    : onResendVerification,
+                child: Text(
+                  resendCooldownSeconds > 0
+                      ? '${context.l10n.resendVerification} '
+                            '($resendCooldownSeconds${context.l10n.secondsShort})'
+                      : context.l10n.resendVerification,
+                ),
+              ),
+          ] else if (mode == _AccountMode.forgot)
+            TextButton(
+              onPressed: () => onModeChanged(_AccountMode.login),
+              child: Text(context.l10n.returnToSignIn),
+            ),
+        ],
+      ),
     ),
   );
 }
@@ -351,6 +518,10 @@ class _AccountSignedView extends StatelessWidget {
     required this.currentPassword,
     required this.newPassword,
     required this.newPasswordRepeat,
+    required this.currentPasswordFocus,
+    required this.newPasswordFocus,
+    required this.newPasswordRepeatFocus,
+    required this.localError,
     required this.onSecurityChanged,
     required this.onHistory,
     required this.onChangePassword,
@@ -365,123 +536,159 @@ class _AccountSignedView extends StatelessWidget {
   final TextEditingController currentPassword;
   final TextEditingController newPassword;
   final TextEditingController newPasswordRepeat;
+  final FocusNode currentPasswordFocus;
+  final FocusNode newPasswordFocus;
+  final FocusNode newPasswordRepeatFocus;
+  final _AccountLocalError? localError;
   final ValueChanged<bool> onSecurityChanged;
   final VoidCallback? onHistory;
   final ValueChanged<AccountBloc> onChangePassword;
 
   @override
   Widget build(BuildContext context) => SingleChildScrollView(
-    child: Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        _SignedTabs(security: security, onChanged: onSecurityChanged),
-        const SizedBox(height: 12),
-        if (notice.isNotEmpty) _Notice(notice),
-        if (!security) ...[
-          if (MediaQuery.sizeOf(context).height > 650) ...[
-            _SignedProfile(profile: profile),
-            const SizedBox(height: 9),
-          ],
-          _AccountOverviewCards(onHistory: onHistory),
-          const SizedBox(height: 6),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              if (onHistory != null)
-                TextButton.icon(
-                  onPressed: onHistory,
-                  icon: const Icon(LucideIcons.history, size: 16),
-                  label: Text(context.l10n.history),
-                ),
-              TextButton.icon(
-                onPressed: loading
-                    ? null
-                    : () => bloc.add(const AccountEvent$Logout()),
-                icon: const Icon(LucideIcons.logOut, size: 16),
-                label: Text(context.l10n.signOut),
-              ),
+    keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+    child: AutofillGroup(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          _SignedTabs(security: security, onChanged: onSecurityChanged),
+          const SizedBox(height: 12),
+          if (notice.isNotEmpty) _Notice(notice),
+          if (!security) ...[
+            if (MediaQuery.sizeOf(context).height > 650) ...[
+              _SignedProfile(profile: profile),
+              const SizedBox(height: 9),
             ],
-          ),
-        ] else ...[
-          Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              border: Border.all(color: const Color(0xFFDDE1D8)),
-              borderRadius: BorderRadius.circular(14),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
+            _AccountOverviewCards(onHistory: onHistory),
+            const SizedBox(height: 6),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Row(
-                  children: [
-                    Icon(
-                      LucideIcons.lockKeyhole,
-                      size: 20,
-                      color: context.colors.accent,
-                    ),
-                    const SizedBox(width: 11),
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          context.l10n.changePasswordUpper,
-                          style: context.textStyle.micro.copyWith(
-                            fontSize: 8,
-                            fontWeight: FontWeight.w800,
-                            letterSpacing: 1.2,
-                          ),
-                        ),
-                        Text(
-                          context.l10n.updateCredentials,
-                          style: context.textStyle.bodyStrong.copyWith(
-                            fontSize: 12,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 17),
-                _Field(
-                  label: context.l10n.currentPassword,
-                  controller: currentPassword,
-                  obscureText: true,
-                ),
-                const SizedBox(height: 11),
-                _Field(
-                  label: context.l10n.newPassword,
-                  controller: newPassword,
-                  obscureText: true,
-                  maxLength: 128,
-                ),
-                const SizedBox(height: 5),
-                Text(
-                  context.l10n.passwordLengthHint,
-                  style: context.textStyle.micro.copyWith(fontSize: 8),
-                ),
-                const SizedBox(height: 11),
-                _Field(
-                  label: context.l10n.repeatNewPassword,
-                  controller: newPasswordRepeat,
-                  obscureText: true,
-                  maxLength: 128,
-                ),
-                if (failure.isNotEmpty) _Error(failure),
-                if (notice.isNotEmpty) _Notice(notice),
-                const SizedBox(height: 11),
-                FilledButton.icon(
-                  onPressed: loading ? null : () => onChangePassword(bloc),
-                  icon: const Icon(LucideIcons.keyRound, size: 17),
-                  label: Text(
-                    loading ? context.l10n.saving : context.l10n.changePassword,
+                if (onHistory != null)
+                  TextButton.icon(
+                    onPressed: onHistory,
+                    icon: const Icon(LucideIcons.history, size: 16),
+                    label: Text(context.l10n.history),
                   ),
+                TextButton.icon(
+                  onPressed: loading
+                      ? null
+                      : () => bloc.add(const AccountEvent$Logout()),
+                  icon: const Icon(LucideIcons.logOut, size: 16),
+                  label: Text(context.l10n.signOut),
                 ),
               ],
             ),
-          ),
+          ] else ...[
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                border: Border.all(color: const Color(0xFFDDE1D8)),
+                borderRadius: BorderRadius.circular(14),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Row(
+                    children: [
+                      Icon(
+                        LucideIcons.lockKeyhole,
+                        size: 20,
+                        color: context.colors.accent,
+                      ),
+                      const SizedBox(width: 11),
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            context.l10n.changePasswordUpper,
+                            style: context.textStyle.micro.copyWith(
+                              fontSize: 8,
+                              fontWeight: FontWeight.w800,
+                              letterSpacing: 1.2,
+                            ),
+                          ),
+                          Text(
+                            context.l10n.updateCredentials,
+                            style: context.textStyle.bodyStrong.copyWith(
+                              fontSize: 12,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 17),
+                  _Field(
+                    label: context.l10n.currentPassword,
+                    controller: currentPassword,
+                    obscureText: true,
+                    showPasswordToggle: true,
+                    focusNode: currentPasswordFocus,
+                    textInputAction: TextInputAction.next,
+                    autofillHints: const <String>[AutofillHints.password],
+                    onSubmitted: (_) => newPasswordFocus.requestFocus(),
+                  ),
+                  const SizedBox(height: 11),
+                  _Field(
+                    label: context.l10n.newPassword,
+                    controller: newPassword,
+                    obscureText: true,
+                    showPasswordToggle: true,
+                    maxLength: 128,
+                    focusNode: newPasswordFocus,
+                    textInputAction: TextInputAction.next,
+                    autofillHints: const <String>[AutofillHints.newPassword],
+                    errorText:
+                        localError == _AccountLocalError.newPasswordValidation
+                        ? context.l10n.newPasswordValidation
+                        : null,
+                    onSubmitted: (_) => newPasswordRepeatFocus.requestFocus(),
+                  ),
+                  const SizedBox(height: 5),
+                  Text(
+                    context.l10n.passwordLengthHint,
+                    style: context.textStyle.micro.copyWith(fontSize: 8),
+                  ),
+                  const SizedBox(height: 11),
+                  _Field(
+                    label: context.l10n.repeatNewPassword,
+                    controller: newPasswordRepeat,
+                    obscureText: true,
+                    showPasswordToggle: true,
+                    maxLength: 128,
+                    focusNode: newPasswordRepeatFocus,
+                    textInputAction: TextInputAction.done,
+                    autofillHints: const <String>[AutofillHints.newPassword],
+                    errorText:
+                        localError == _AccountLocalError.newPasswordsMismatch
+                        ? context.l10n.newPasswordsMismatch
+                        : localError == _AccountLocalError.passwordMustDiffer
+                        ? context.l10n.passwordMustDiffer
+                        : null,
+                    onSubmitted: (_) {
+                      if (!loading) onChangePassword(bloc);
+                    },
+                  ),
+                  if (failure.isNotEmpty) _Error(failure),
+                  if (notice.isNotEmpty) _Notice(notice),
+                  const SizedBox(height: 11),
+                  FilledButton.icon(
+                    onPressed: loading ? null : () => onChangePassword(bloc),
+                    icon: const Icon(LucideIcons.keyRound, size: 17),
+                    label: Text(
+                      loading
+                          ? context.l10n.saving
+                          : context.l10n.changePassword,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
         ],
-      ],
+      ),
     ),
   );
 }
@@ -494,6 +701,8 @@ class _AccountResetView extends StatelessWidget {
     required this.failure,
     required this.password,
     required this.passwordRepeat,
+    required this.passwordFocus,
+    required this.passwordRepeatFocus,
     required this.onComplete,
   });
 
@@ -503,38 +712,55 @@ class _AccountResetView extends StatelessWidget {
   final String failure;
   final TextEditingController password;
   final TextEditingController passwordRepeat;
+  final FocusNode passwordFocus;
+  final FocusNode passwordRepeatFocus;
   final void Function(AccountBloc, String) onComplete;
 
   @override
   Widget build(BuildContext context) => SingleChildScrollView(
-    child: Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        Text(
-          context.l10n.setNewPasswordHint,
-          style: context.textStyle.caption.copyWith(height: 1.5),
-        ),
-        const SizedBox(height: 16),
-        _Field(
-          label: context.l10n.newPassword,
-          controller: password,
-          obscureText: true,
-        ),
-        const SizedBox(height: 10),
-        _Field(
-          label: context.l10n.repeatPassword,
-          controller: passwordRepeat,
-          obscureText: true,
-        ),
-        if (failure.isNotEmpty) _Error(failure),
-        const SizedBox(height: 16),
-        FilledButton(
-          onPressed: loading ? null : () => onComplete(bloc, token),
-          child: Text(
-            loading ? context.l10n.saving : context.l10n.changePassword,
+    keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+    child: AutofillGroup(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Text(
+            context.l10n.setNewPasswordHint,
+            style: context.textStyle.caption.copyWith(height: 1.5),
           ),
-        ),
-      ],
+          const SizedBox(height: 16),
+          _Field(
+            label: context.l10n.newPassword,
+            controller: password,
+            obscureText: true,
+            showPasswordToggle: true,
+            focusNode: passwordFocus,
+            textInputAction: TextInputAction.next,
+            autofillHints: const <String>[AutofillHints.newPassword],
+            onSubmitted: (_) => passwordRepeatFocus.requestFocus(),
+          ),
+          const SizedBox(height: 10),
+          _Field(
+            label: context.l10n.repeatPassword,
+            controller: passwordRepeat,
+            obscureText: true,
+            showPasswordToggle: true,
+            focusNode: passwordRepeatFocus,
+            textInputAction: TextInputAction.done,
+            autofillHints: const <String>[AutofillHints.newPassword],
+            onSubmitted: (_) {
+              if (!loading) onComplete(bloc, token);
+            },
+          ),
+          if (failure.isNotEmpty) _Error(failure),
+          const SizedBox(height: 16),
+          FilledButton(
+            onPressed: loading ? null : () => onComplete(bloc, token),
+            child: Text(
+              loading ? context.l10n.saving : context.l10n.changePassword,
+            ),
+          ),
+        ],
+      ),
     ),
   );
 }
@@ -546,37 +772,48 @@ class _ProfileIntro extends StatelessWidget {
   Widget build(BuildContext context) => DecoratedBox(
     decoration: BoxDecoration(
       color: const Color(0xFFF0F2EC),
-      borderRadius: BorderRadius.circular(10),
+      borderRadius: BorderRadius.circular(16),
     ),
-    child: Padding(
-      padding: const EdgeInsets.all(12),
-      child: Row(
-        children: [
-          const Icon(LucideIcons.userRound, size: 20, color: Color(0xFF687064)),
-          const SizedBox(width: 11),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                context.l10n.currentProfileUpper,
-                style: const TextStyle(
-                  fontSize: 8,
-                  letterSpacing: 1.2,
-                  fontWeight: FontWeight.w800,
-                  color: AppColors.muted,
-                ),
+    child: ConstrainedBox(
+      constraints: const BoxConstraints(minHeight: 58),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+        child: Row(
+          children: [
+            const Icon(
+              LucideIcons.userRound,
+              size: 22,
+              color: Color(0xFF596052),
+            ),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    context.l10n.currentProfileUpper,
+                    style: const TextStyle(
+                      fontSize: 8,
+                      height: 14 / 11,
+                      letterSpacing: 1.2,
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.muted,
+                    ),
+                  ),
+                  Text(
+                    name,
+                    style: const TextStyle(
+                      color: Color(0xFF2F342D),
+                      fontSize: 12,
+                      height: 22 / 16,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
               ),
-              Text(
-                name,
-                style: const TextStyle(
-                  color: Color(0xFF2F342D),
-                  fontSize: 12,
-                  fontWeight: FontWeight.w800,
-                ),
-              ),
-            ],
-          ),
-        ],
+            ),
+          ],
+        ),
       ),
     ),
   );
@@ -587,35 +824,16 @@ class _AuthTabs extends StatelessWidget {
   final _AccountMode mode;
   final ValueChanged<_AccountMode> onChanged;
   @override
-  Widget build(BuildContext context) => Row(
-    children: [
-      for (final (_AccountMode value, String label) in [
-        (_AccountMode.register, context.l10n.registration),
-        (_AccountMode.login, context.l10n.login),
-      ]) ...[
-        if (value != _AccountMode.register) const SizedBox(width: 8),
-        Expanded(
-          child: OutlinedButton(
-            onPressed: () => onChanged(value),
-            style: OutlinedButton.styleFrom(
-              minimumSize: const Size(0, 44),
-              padding: const EdgeInsets.all(10),
-              backgroundColor: Colors.white,
-              foregroundColor: value == mode ? AppColors.accent : AppColors.ink,
-              side: BorderSide(
-                color: value == mode
-                    ? AppColors.accent
-                    : const Color(0xFFDCE0D4),
-              ),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(7),
-              ),
-            ),
-            child: Text(label),
-          ),
-        ),
-      ],
+  Widget build(BuildContext context) => AppSegmentedControl<_AccountMode>(
+    options: <AppSegment<_AccountMode>>[
+      AppSegment(
+        value: _AccountMode.register,
+        label: context.l10n.registration,
+      ),
+      AppSegment(value: _AccountMode.login, label: context.l10n.login),
     ],
+    selected: mode,
+    onChanged: onChanged,
   );
 }
 
@@ -1186,24 +1404,48 @@ class _Field extends StatelessWidget {
     required this.label,
     required this.controller,
     this.obscureText = false,
+    this.showPasswordToggle = false,
     this.autocorrect = true,
     this.keyboardType,
     this.maxLength,
+    this.focusNode,
+    this.textInputAction,
+    this.autofillHints,
+    this.hintText,
+    this.helperText,
+    this.errorText,
+    this.onSubmitted,
   });
   final String label;
   final TextEditingController controller;
   final bool obscureText;
+  final bool showPasswordToggle;
   final bool autocorrect;
   final TextInputType? keyboardType;
   final int? maxLength;
+  final FocusNode? focusNode;
+  final TextInputAction? textInputAction;
+  final Iterable<String>? autofillHints;
+  final String? hintText;
+  final String? helperText;
+  final String? errorText;
+  final ValueChanged<String>? onSubmitted;
   @override
   Widget build(BuildContext context) => AppTextField(
     controller: controller,
     obscureText: obscureText,
+    showPasswordToggle: showPasswordToggle,
     autocorrect: autocorrect,
     keyboardType: keyboardType,
     maxLength: maxLength,
     label: label,
+    focusNode: focusNode,
+    textInputAction: textInputAction,
+    autofillHints: autofillHints,
+    hintText: hintText,
+    helperText: helperText,
+    errorText: errorText,
+    onSubmitted: onSubmitted,
   );
 }
 

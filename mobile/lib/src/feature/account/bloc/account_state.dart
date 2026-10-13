@@ -46,14 +46,20 @@ final class AccountState$Ready extends AccountState {
 }
 
 final class AccountState$Failure extends AccountState {
-  const new(this.profile, this.message, {this.failure});
+  const new(
+    this.profile,
+    this.message, {
+    this.failure,
+    this.verificationRequired = false,
+  });
 
   final AccountProfile? profile;
   final String message;
   final RestClientFailure? failure;
+  final bool verificationRequired;
 
   @override
-  List<Object?> get props => [profile, message, failure];
+  List<Object?> get props => [profile, message, failure, verificationRequired];
 }
 
 final class AccountState$PasswordReset extends AccountState {

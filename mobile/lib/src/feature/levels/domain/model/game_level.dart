@@ -37,5 +37,5 @@ final class GameLevel extends Equatable {
   );
 
   @override
-  List<Object> get props => [id, chapter, preset];
+  List<Object?> get props => [id, chapter, preset];
 }

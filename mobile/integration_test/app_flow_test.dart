@@ -67,16 +67,42 @@ void main() {
     }
 
     expect(bloc.data?.phase, GamePhase.playing);
+    final List<Size> toolbarCells = <String>[
+      'game-toolbar-undo',
+      'game-toolbar-xray',
+      'game-toolbar-view',
+      'game-toolbar-reset',
+    ].map((key) => tester.getSize(find.byKey(ValueKey<String>(key)))).toList();
+    expect(
+      toolbarCells.map((size) => size.width),
+      everyElement(closeTo(toolbarCells.first.width, .01)),
+    );
     await binding.takeScreenshot('local-game-empty');
 
     final Finder sceneFinder = find.byType(GameSceneView);
     final Size size = tester.getSize(sceneFinder);
     final Offset origin = tester.getTopLeft(sceneFinder);
-    final double fit = math.max(1, .9 / (size.width / size.height));
+    expect(origin.dx, closeTo(0, .01));
+    expect(
+      size.width,
+      closeTo(
+        tester.view.physicalSize.width / tester.view.devicePixelRatio,
+        .01,
+      ),
+    );
+    expect(
+      toolbarCells.fold<double>(0, (sum, cell) => sum + cell.width),
+      closeTo(size.width - 32, .01),
+    );
+    final GameCameraFraming framing = gameCameraResetFraming(
+      view: CameraView.perspective,
+      viewport: size,
+      demo: false,
+    );
     final fs.PerspectiveCamera camera = fs.PerspectiveCamera(
       fovRadiansY: 35 * math.pi / 180,
-      position: vm.Vector3(7.4, 9.2, 9.3)..scale(fit),
-      target: vm.Vector3(0, .25, 0),
+      position: framing.position,
+      target: framing.target,
       fovFar: 100,
     );
     final Offset center = camera.worldToScreen(vm.Vector3(0, .13, 0), size)!;
@@ -91,7 +117,7 @@ void main() {
 
     await tester.tap(find.byTooltip('Pause'));
     await tester.pump(const Duration(milliseconds: 300));
-    expect(find.text('Time is stopped.'), findsOneWidget);
+    expect(find.text('Time is stopped.'), findsNothing);
     await tester.tap(find.text('Main menu'));
     await tester.pump(const Duration(milliseconds: 500));
     if (find.text('End the current game?').evaluate().isNotEmpty) {
@@ -117,7 +143,10 @@ void main() {
           MoveCandidate(1, 1),
           MoveCandidate(3, 3),
         ]),
-        names: const ['Player 1', 'Player 2'],
+        names: const [
+          'Alexandria-Cassandra the First',
+          'Maximilian-Alexander the Second',
+        ],
       ),
     );
     await tester.pump(const Duration(milliseconds: 500));
@@ -148,7 +177,7 @@ void main() {
     await tester.pump(const Duration(milliseconds: 500));
     await tester.tap(find.byIcon(LucideIcons.userRound).first);
     await tester.pump(const Duration(milliseconds: 300));
-    expect(find.text('Account'), findsOneWidget);
+    expect(find.text('Profile'), findsOneWidget);
     expect(find.text('CURRENT PROFILE'), findsOneWidget);
     expect(find.text('Registration'), findsOneWidget);
     await binding.takeScreenshot('account-guest-portrait');

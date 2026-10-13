@@ -15,7 +15,6 @@ final class LevelAssetDatasource$Bundle implements LevelAssetDatasource {
   List<GameLevel>? _cache;
 
   String get _assetPath => 'assets/data/levels.json';
-
   @override
   Future<List<GameLevel>> load() async {
     if (_cache case final cache?) return cache;

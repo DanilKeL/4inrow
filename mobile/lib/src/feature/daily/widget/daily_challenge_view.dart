@@ -6,6 +6,7 @@ import 'package:four3/src/common/utils/build_context_extension.dart';
 import 'package:four3/src/feature/account/widget/account_root_scope.dart';
 import 'package:four3/src/feature/app_theme/utils/app_theme.dart';
 import 'package:four3/src/feature/app_theme/utils/theme_context_extension.dart';
+import 'package:four3/src/feature/components/buttons/app_action_button.dart';
 import 'package:four3/src/feature/components/progress/app_circular_progress_indicator.dart';
 import 'package:four3/src/feature/daily/bloc/daily_bloc.dart';
 import 'package:four3/src/feature/daily/bloc/daily_event.dart';
@@ -63,7 +64,7 @@ class _DailyChallengeViewState extends State<DailyChallengeView> {
             const SizedBox(height: 18),
             if (state.loading && snapshot == null)
               const Center(child: AppCircularProgressIndicator())
-            else if (state.error.isNotEmpty)
+            else if (snapshot == null && state.error.isNotEmpty)
               _DailyError(
                 message: state.error == 'offline' ? null : state.error,
                 onRetry: () => bloc.add(const DailyEvent$Load()),
@@ -78,9 +79,10 @@ class _DailyChallengeViewState extends State<DailyChallengeView> {
               else
                 _DailyTask(
                   snapshot: snapshot,
-                  onStart: state.loading
-                      ? null
-                      : () => _start(context, snapshot.challenge),
+                  loading: state.loading,
+                  offline: state.error.isNotEmpty,
+                  onRetry: () => bloc.add(const DailyEvent$Load()),
+                  onStart: () => _start(context, snapshot.challenge),
                 ),
             ],
           ],
@@ -109,30 +111,33 @@ class _DailyTabs extends StatelessWidget {
   final ValueChanged<bool> onChanged;
 
   @override
-  Widget build(BuildContext context) => Container(
-    padding: const EdgeInsets.all(4),
-    decoration: BoxDecoration(
-      color: const Color(0xFFEFF1EB),
-      borderRadius: BorderRadius.circular(10),
-    ),
-    child: Row(
-      children: <Widget>[
-        Expanded(
-          child: _DailyTab(
-            label: context.l10n.dailyTaskTab,
-            selected: !results,
-            onTap: () => onChanged(false),
+  Widget build(BuildContext context) => SizedBox(
+    height: 44,
+    child: Container(
+      padding: const EdgeInsets.all(4),
+      decoration: BoxDecoration(
+        color: const Color(0xFFEFF1EB),
+        borderRadius: BorderRadius.circular(10),
+      ),
+      child: Row(
+        children: <Widget>[
+          Expanded(
+            child: _DailyTab(
+              label: context.l10n.dailyTaskTab,
+              selected: !results,
+              onTap: () => onChanged(false),
+            ),
           ),
-        ),
-        const SizedBox(width: 6),
-        Expanded(
-          child: _DailyTab(
-            label: context.l10n.dailyResultsTab,
-            selected: results,
-            onTap: () => onChanged(true),
+          const SizedBox(width: 6),
+          Expanded(
+            child: _DailyTab(
+              label: context.l10n.dailyResultsTab,
+              selected: results,
+              onTap: () => onChanged(true),
+            ),
           ),
-        ),
-      ],
+        ],
+      ),
     ),
   );
 }
@@ -151,7 +156,7 @@ class _DailyTab extends StatelessWidget {
     child: Ink(
       padding: const EdgeInsets.symmetric(vertical: 10),
       decoration: BoxDecoration(
-        color: selected ? Colors.white : Colors.transparent,
+        color: selected ? context.colors.accentSubtle : Colors.transparent,
         borderRadius: BorderRadius.circular(7),
         boxShadow: selected
             ? const <BoxShadow>[
@@ -167,7 +172,8 @@ class _DailyTab extends StatelessWidget {
         label,
         textAlign: TextAlign.center,
         style: context.textStyle.caption.copyWith(
-          color: selected ? AppColors.ink : AppColors.muted,
+          color: selected ? context.colors.accent : AppColors.muted,
+          fontWeight: selected ? FontWeight.w600 : FontWeight.w400,
         ),
       ),
     ),
@@ -191,13 +197,13 @@ class _DailyHeading extends StatelessWidget {
     );
     return Row(
       children: <Widget>[
-        const Icon(LucideIcons.calendarDays, size: 17),
+        const Icon(LucideIcons.calendarDays, size: 20),
         const SizedBox(width: 7),
         Expanded(
           child: Text(
             DateFormat.MMMMd(Localizations.localeOf(context).toLanguageTag())
                 .format(date),
-            style: context.textStyle.captionStrong,
+            style: context.textStyle.bodyStrong.copyWith(fontSize: 11),
           ),
         ),
         Text(
@@ -205,7 +211,10 @@ class _DailyHeading extends StatelessWidget {
             remaining.inHours,
             remaining.inMinutes.remainder(60),
           ),
-          style: context.textStyle.micro.copyWith(color: AppColors.muted),
+          style: context.textStyle.caption.copyWith(
+            color: AppColors.muted,
+            fontSize: 9,
+          ),
         ),
       ],
     );
@@ -213,10 +222,19 @@ class _DailyHeading extends StatelessWidget {
 }
 
 class _DailyTask extends StatelessWidget {
-  const new({required this.snapshot, required this.onStart});
+  const new({
+    required this.snapshot,
+    required this.onStart,
+    required this.onRetry,
+    required this.loading,
+    required this.offline,
+  });
 
   final DailySnapshot snapshot;
-  final VoidCallback? onStart;
+  final VoidCallback onStart;
+  final VoidCallback onRetry;
+  final bool loading;
+  final bool offline;
 
   @override
   Widget build(BuildContext context) => Column(
@@ -226,17 +244,18 @@ class _DailyTask extends StatelessWidget {
         context.l10n.dailyGoal,
         style: const TextStyle(
           fontSize: 22,
-          fontWeight: FontWeight.w700,
+          height: 25 / 20,
+          fontWeight: FontWeight.w600,
           letterSpacing: -.5,
         ),
       ),
-      const SizedBox(height: 16),
+      const SizedBox(height: 14),
       Container(
-        padding: const EdgeInsets.all(18),
+        constraints: const BoxConstraints(minHeight: 54),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
         decoration: BoxDecoration(
           color: const Color(0xFFF4F5EF),
           borderRadius: BorderRadius.circular(10),
-          border: Border.all(color: AppColors.border),
         ),
         child: Row(
           children: <Widget>[
@@ -252,20 +271,36 @@ class _DailyTask extends StatelessWidget {
               snapshot.ownBest == null
                   ? '—'
                   : context.l10n.moves(snapshot.ownBest!),
-              style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w700),
+              style: const TextStyle(
+                fontSize: 22,
+                height: 22 / 18,
+                fontWeight: FontWeight.w600,
+              ),
             ),
           ],
         ),
       ),
       const SizedBox(height: 16),
-      SizedBox(
-        height: 48,
-        child: FilledButton.icon(
-          onPressed: snapshot.isCurrent ? onStart : null,
-          icon: const Icon(LucideIcons.play, size: 18),
-          label: Text(context.l10n.dailyPlay),
-        ),
+      AppActionButton(
+        onPressed: snapshot.isCurrent && !offline ? onStart : null,
+        loading: loading,
+        leading: const Icon(LucideIcons.play, size: 20),
+        label: !snapshot.isCurrent
+            ? context.l10n.dailyExpired
+            : offline
+            ? context.l10n.noConnection
+            : snapshot.ownBest == null
+            ? context.l10n.dailyPlay
+            : context.l10n.dailyRetryChallenge,
       ),
+      if (offline) ...[
+        const SizedBox(height: 8),
+        AppActionButton(
+          style: AppActionStyle.secondary,
+          onPressed: loading ? null : onRetry,
+          label: context.l10n.retryShort,
+        ),
+      ],
     ],
   );
 }
@@ -357,8 +392,9 @@ class _DailyResultsHeader extends StatelessWidget {
       IconButton.outlined(
         tooltip: context.l10n.dailyRefreshResults,
         onPressed: loading ? null : onRefresh,
-        style: IconButton.styleFrom(fixedSize: const Size.square(36)),
-        icon: const Icon(LucideIcons.refreshCw, size: 16),
+        icon: loading
+            ? const AppCircularProgressIndicator(dimension: 16)
+            : const Icon(LucideIcons.refreshCw, size: 16),
       ),
     ],
   );

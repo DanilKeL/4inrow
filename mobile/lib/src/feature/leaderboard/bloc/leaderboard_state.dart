@@ -17,12 +17,13 @@ final class LeaderboardState$Loading extends LeaderboardState {
 }
 
 final class LeaderboardState$Ready extends LeaderboardState {
-  const new(this.players);
+  const new(this.players, {this.refreshing = false});
 
   final List<LeaderboardPlayer> players;
+  final bool refreshing;
 
   @override
-  List<Object> get props => [players];
+  List<Object> get props => [players, refreshing];
 }
 
 final class LeaderboardState$Failure extends LeaderboardState {

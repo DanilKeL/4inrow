@@ -5,6 +5,7 @@ import 'package:four3/src/feature/account/domain/model/account_profile.dart';
 import 'package:four3/src/feature/account/widget/account_root_scope.dart';
 import 'package:four3/src/feature/app_theme/utils/app_theme.dart';
 import 'package:four3/src/feature/app_theme/utils/theme_context_extension.dart';
+import 'package:four3/src/feature/components/buttons/app_action_button.dart';
 import 'package:four3/src/feature/components/modals/app_dialog.dart';
 import 'package:four3/src/feature/components/selectors/app_segmented_control.dart';
 import 'package:four3/src/feature/game/bloc/game_bloc.dart';
@@ -52,7 +53,7 @@ class _GameSetupViewState extends State<GameSetupView> {
                 onTap: () => setState(() => _mode = GameMode.local),
               ),
             ),
-            const SizedBox(width: 6),
+            const SizedBox(width: 8),
             Expanded(
               child: _ModeChoice(
                 icon: LucideIcons.cpu,
@@ -62,7 +63,7 @@ class _GameSetupViewState extends State<GameSetupView> {
                 onTap: () => setState(() => _mode = GameMode.ai),
               ),
             ),
-            const SizedBox(width: 6),
+            const SizedBox(width: 8),
             Expanded(
               child: _ModeChoice(
                 icon: LucideIcons.globe2,
@@ -74,42 +75,19 @@ class _GameSetupViewState extends State<GameSetupView> {
             ),
           ],
         ),
-        const SizedBox(height: 12),
-        Wrap(
-          spacing: 12,
-          runSpacing: 4,
-          children: [
-            Text.rich(
-              TextSpan(
-                text: l10n.playingAs,
-                children: [
-                  TextSpan(
-                    text: player,
-                    style: context.textStyle.captionStrong,
-                  ),
-                ],
-              ),
-              style: context.textStyle.caption,
-            ),
-            if (_mode == GameMode.local)
-              Text.rich(
-                TextSpan(
-                  text: l10n.secondPlayer,
-                  children: [
-                    TextSpan(
-                      text: l10n.playerTwo,
-                      style: context.textStyle.captionStrong,
-                    ),
-                  ],
-                ),
-                style: context.textStyle.caption,
-              ),
-          ],
-        ),
+        const SizedBox(height: 16),
+        _PlayerRow(label: l10n.playerLabel, value: player),
+        if (_mode == GameMode.local) ...[
+          const SizedBox(height: 4),
+          _PlayerRow(label: l10n.playerTwoLabel, value: l10n.playerTwo),
+        ],
         if (_mode == GameMode.ai) ...[
-          const SizedBox(height: 14),
-          Text(l10n.difficulty, style: context.textStyle.caption),
-          const SizedBox(height: 7),
+          const SizedBox(height: 20),
+          Text(
+            l10n.difficulty,
+            style: context.textStyle.bodyStrong.copyWith(fontSize: 11),
+          ),
+          const SizedBox(height: 8),
           AppSegmentedControl<Difficulty>(
             options: [
               AppSegment(value: Difficulty.easy, label: l10n.easy),
@@ -121,19 +99,15 @@ class _GameSetupViewState extends State<GameSetupView> {
           ),
         ],
         if (_mode == GameMode.online) ...[
-          const SizedBox(height: 14),
+          const SizedBox(height: 20),
           OnlineSetupView(onQuickStart: () => _openQuick(context, player)),
         ],
         if (_mode != GameMode.online) ...[
-          const SizedBox(height: 18),
-          SizedBox(
-            height: 48,
-            child: FilledButton.icon(
-              onPressed: () => _start(context, player),
-              iconAlignment: IconAlignment.end,
-              icon: const Icon(LucideIcons.arrowRight, size: 18),
-              label: Text(l10n.startGame),
-            ),
+          const SizedBox(height: 20),
+          AppActionButton(
+            onPressed: () => _start(context, player),
+            label: l10n.startGame,
+            trailing: const Icon(LucideIcons.arrowRight, size: 18),
           ),
         ],
       ],
@@ -185,7 +159,12 @@ class _GameSetupViewState extends State<GameSetupView> {
       if (!appContext.mounted) return;
       showAppDialog<void>(
         context: appContext,
-        titleBuilder: (context) => context.l10n.rankedGame,
+        titleBuilder: (context) =>
+            AccountRootScope.of(context).profile?.username == null
+            ? context.l10n.quickGame
+            : context.l10n.rankedGame,
+        showCloseButton: false,
+        barrierDismissible: false,
         builder: (_) => const OnlineSetupView(quickOnly: true),
       );
     });
@@ -210,26 +189,31 @@ class _ModeChoice extends StatelessWidget {
   @override
   Widget build(BuildContext context) => InkWell(
     onTap: onTap,
-    borderRadius: BorderRadius.circular(10),
+    borderRadius: BorderRadius.circular(16),
     child: Ink(
-      height: 78,
-      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
+      height: MediaQuery.textScalerOf(context).scale(1) > 1.3 ? 108 : 84,
+      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 8),
       decoration: BoxDecoration(
-        color: selected ? const Color(0xFFE8EDFE) : const Color(0xFFF4F5EF),
-        borderRadius: BorderRadius.circular(10),
+        color: selected ? context.colors.accentSubtle : context.colors.surface,
+        borderRadius: BorderRadius.circular(16),
         border: Border.all(
-          color: selected ? const Color(0xFF9FB2F4) : const Color(0xFFDCE0D4),
+          width: selected ? 1.5 : 1,
+          color: selected ? context.colors.accent : context.colors.border,
         ),
       ),
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(icon, size: 20, color: selected ? AppColors.accent : null),
-          const SizedBox(height: 4),
+          Icon(icon, size: 22, color: selected ? AppColors.accent : null),
+          const SizedBox(height: 6),
           Text(
             title,
             maxLines: 1,
-            style: context.textStyle.captionStrong.copyWith(
+            overflow: TextOverflow.ellipsis,
+            textAlign: TextAlign.center,
+            style: context.textStyle.bodyStrong.copyWith(
+              fontSize: 11,
+              height: 18 / 15,
               color: selected ? AppColors.accent : null,
             ),
           ),
@@ -237,11 +221,39 @@ class _ModeChoice extends StatelessWidget {
           Text(
             subtitle,
             maxLines: 1,
+            textAlign: TextAlign.center,
             overflow: TextOverflow.ellipsis,
-            style: context.textStyle.micro.copyWith(fontSize: 8),
+            style: context.textStyle.caption.copyWith(
+              fontSize: 8,
+              height: 13 / 11,
+            ),
           ),
         ],
       ),
     ),
+  );
+}
+
+class _PlayerRow extends StatelessWidget {
+  const new({required this.label, required this.value});
+
+  final String label;
+  final String value;
+
+  @override
+  Widget build(BuildContext context) => Row(
+    children: [
+      Text(label, style: context.textStyle.caption),
+      const SizedBox(width: 8),
+      Expanded(
+        child: Text(
+          value,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          textAlign: TextAlign.right,
+          style: context.textStyle.captionStrong,
+        ),
+      ),
+    ],
   );
 }

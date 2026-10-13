@@ -42,21 +42,36 @@ class _LeaderboardViewState extends State<LeaderboardView> {
                 style: context.textStyle.caption.copyWith(fontSize: 12),
               ),
             ),
-            SizedBox(
-              width: 36,
-              height: 36,
-              child: IconButton.outlined(
-                padding: EdgeInsets.zero,
-                tooltip: context.l10n.refreshLeaderboard,
-                onPressed: () => bloc.add(const LeaderboardEvent$Load()),
-                style: IconButton.styleFrom(
-                  side: const BorderSide(color: Color(0xFFDFE3DA)),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(10),
+            BlocBuilder<LeaderboardBloc, LeaderboardState>(
+              bloc: bloc,
+              builder: (context, state) {
+                final bool loading = switch (state) {
+                  LeaderboardState$Loading() => true,
+                  LeaderboardState$Ready(:final refreshing) => refreshing,
+                  _ => false,
+                };
+                return SizedBox.square(
+                  dimension: 44,
+                  child: IconButton.outlined(
+                    tooltip: context.l10n.refreshLeaderboard,
+                    onPressed: loading
+                        ? null
+                        : () => bloc.add(const LeaderboardEvent$Load()),
+                    style: IconButton.styleFrom(
+                      side: const BorderSide(color: Color(0xFFDFE3DA)),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                    ),
+                    icon: loading
+                        ? const SizedBox.square(
+                            dimension: 16,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : const Icon(LucideIcons.refreshCw, size: 18),
                   ),
-                ),
-                icon: const Icon(LucideIcons.refreshCw, size: 16),
-              ),
+                );
+              },
             ),
           ],
         ),
@@ -213,7 +228,7 @@ class _TableRow extends StatelessWidget {
             Expanded(
               flex: 2,
               child: Text(
-                header ? 'Elo' : '${player!.elo}',
+                header ? context.l10n.eloLabel : '${player!.elo}',
                 textAlign: TextAlign.right,
                 style: TextStyle(
                   fontWeight: header ? FontWeight.w600 : FontWeight.w800,

@@ -9,6 +9,7 @@ import 'package:four3/src/feature/account/domain/model/account_profile.dart';
 import 'package:four3/src/feature/account/widget/account_root_scope.dart';
 import 'package:four3/src/feature/app_theme/utils/app_theme.dart';
 import 'package:four3/src/feature/app_theme/utils/theme_context_extension.dart';
+import 'package:four3/src/feature/components/buttons/app_action_button.dart';
 import 'package:four3/src/feature/components/fields/app_text_field.dart';
 import 'package:four3/src/feature/matchmaking/bloc/matchmaking_bloc.dart';
 import 'package:four3/src/feature/matchmaking/bloc/matchmaking_event.dart';
@@ -32,13 +33,20 @@ class _OnlineSetupViewState extends State<OnlineSetupView> {
   late final MatchmakingBloc _bloc;
   late final Timer _clock;
   bool _handingOffQuickSearch = false;
+  _PendingAction? _pending;
+  int? _pendingStartedAt;
 
   @override
   void initState() {
     super.initState();
     _bloc = MatchmakingRootScope.of(context);
     _clock = Timer.periodic(const Duration(seconds: 1), (_) {
-      if (mounted && _bloc.state is MatchmakingState$Found) setState(() {});
+      if (mounted &&
+          (_bloc.state is MatchmakingState$Found ||
+              _bloc.state is MatchmakingState$Searching ||
+              _bloc.state is MatchmakingState$Connecting)) {
+        setState(() {});
+      }
     });
   }
 
@@ -78,13 +86,19 @@ class _OnlineSetupViewState extends State<OnlineSetupView> {
           ),
         MatchmakingState$Connecting() => _Setup(
           code: _code,
-          connecting: true,
-          onCreate: () {},
-          onJoin: () {},
-          onFind: _startQuickSearch,
-        ),
-        MatchmakingState$Searching() => _QuickSearching(
           signedIn: signedIn,
+          pending: _pending,
+          slow: shouldShowMatchmakingCancel(_pendingStartedAt),
+          onCancel: () => bloc.add(const MatchmakingEvent$Cancel()),
+          onCreate: () => _start(_PendingAction.create, name),
+          onJoin: () => _start(_PendingAction.join, name),
+          onFind: () => _start(_PendingAction.find, name),
+        ),
+        MatchmakingState$Searching(:final startedAt) => _QuickSearching(
+          signedIn: signedIn,
+          elapsed: Duration(
+            milliseconds: DateTime.now().millisecondsSinceEpoch - startedAt,
+          ),
           onCancel: () => _cancelAndClose(context, bloc),
         ),
         MatchmakingState$Found(
@@ -115,12 +129,12 @@ class _OnlineSetupViewState extends State<OnlineSetupView> {
           ),
         MatchmakingState$Failure(:final message, :final failure) => _Setup(
           code: _code,
+          signedIn: signedIn,
           error: _failureText(context, message, failure),
-          onCreate: () => bloc.add(MatchmakingEvent$Create(name)),
-          onJoin: () => bloc.add(MatchmakingEvent$Join(name, _code.text)),
-          onFind: widget.onQuickStart == null
-              ? () => bloc.add(MatchmakingEvent$Find(name))
-              : _startQuickSearch,
+          failed: _pending,
+          onCreate: () => _start(_PendingAction.create, name),
+          onJoin: () => _start(_PendingAction.join, name),
+          onFind: () => _start(_PendingAction.find, name),
         ),
         _ when widget.quickOnly => _QuickSearching(
           signedIn: signedIn,
@@ -128,11 +142,10 @@ class _OnlineSetupViewState extends State<OnlineSetupView> {
         ),
         _ => _Setup(
           code: _code,
-          onCreate: () => bloc.add(MatchmakingEvent$Create(name)),
-          onJoin: () => bloc.add(MatchmakingEvent$Join(name, _code.text)),
-          onFind: widget.onQuickStart == null
-              ? () => bloc.add(MatchmakingEvent$Find(name))
-              : _startQuickSearch,
+          signedIn: signedIn,
+          onCreate: () => _start(_PendingAction.create, name),
+          onJoin: () => _start(_PendingAction.join, name),
+          onFind: () => _start(_PendingAction.find, name),
         ),
       },
     );
@@ -143,11 +156,25 @@ class _OnlineSetupViewState extends State<OnlineSetupView> {
     Navigator.maybePop(context);
   }
 
-  void _startQuickSearch() {
-    _handingOffQuickSearch = true;
-    widget.onQuickStart?.call();
+  void _start(_PendingAction action, String name) {
+    setState(() {
+      _pending = action;
+      _pendingStartedAt = DateTime.now().millisecondsSinceEpoch;
+    });
+    if (action == _PendingAction.find && widget.onQuickStart != null) {
+      _handingOffQuickSearch = true;
+      widget.onQuickStart!.call();
+      return;
+    }
+    _bloc.add(switch (action) {
+      _PendingAction.create => MatchmakingEvent$Create(name),
+      _PendingAction.join => MatchmakingEvent$Join(name, _code.text),
+      _PendingAction.find => MatchmakingEvent$Find(name),
+    });
   }
 }
+
+enum _PendingAction { find, create, join }
 
 String _failureText(
   BuildContext context,
@@ -157,6 +184,12 @@ String _failureText(
   if (remoteMessage.isNotEmpty) return remoteMessage;
   return switch (failure) {
     MatchmakingFailure.invalidCode => context.l10n.enterFiveLetterCode,
+    MatchmakingFailure.roomNotFound => context.l10n.roomNotFound,
+    MatchmakingFailure.roomFull => context.l10n.roomFull,
+    MatchmakingFailure.matchExpired => context.l10n.matchExpired,
+    MatchmakingFailure.accountBusy => context.l10n.accountBusy,
+    MatchmakingFailure.alreadyMatching => context.l10n.alreadyMatching,
+    MatchmakingFailure.serverFull => context.l10n.serverFull,
     MatchmakingFailure.moveNotSent => context.l10n.moveNotSent,
     MatchmakingFailure.invalidServerResponse =>
       context.l10n.invalidServerResponse,
@@ -175,48 +208,75 @@ int _secondsLeft(int deadline) =>
 class _Setup extends StatelessWidget {
   const new({
     required this.code,
+    required this.signedIn,
     required this.onCreate,
     required this.onJoin,
     required this.onFind,
     this.error,
-    this.connecting = false,
+    this.pending,
+    this.failed,
+    this.slow = false,
+    this.onCancel,
   });
   final TextEditingController code;
+  final bool signedIn;
   final VoidCallback onCreate;
   final VoidCallback onJoin;
   final VoidCallback onFind;
   final String? error;
-  final bool connecting;
+  final _PendingAction? pending;
+  final _PendingAction? failed;
+  final bool slow;
+  final VoidCallback? onCancel;
 
   @override
   Widget build(BuildContext context) => Column(
     crossAxisAlignment: CrossAxisAlignment.stretch,
     children: [
-      if (error case final value?) ...[
-        Text(
-          value,
-          style: context.textStyle.caption.copyWith(
-            color: Theme.of(context).colorScheme.error,
-            fontSize: 12,
-            height: 1.7,
+      Text(
+        signedIn ? context.l10n.rankedGame : context.l10n.quickGame,
+        style: context.textStyle.bodyStrong,
+      ),
+      const SizedBox(height: 4),
+      Text(
+        signedIn
+            ? context.l10n.rankedGameDescription
+            : context.l10n.quickGameDescription,
+        style: context.textStyle.caption.copyWith(color: context.colors.muted),
+      ),
+      const SizedBox(height: 12),
+      AppActionButton(
+        onPressed: pending == null ? onFind : null,
+        loading: pending == _PendingAction.find,
+        label: pending == _PendingAction.find
+            ? context.l10n.searchingShort
+            : context.l10n.findOpponent,
+      ),
+      if (error != null && failed == _PendingAction.find)
+        _ActionError(message: error!, onRetry: onFind),
+      const SizedBox(height: 12),
+      Row(
+        children: [
+          Expanded(child: Divider(color: context.colors.border)),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 12),
+            child: Text(context.l10n.or, style: context.textStyle.caption),
           ),
-        ),
-        const SizedBox(height: 6),
-      ],
-      OutlinedButton(
-        onPressed: connecting ? null : onFind,
-        child: Text(context.l10n.findRankedOpponent),
+          Expanded(child: Divider(color: context.colors.border)),
+        ],
       ),
-      const SizedBox(height: 6),
-      FilledButton.icon(
-        onPressed: connecting ? null : onCreate,
-        iconAlignment: IconAlignment.end,
-        icon: const Icon(LucideIcons.arrowRight, size: 18),
-        label: Text(
-          connecting ? context.l10n.connecting : context.l10n.createLobby,
-        ),
+      const SizedBox(height: 12),
+      AppActionButton(
+        style: AppActionStyle.secondary,
+        onPressed: pending == null ? onCreate : null,
+        loading: pending == _PendingAction.create,
+        label: pending == _PendingAction.create
+            ? context.l10n.creatingRoom
+            : context.l10n.createLobby,
       ),
-      const SizedBox(height: 6),
+      if (error != null && failed == _PendingAction.create)
+        _ActionError(message: error!, onRetry: onCreate),
+      const SizedBox(height: 20),
       AppTextField(
         controller: code,
         label: context.l10n.lobbyCode,
@@ -228,20 +288,69 @@ class _Setup extends StatelessWidget {
           _UpperCaseFormatter(),
         ],
         fontSize: 23,
-        letterSpacing: 7,
-        onSubmitted: (_) => onJoin(),
+        fontFamily: 'monospace',
+        letterSpacing: 2,
+        enabled: pending == null,
+        onSubmitted: (_) {
+          if (RegExp(r'^[A-Z]{5}$').hasMatch(code.text)) onJoin();
+        },
       ),
-      const SizedBox(height: 6),
+      const SizedBox(height: 8),
       ListenableBuilder(
         listenable: code,
-        builder: (context, _) => OutlinedButton(
-          onPressed: connecting || !RegExp(r'^[A-Z]{5}$').hasMatch(code.text)
+        builder: (context, _) => AppActionButton(
+          style: AppActionStyle.secondary,
+          loading: pending == _PendingAction.join,
+          onPressed:
+              pending != null || !RegExp(r'^[A-Z]{5}$').hasMatch(code.text)
               ? null
               : onJoin,
-          child: Text(context.l10n.joinLobby),
+          label: pending == _PendingAction.join
+              ? context.l10n.joiningRoom
+              : context.l10n.joinLobby,
         ),
       ),
+      if (error != null && failed == _PendingAction.join)
+        _ActionError(message: error!, onRetry: onJoin),
+      if (error != null && failed == null)
+        _ActionError(message: error!, onRetry: onFind),
+      if (slow && onCancel != null) ...[
+        const SizedBox(height: 8),
+        AppActionButton(
+          style: AppActionStyle.text,
+          compact: true,
+          onPressed: onCancel,
+          label: context.l10n.cancel,
+        ),
+      ],
     ],
+  );
+}
+
+class _ActionError extends StatelessWidget {
+  const new({required this.message, required this.onRetry});
+
+  final String message;
+  final VoidCallback onRetry;
+
+  @override
+  Widget build(BuildContext context) => Padding(
+    padding: const EdgeInsets.only(top: 8),
+    child: Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Expanded(
+          child: Text(
+            message,
+            style: context.textStyle.caption.copyWith(
+              color: Theme.of(context).colorScheme.error,
+            ),
+          ),
+        ),
+        const SizedBox(width: 8),
+        TextButton(onPressed: onRetry, child: Text(context.l10n.retry)),
+      ],
+    ),
   );
 }
 
@@ -257,15 +366,17 @@ class _QuickSearching extends StatelessWidget {
   const new({
     required this.signedIn,
     required this.onCancel,
+    this.elapsed = Duration.zero,
     this.reconnecting = false,
   });
   final bool signedIn;
   final VoidCallback onCancel;
   final bool reconnecting;
+  final Duration elapsed;
 
   @override
   Widget build(BuildContext context) => Padding(
-    padding: const EdgeInsets.fromLTRB(0, 12, 0, 2),
+    padding: const EdgeInsets.only(bottom: 2),
     child: Column(
       children: [
         const QuickSearchOrbitIcon(),
@@ -276,7 +387,7 @@ class _QuickSearching extends StatelessWidget {
               : context.l10n.searchingOpponent,
           style: context.textStyle.headline,
         ),
-        const SizedBox(height: 14),
+        const SizedBox(height: 6),
         Text(
           reconnecting
               ? context.l10n.searchReconnectHint
@@ -289,18 +400,38 @@ class _QuickSearching extends StatelessWidget {
             height: 1.5,
           ),
         ),
-        const SizedBox(height: 14),
+        const SizedBox(height: 12),
+        Text(
+          formatMatchmakingElapsed(elapsed),
+          style: context.textStyle.bodyStrong.copyWith(
+            color: context.colors.accent,
+            fontFeatures: const <FontFeature>[FontFeature.tabularFigures()],
+          ),
+        ),
+        const SizedBox(height: 20),
         SizedBox(
           width: double.infinity,
-          child: OutlinedButton(
+          child: AppActionButton(
+            style: AppActionStyle.secondary,
             onPressed: onCancel,
-            child: Text(context.l10n.cancelSearch),
+            label: context.l10n.cancelSearch,
           ),
         ),
       ],
     ),
   );
 }
+
+String formatMatchmakingElapsed(Duration elapsed) {
+  final int seconds = elapsed.inSeconds.clamp(0, 99 * 60 + 59);
+  final String minutes = (seconds ~/ 60).toString().padLeft(2, '0');
+  final String remainder = (seconds % 60).toString().padLeft(2, '0');
+  return '$minutes:$remainder';
+}
+
+bool shouldShowMatchmakingCancel(int? startedAt, {int? now}) =>
+    startedAt != null &&
+    (now ?? DateTime.now().millisecondsSinceEpoch) - startedAt >= 9000;
 
 class QuickSearchOrbitIcon extends StatefulWidget {
   const new({super.key});

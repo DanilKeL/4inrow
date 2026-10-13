@@ -17,6 +17,86 @@ import 'package:four3/src/feature/game/service/game_engine.dart';
 import 'package:four3/src/feature/settings/domain/model/app_settings.dart';
 import 'package:vector_math/vector_math.dart' as vm;
 
+typedef GameCameraFraming = ({vm.Vector3 position, vm.Vector3 target});
+
+@visibleForTesting
+GameCameraFraming gameCameraResetFraming({
+  required CameraView view,
+  required Size viewport,
+  required bool demo,
+  double inset = 8,
+}) {
+  // Keep the active board at the same apparent size it had before the old
+  // 16 px canvas gutters were removed. The recovered width becomes breathing
+  // room around the projection instead of zooming the camera back in.
+  final double framingWidth = demo
+      ? viewport.width
+      : math.max(1, viewport.width - 32);
+  final double aspect = viewport.isEmpty ? 1 : framingWidth / viewport.height;
+  final double fit = math.max(1, .9 / aspect);
+  final vm.Vector3 target = vm.Vector3(0, demo ? -.35 : -.15, 0);
+  final vm.Vector3 base = switch (view) {
+    CameraView.top => vm.Vector3(0, 13.7, .035),
+    CameraView.front => vm.Vector3(0, 5.6, 12.8),
+    CameraView.perspective =>
+      demo ? vm.Vector3(8.7, 7.25, 9.8) : vm.Vector3(7.4, 9.2, 9.3),
+  };
+  final double nominalScale = demo ? .88 : .84;
+  double framingScale = 1;
+  if (!demo && !viewport.isEmpty) {
+    for (var step = 0; step <= 12; step++) {
+      final double candidate = 1 + step * .0025;
+      final vm.Vector3 position = base.clone()
+        ..scale(fit * nominalScale * candidate);
+      if (_boardFitsViewport(position, target, viewport, inset)) {
+        framingScale = candidate;
+        break;
+      }
+      framingScale = 1.03;
+    }
+  }
+  return (
+    position: base.clone()..scale(fit * nominalScale * framingScale),
+    target: target,
+  );
+}
+
+bool _boardFitsViewport(
+  vm.Vector3 position,
+  vm.Vector3 target,
+  Size viewport,
+  double inset,
+) {
+  final fs.PerspectiveCamera camera = fs.PerspectiveCamera(
+    fovRadiansY: 35 * math.pi / 180,
+    position: position,
+    target: target,
+    up: vm.Vector3(0, 1, 0),
+    fovFar: 100,
+  );
+  for (final vm.Vector3 worldPoint in gameBoardFramingEnvelope()) {
+    final Offset? point = camera.worldToScreen(worldPoint, viewport);
+    if (point == null ||
+        point.dx < inset ||
+        point.dx > viewport.width - inset ||
+        point.dy < inset ||
+        point.dy > viewport.height - inset) {
+      return false;
+    }
+  }
+  return true;
+}
+
+@visibleForTesting
+List<vm.Vector3> gameBoardFramingEnvelope() => <vm.Vector3>[
+  for (final double x in const <double>[-2.28, 2.28])
+    for (final double y in const <double>[-.43, .18])
+      for (final double z in const <double>[-2.28, 2.28]) vm.Vector3(x, y, z),
+  for (final double x in const <double>[-2.28, 2.28])
+    for (final double y in const <double>[.13, 2.9])
+      for (final double z in const <double>[-2.28, 2.28]) vm.Vector3(x, y, z),
+];
+
 class GameSceneView extends StatefulWidget {
   const new({
     required this.data,
@@ -47,6 +127,7 @@ class _GameSceneViewState extends State<GameSceneView> {
   double _polar = .65;
   double _distance = 15;
   double _startDistance = 15;
+  double _minimumDistance = 7;
   double _azimuthVelocity = 0;
   double _polarVelocity = 0;
   double? _goalAzimuth;
@@ -100,7 +181,9 @@ class _GameSceneViewState extends State<GameSceneView> {
       snapshot: widget.data.displayedSnapshot,
       xray: widget.data.xray,
       layers: widget.data.layers,
-      animations: widget.settings.animations,
+      animations:
+          widget.settings.animations &&
+          !MediaQuery.disableAnimationsOf(context),
       introduction: widget.demo,
     );
     final bool viewChanged = oldViewNeedsReset(widget.data.cameraView);
@@ -109,7 +192,7 @@ class _GameSceneViewState extends State<GameSceneView> {
       _resetCamera(widget.data.cameraView);
     }
     if (widget.data.snapshot.status == GameStatus.won) {
-      _targetGoal = _controller.winningTarget();
+      _targetGoal = _boundedTarget(_controller.winningTarget());
     }
   }
 
@@ -121,22 +204,23 @@ class _GameSceneViewState extends State<GameSceneView> {
   }
 
   void _resetCamera(CameraView view) {
-    final double aspect = _size.isEmpty ? 1.0 : _size.width / _size.height;
-    final double fit = math.max(1, .9 / aspect);
-    final vm.Vector3 raw = switch (view) {
-      CameraView.top => vm.Vector3(0, 13.7, .035),
-      CameraView.front => vm.Vector3(0, 5.6, 12.8),
-      CameraView.perspective =>
-        widget.demo ? vm.Vector3(8.7, 7.25, 9.8) : vm.Vector3(7.4, 9.2, 9.3),
-    }..scale(fit * (widget.demo ? .92 : 1));
-    _targetGoal = vm.Vector3(0, .25, 0);
+    final GameCameraFraming framing = gameCameraResetFraming(
+      view: view,
+      viewport: _size,
+      demo: widget.demo,
+    );
+    final vm.Vector3 raw = framing.position;
+    _targetGoal = framing.target;
     final vm.Vector3 offset = raw - _targetGoal;
     final double distance = offset.length.clamp(7, 23);
+    _minimumDistance = distance;
     final double azimuth = math.atan2(-offset.x, -offset.z);
     final double polar = math.asin((offset.y / distance).clamp(-1, 1));
     _azimuthVelocity = 0;
     _polarVelocity = 0;
-    if (!_cameraInitialized || !widget.settings.animations) {
+    if (!_cameraInitialized ||
+        !widget.settings.animations ||
+        MediaQuery.disableAnimationsOf(context)) {
       _azimuth = azimuth;
       _polar = polar;
       _distance = distance;
@@ -155,6 +239,12 @@ class _GameSceneViewState extends State<GameSceneView> {
     _goalPolar = null;
     _goalDistance = null;
   }
+
+  vm.Vector3 _boundedTarget(vm.Vector3 value) => vm.Vector3(
+    value.x.clamp(-2.8, 2.8),
+    value.y.clamp(-.35, 3.8),
+    value.z.clamp(-2.8, 2.8),
+  );
 
   fs.PerspectiveCamera _camera() {
     final double horizontal = math.cos(_polar) * _distance;
@@ -176,7 +266,8 @@ class _GameSceneViewState extends State<GameSceneView> {
         elapsed.inMicroseconds / Duration.microsecondsPerSecond;
     _controller.setClock(seconds);
     _controller.tick(seconds, delta);
-    final double response = widget.settings.animations
+    final double response =
+        widget.settings.animations && !MediaQuery.disableAnimationsOf(context)
         ? 1 - math.exp(-delta * 6)
         : 1.0;
     _target += (_targetGoal - _target) * response;
@@ -255,7 +346,7 @@ class _GameSceneViewState extends State<GameSceneView> {
 
   void _onScaleUpdate(ScaleUpdateDetails details) {
     if (details.pointerCount > 1) {
-      _distance = (_startDistance / details.scale).clamp(7, 23);
+      _distance = (_startDistance / details.scale).clamp(_minimumDistance, 23);
       _rotating = false;
     } else if (_size.height > 0) {
       _rotating = true;
@@ -378,6 +469,11 @@ class _GameSceneViewState extends State<GameSceneView> {
                       ),
                     ),
                   ),
+                if (MediaQuery.accessibleNavigationOf(context))
+                  GameAccessibleBoardGrid(
+                    data: widget.data,
+                    onPlace: widget.onPlace,
+                  ),
               ],
             ),
           ),
@@ -394,6 +490,66 @@ class _GameSceneViewState extends State<GameSceneView> {
     _sceneRepaint.dispose();
     _controller.dispose();
     super.dispose();
+  }
+}
+
+class GameAccessibleBoardGrid extends StatelessWidget {
+  const new({required this.data, required this.onPlace, super.key});
+
+  final GameViewData data;
+  final void Function(int x, int y) onPlace;
+
+  @override
+  Widget build(BuildContext context) => ColoredBox(
+    color: Colors.transparent,
+    child: Column(
+      children: [
+        for (var y = 0; y < GameEngine.size; y++)
+          Expanded(
+            child: Row(
+              children: [
+                for (var x = 0; x < GameEngine.size; x++)
+                  Expanded(
+                    child: _AccessibleColumn(
+                      data: data,
+                      x: x,
+                      y: y,
+                      onPlace: onPlace,
+                    ),
+                  ),
+              ],
+            ),
+          ),
+      ],
+    ),
+  );
+}
+
+class _AccessibleColumn extends StatelessWidget {
+  const new({
+    required this.data,
+    required this.x,
+    required this.y,
+    required this.onPlace,
+  });
+
+  final GameViewData data;
+  final int x;
+  final int y;
+  final void Function(int x, int y) onPlace;
+
+  @override
+  Widget build(BuildContext context) {
+    final int height = data.snapshot.heights[y * GameEngine.size + x];
+    final bool enabled = data.canPlace && height < GameEngine.size;
+    return Semantics(
+      key: ValueKey<String>('board-column-$x-$y'),
+      button: true,
+      enabled: enabled,
+      label: context.l10n.boardColumn(x + 1, y + 1, height),
+      onTap: enabled ? () => onPlace(x, y) : null,
+      child: const SizedBox.expand(),
+    );
   }
 }
 

@@ -6,6 +6,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:four3/src/feature/game/model/game_models.dart';
 import 'package:four3/src/feature/game/scene/game_scene_controller.dart';
 import 'package:four3/src/feature/game/service/game_engine.dart';
+import 'package:four3/src/feature/game/widget/game_scene_view.dart';
 import 'package:integration_test/integration_test.dart';
 import 'package:vector_math/vector_math.dart' as vm;
 
@@ -130,16 +131,15 @@ void main() {
 }
 
 fs.PerspectiveCamera _camera(CameraView view, Size size) {
-  final double fit = math.max(1, .9 / (size.width / size.height));
-  final vm.Vector3 position = switch (view) {
-    CameraView.perspective => vm.Vector3(7.4, 9.2, 9.3),
-    CameraView.top => vm.Vector3(0, 13.7, .035),
-    CameraView.front => vm.Vector3(0, 5.6, 12.8),
-  }..scale(fit);
+  final GameCameraFraming framing = gameCameraResetFraming(
+    view: view,
+    viewport: size,
+    demo: false,
+  );
   return fs.PerspectiveCamera(
     fovRadiansY: 35 * math.pi / 180,
-    position: position,
-    target: vm.Vector3(0, .25, 0),
+    position: framing.position,
+    target: framing.target,
     up: view == CameraView.top ? vm.Vector3(0, 0, 1) : vm.Vector3(0, 1, 0),
     fovFar: 100,
   );

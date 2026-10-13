@@ -50,6 +50,13 @@ void main() {
 
     channels.first.serverAdd(jsonEncode(const {'type': 'queue'}));
     await _flush();
+    final OnlineTransportEvent$Message queueEvent = events
+        .whereType<OnlineTransportEvent$Message>()
+        .singleWhere((event) => event.json['type'] == 'queue');
+    expect(
+      queueEvent.json['startedAt'],
+      persistenceDatasource.loadSearch()?['savedAt'],
+    );
     expect(
       events.whereType<OnlineTransportEvent$Status>().map(
         (event) => event.status,

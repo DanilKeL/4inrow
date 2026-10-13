@@ -232,6 +232,7 @@ class _TutorialViewState extends State<TutorialView> {
       );
     }
     return Column(
+      mainAxisSize: MainAxisSize.min,
       children: [
         goal,
         const SizedBox(height: 10),
@@ -577,17 +578,33 @@ class _TutorialFooter extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Row(
-    mainAxisAlignment: MainAxisAlignment.spaceBetween,
     children: [
-      TextButton.icon(
-        onPressed: onNext,
-        style: TextButton.styleFrom(textStyle: context.textStyle.buttonSmall),
-        iconAlignment: IconAlignment.end,
-        icon: const Icon(LucideIcons.arrowRight, size: 16),
-        label: Text(
-          selected == _lessonIds.length - 1
-              ? context.l10n.firstExample
-              : context.l10n.nextExample,
+      Expanded(
+        child: Align(
+          alignment: Alignment.centerLeft,
+          child: TextButton(
+            onPressed: onNext,
+            style: TextButton.styleFrom(
+              padding: const EdgeInsets.symmetric(horizontal: 8),
+              textStyle: context.textStyle.buttonSmall,
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Flexible(
+                  child: Text(
+                    selected == _lessonIds.length - 1
+                        ? context.l10n.firstExample
+                        : context.l10n.nextExample,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+                const SizedBox(width: 8),
+                const Icon(LucideIcons.arrowRight, size: 16),
+              ],
+            ),
+          ),
         ),
       ),
       const SizedBox(width: 8),

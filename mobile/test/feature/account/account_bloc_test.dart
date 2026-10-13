@@ -1,5 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:four3/src/common/preferences/preferences_datasource_tool.dart';
+import 'package:four3/src/common/rest_client/rest_client.dart';
 import 'package:four3/src/feature/account/bloc/account_bloc.dart';
 import 'package:four3/src/feature/account/bloc/account_event.dart';
 import 'package:four3/src/feature/account/bloc/account_state.dart';
@@ -92,11 +93,28 @@ void main() {
     expect(ready.registrationCompleted, isTrue);
     expect(ready.notice, contains('spam folder'));
   });
+
+  test('exposes verification requirement from a login failure', () async {
+    datasource.loginException = const RestClientException(
+      'Почта не подтверждена',
+      statusCode: 403,
+      data: <String, dynamic>{'verificationRequired': true},
+    );
+
+    bloc.add(const AccountEvent$Login('Alice', 'password-123'));
+    final AccountState$Failure failure = (await bloc.stream.firstWhere(
+      (state) => state is AccountState$Failure,
+    )) as AccountState$Failure;
+
+    expect(failure.message, 'Почта не подтверждена');
+    expect(failure.verificationRequired, isTrue);
+  });
 }
 
 final class _AccountDatasource implements AccountDatasource {
   String? completedToken;
   bool signedIn = false;
+  RestClientException? loginException;
   Map<String, dynamic> registrationResponse = {'message': 'registered'};
 
   @override
@@ -140,6 +158,9 @@ final class _AccountDatasource implements AccountDatasource {
     required String username,
     required String password,
   }) async {
+    if (loginException case final RestClientException exception) {
+      throw exception;
+    }
     signedIn = true;
     return {'ok': true};
   }

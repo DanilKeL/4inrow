@@ -27,41 +27,59 @@ class SettingsView extends StatelessWidget {
       builder: (context, state) {
         final AppSettings settings = bloc.settings;
         final AppLocalizations l10n = context.l10n;
+        final bool landscape =
+            MediaQuery.orientationOf(context) == Orientation.landscape &&
+            MediaQuery.sizeOf(context).height <= 550;
         void update(AppSettings value) => bloc.add(SettingsEvent$Update(value));
         final items = <Widget>[
           _SettingRow(
             icon: LucideIcons.languages,
             centerIcon: true,
+            minHeight: landscape ? 84 : 56,
+            verticalPadding: landscape ? 12 : null,
             child: _LanguagePicker(scope: AppLocaleScope.of(context)),
           ),
           _SettingRow(
             icon: LucideIcons.volume2,
+            minHeight: landscape ? 84 : 74,
+            verticalPadding: landscape ? 12 : null,
             child: Column(
+              mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Row(
-                  children: [
-                    Expanded(
-                      child: Text(
-                        l10n.soundVolume,
+                ConstrainedBox(
+                  constraints: BoxConstraints(minHeight: landscape ? 22 : 0),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          l10n.soundVolume,
+                          style: context.textStyle.bodyStrong.copyWith(
+                            fontSize: 12,
+                          ),
+                        ),
+                      ),
+                      Text(
+                        '${(settings.volume * 100).round()}%',
                         style: context.textStyle.bodyStrong.copyWith(
+                          color: context.colors.accent,
                           fontSize: 12,
                         ),
                       ),
-                    ),
-                    Text(
-                      '${(settings.volume * 100).round()}%',
-                      style: context.textStyle.bodyStrong.copyWith(
-                        color: context.colors.accent,
-                        fontSize: 12,
-                      ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
-                Slider(
-                  value: settings.volume,
-                  onChanged: (value) =>
-                      update(settings.copyWith(volume: value)),
+                if (landscape) const SizedBox(height: 4),
+                SizedBox(
+                  height: landscape ? 32 : null,
+                  child: Padding(
+                    padding: const EdgeInsets.only(right: 8),
+                    child: Slider(
+                      value: settings.volume,
+                      onChanged: (value) =>
+                          update(settings.copyWith(volume: value)),
+                    ),
+                  ),
                 ),
                 if (!settings.sound)
                   Text(
@@ -93,20 +111,18 @@ class SettingsView extends StatelessWidget {
             onChanged: (value) => update(settings.copyWith(xrayDefault: value)),
           ),
         ];
-        return LayoutBuilder(
-          builder: (context, constraints) {
-            final bool landscape =
-                MediaQuery.orientationOf(context) == Orientation.landscape &&
-                MediaQuery.sizeOf(context).height <= 550;
-            if (!landscape) return ListView(shrinkWrap: true, children: items);
-            return GridView.count(
-              shrinkWrap: true,
-              crossAxisCount: 2,
-              childAspectRatio: 3.7,
-              crossAxisSpacing: 20,
-              children: items,
-            );
-          },
+        if (!landscape) return ListView(shrinkWrap: true, children: items);
+        return ListView(
+          shrinkWrap: true,
+          children: [
+            _SettingsLandscapeRow(
+              minHeight: 84,
+              left: items[0],
+              right: items[1],
+            ),
+            _SettingsLandscapeRow(left: items[2], right: items[3]),
+            _SettingsLandscapeRow(left: items[4]),
+          ],
         );
       },
     );
@@ -409,33 +425,83 @@ _LanguageOption _optionForLocale(Locale locale, AppLocalizations l10n) =>
     };
 
 class _SettingRow extends StatelessWidget {
-  const new({required this.icon, required this.child, this.centerIcon = false});
+  const new({
+    required this.icon,
+    required this.child,
+    this.centerIcon = false,
+    this.minHeight = 66,
+    this.verticalPadding,
+  });
 
   final IconData icon;
   final Widget child;
   final bool centerIcon;
+  final double minHeight;
+  final double? verticalPadding;
 
   @override
-  Widget build(BuildContext context) => Container(
-    constraints: const BoxConstraints(minHeight: 54),
-    padding: EdgeInsets.symmetric(
-      vertical: MediaQuery.sizeOf(context).width <= 650 ? 10 : 18,
+  Widget build(BuildContext context) => ConstrainedBox(
+    constraints: BoxConstraints(minHeight: minHeight),
+    child: IntrinsicHeight(
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Align(
+            alignment: centerIcon ? Alignment.center : Alignment.topCenter,
+            child: Padding(
+              padding: EdgeInsets.only(
+                top: centerIcon
+                    ? 0
+                    : MediaQuery.sizeOf(context).width <= 650
+                    ? 10
+                    : 18,
+              ),
+              child: Icon(icon, size: 22, color: const Color(0xFF596052)),
+            ),
+          ),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              children: [
+                Expanded(
+                  child: Padding(
+                    padding: EdgeInsets.symmetric(
+                      vertical:
+                          verticalPadding ??
+                          (MediaQuery.sizeOf(context).width <= 650 ? 8 : 16),
+                    ),
+                    child: Align(alignment: Alignment.centerLeft, child: child),
+                  ),
+                ),
+                Divider(height: 1, thickness: 1, color: context.colors.border),
+              ],
+            ),
+          ),
+        ],
+      ),
     ),
-    decoration: BoxDecoration(
-      border: Border(bottom: BorderSide(color: context.colors.border)),
-    ),
-    child: Row(
-      crossAxisAlignment: centerIcon
-          ? CrossAxisAlignment.center
-          : CrossAxisAlignment.start,
-      children: [
-        Padding(
-          padding: EdgeInsets.only(top: centerIcon ? 0 : 2),
-          child: Icon(icon, size: 20, color: const Color(0xFF6D765F)),
-        ),
-        SizedBox(width: MediaQuery.sizeOf(context).width <= 650 ? 8 : 15),
-        Expanded(child: child),
-      ],
+  );
+}
+
+class _SettingsLandscapeRow extends StatelessWidget {
+  const new({required this.left, this.right, this.minHeight = 0});
+
+  final Widget left;
+  final Widget? right;
+  final double minHeight;
+
+  @override
+  Widget build(BuildContext context) => ConstrainedBox(
+    constraints: BoxConstraints(minHeight: minHeight),
+    child: IntrinsicHeight(
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Expanded(child: left),
+          const SizedBox(width: 20),
+          Expanded(child: right ?? const SizedBox.shrink()),
+        ],
+      ),
     ),
   );
 }
@@ -458,10 +524,13 @@ class _SettingSwitch extends StatelessWidget {
   @override
   Widget build(BuildContext context) => _SettingRow(
     icon: icon,
+    centerIcon: true,
     child: Row(
       children: [
         Expanded(
           child: Column(
+            mainAxisSize: MainAxisSize.min,
+            mainAxisAlignment: MainAxisAlignment.center,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
@@ -476,7 +545,17 @@ class _SettingSwitch extends StatelessWidget {
             ],
           ),
         ),
-        AppToggle(value: value, onChanged: onChanged, semanticLabel: title),
+        SizedBox(
+          width: 68,
+          child: Align(
+            alignment: Alignment.centerRight,
+            child: AppToggle(
+              value: value,
+              onChanged: onChanged,
+              semanticLabel: title,
+            ),
+          ),
+        ),
       ],
     ),
   );

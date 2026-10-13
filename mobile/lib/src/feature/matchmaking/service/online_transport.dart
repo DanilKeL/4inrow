@@ -245,7 +245,12 @@ final class OnlineTransport implements OnlineTransportClient {
         _clearTimers();
         _retry = 0;
         _retryStarted = null;
-        _events.add(OnlineTransportEvent$Message(event));
+        _events.add(
+          OnlineTransportEvent$Message(<String, dynamic>{
+            ...event,
+            'startedAt': _search?['savedAt'],
+          }),
+        );
         _emitStatus('connected');
       case 'queue_removed':
         _search = null;
