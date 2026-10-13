@@ -13,7 +13,9 @@ import 'package:four3/src/feature/game/model/game_models.dart';
 import 'package:four3/src/feature/game/model/game_view_data.dart';
 import 'package:four3/src/feature/game/scene/game_camera_orbit.dart';
 import 'package:four3/src/feature/game/scene/game_scene_controller.dart';
+import 'package:four3/src/feature/game/scene/victory_camera.dart';
 import 'package:four3/src/feature/game/service/game_engine.dart';
+import 'package:four3/src/feature/game/service/victory_presentation.dart';
 import 'package:four3/src/feature/settings/domain/model/app_settings.dart';
 import 'package:vector_math/vector_math.dart' as vm;
 
@@ -104,6 +106,7 @@ class GameSceneView extends StatefulWidget {
     required this.skin,
     required this.imageCache,
     required this.onPlace,
+    this.victory,
     this.demo = false,
     super.key,
   });
@@ -113,6 +116,7 @@ class GameSceneView extends StatefulWidget {
   final Skin skin;
   final SkinImageCache imageCache;
   final void Function(int x, int y) onPlace;
+  final VictoryPresentationSession? victory;
   final bool demo;
 
   @override
@@ -128,6 +132,7 @@ class _GameSceneViewState extends State<GameSceneView> {
   double _distance = 15;
   double _startDistance = 15;
   double _minimumDistance = 7;
+  double _maximumDistance = 23;
   double _azimuthVelocity = 0;
   double _polarVelocity = 0;
   double? _goalAzimuth;
@@ -143,6 +148,8 @@ class _GameSceneViewState extends State<GameSceneView> {
   final List<double> _frameTimes = [];
   final ValueNotifier<int> _sceneRepaint = ValueNotifier<int>(0);
   Timer? _invalidColumnTimer;
+  VictoryCameraShot? _victoryShot;
+  String? _victoryKey;
 
   @override
   void initState() {
@@ -185,15 +192,47 @@ class _GameSceneViewState extends State<GameSceneView> {
           widget.settings.animations &&
           !MediaQuery.disableAnimationsOf(context),
       introduction: widget.demo,
+      victoryAnimated: widget.victory?.animations ?? false,
     );
     final bool viewChanged = oldViewNeedsReset(widget.data.cameraView);
     if (_cameraReset != widget.data.cameraReset || viewChanged) {
       _cameraReset = widget.data.cameraReset;
       _resetCamera(widget.data.cameraView);
     }
-    if (widget.data.snapshot.status == GameStatus.won) {
-      _targetGoal = _boundedTarget(_controller.winningTarget());
+    _syncVictoryCamera();
+  }
+
+  void _syncVictoryCamera() {
+    final VictoryPresentationSession? victory = widget.victory;
+    if (victory == null || !victory.animations) {
+      _victoryKey = null;
+      _victoryShot = null;
+      _minimumDistance = 7;
+      _maximumDistance = 23;
+      return;
     }
+    if (_victoryKey == victory.key ||
+        _size.isEmpty ||
+        victory.elapsed >= victoryCinematicDuration ||
+        widget.data.snapshot.history.isEmpty ||
+        widget.data.snapshot.winningLines.isEmpty) {
+      return;
+    }
+    _victoryKey = victory.key;
+    _azimuthVelocity = 0;
+    _polarVelocity = 0;
+    _clearCameraGoal();
+    _targetGoal = _target.clone();
+    _victoryShot = fitVictoryCamera(
+      lines: widget.data.snapshot.winningLines,
+      last: widget.data.snapshot.history.last.position,
+      currentTarget: _target,
+      currentAzimuth: _azimuth,
+      currentPolar: _polar,
+      currentDistance: _distance,
+      fovRadians: 35 * math.pi / 180,
+      viewport: _size,
+    );
   }
 
   CameraView? _lastView;
@@ -214,6 +253,7 @@ class _GameSceneViewState extends State<GameSceneView> {
     final vm.Vector3 offset = raw - _targetGoal;
     final double distance = offset.length.clamp(7, 23);
     _minimumDistance = distance;
+    _maximumDistance = 23;
     final double azimuth = math.atan2(-offset.x, -offset.z);
     final double polar = math.asin((offset.y / distance).clamp(-1, 1));
     _azimuthVelocity = 0;
@@ -240,12 +280,6 @@ class _GameSceneViewState extends State<GameSceneView> {
     _goalDistance = null;
   }
 
-  vm.Vector3 _boundedTarget(vm.Vector3 value) => vm.Vector3(
-    value.x.clamp(-2.8, 2.8),
-    value.y.clamp(-.35, 3.8),
-    value.z.clamp(-2.8, 2.8),
-  );
-
   fs.PerspectiveCamera _camera() {
     final double horizontal = math.cos(_polar) * _distance;
     final vm.Vector3 position =
@@ -253,7 +287,9 @@ class _GameSceneViewState extends State<GameSceneView> {
         vm.Vector3(-math.sin(_azimuth), 0, -math.cos(_azimuth)) * horizontal +
         vm.Vector3(0, math.sin(_polar) * _distance, 0);
     return fs.PerspectiveCamera(
-      fovRadiansY: 35 * math.pi / 180,
+      fovRadiansY: _victoryShot == null
+          ? 35 * math.pi / 180
+          : victoryFov(viewportHeight: _size.height, shot: _victoryShot!),
       position: position,
       target: _target,
       up: vm.Vector3(0, 1, 0),
@@ -265,7 +301,36 @@ class _GameSceneViewState extends State<GameSceneView> {
     final double seconds =
         elapsed.inMicroseconds / Duration.microsecondsPerSecond;
     _controller.setClock(seconds);
-    _controller.tick(seconds, delta);
+    final VictoryPresentationSession? victory = widget.victory;
+    final VictoryProgress? presentation = victory != null && victory.animations
+        ? victoryProgress(victory.elapsed)
+        : null;
+    _controller.tick(seconds, delta, victory: presentation);
+    final VictoryCameraShot? shot = _victoryShot;
+    if (victory != null && shot != null && _victoryKey == victory.key) {
+      if (victory.cameraLocked) {
+        final double raw =
+            victory.elapsed.inMicroseconds / winCameraDuration.inMicroseconds;
+        final double eased = victorySmoothStep(raw);
+        _azimuth =
+            shot.fromAzimuth +
+            shortestVictoryAngle(shot.fromAzimuth, shot.toAzimuth) * eased;
+        _polar = shot.fromPolar + (shot.toPolar - shot.fromPolar) * eased;
+        _distance =
+            shot.fromDistance + (shot.toDistance - shot.fromDistance) * eased;
+        _target = shot.fromTarget.clone()
+          ..add((shot.toTarget - shot.fromTarget) * eased);
+        _targetGoal = _target.clone();
+        _sceneRepaint.value++;
+        return;
+      }
+      if (!shot.released) {
+        _minimumDistance = math.min(7, _distance);
+        _maximumDistance = math.max(23, _distance);
+        shot.released = true;
+        _clearCameraGoal();
+      }
+    }
     final double response =
         widget.settings.animations && !MediaQuery.disableAnimationsOf(context)
         ? 1 - math.exp(-delta * 6)
@@ -335,6 +400,7 @@ class _GameSceneViewState extends State<GameSceneView> {
   }
 
   void _onScaleStart(ScaleStartDetails details) {
+    if (widget.victory?.cameraLocked ?? false) return;
     _controller.hideGhost();
     _startDistance = _distance;
     _azimuthVelocity = 0;
@@ -345,8 +411,12 @@ class _GameSceneViewState extends State<GameSceneView> {
   }
 
   void _onScaleUpdate(ScaleUpdateDetails details) {
+    if (widget.victory?.cameraLocked ?? false) return;
     if (details.pointerCount > 1) {
-      _distance = (_startDistance / details.scale).clamp(_minimumDistance, 23);
+      _distance = (_startDistance / details.scale).clamp(
+        _minimumDistance,
+        _maximumDistance,
+      );
       _rotating = false;
     } else if (_size.height > 0) {
       _rotating = true;
@@ -363,6 +433,7 @@ class _GameSceneViewState extends State<GameSceneView> {
   }
 
   void _onScaleEnd(ScaleEndDetails details) {
+    if (widget.victory?.cameraLocked ?? false) return;
     if (!_rotating || _size.height <= 0) return;
     final ({double azimuth, double polar}) velocity =
         GameCameraOrbit.velocityFromPixels(
@@ -424,7 +495,8 @@ class _GameSceneViewState extends State<GameSceneView> {
         final Size nextSize = constraints.biggest;
         if (_size != nextSize) {
           _size = nextSize;
-          _resetCamera(widget.data.cameraView);
+          if (_victoryShot == null) _resetCamera(widget.data.cameraView);
+          _syncVictoryCamera();
         }
         final double dpr = MediaQuery.devicePixelRatioOf(context);
         final double area = math.max(1, _size.width * _size.height * dpr * dpr);
@@ -464,6 +536,7 @@ class _GameSceneViewState extends State<GameSceneView> {
                         layers: widget.data.layers,
                         color: _skinColor(widget.skin.palette.accent),
                         camera: _camera,
+                        victory: widget.victory,
                         devicePixelRatio: dpr,
                         repaint: _sceneRepaint,
                       ),
@@ -563,6 +636,7 @@ final class _WinningLinesPainter extends CustomPainter {
     required this.color,
     required this.camera,
     required this.devicePixelRatio,
+    required this.victory,
     required Listenable repaint,
   }) : super(repaint: repaint);
 
@@ -571,6 +645,7 @@ final class _WinningLinesPainter extends CustomPainter {
   final Color color;
   final fs.PerspectiveCamera Function() camera;
   final double devicePixelRatio;
+  final VictoryPresentationSession? victory;
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -580,7 +655,21 @@ final class _WinningLinesPainter extends CustomPainter {
       ..strokeWidth = 4 / devicePixelRatio
       ..strokeCap = StrokeCap.round
       ..style = PaintingStyle.stroke;
-    for (final List<BoardPosition> line in snapshot.winningLines) {
+    final VictoryProgress? presentation = victory != null && victory!.animations
+        ? victoryProgress(victory!.elapsed)
+        : null;
+    final BoardPosition? last = snapshot.history.isEmpty
+        ? null
+        : snapshot.history.last.position;
+    for (final List<BoardPosition> source in snapshot.winningLines) {
+      final List<BoardPosition> line =
+          presentation != null &&
+              last != null &&
+              source.isNotEmpty &&
+              source.last == last
+          ? source.reversed.toList(growable: false)
+          : source;
+      final int total = math.max(0, line.length - 1);
       for (var index = 1; index < line.length; index++) {
         final BoardPosition first = line[index - 1];
         final BoardPosition second = line[index];
@@ -591,7 +680,19 @@ final class _WinningLinesPainter extends CustomPainter {
           ..y += .27;
         final Offset? a = activeCamera.worldToScreen(firstWorld, size);
         final Offset? b = activeCamera.worldToScreen(secondWorld, size);
-        if (a != null && b != null) canvas.drawLine(a, b, paint);
+        final double progress = presentation == null
+            ? 1
+            : victorySegmentProgress(
+                presentation.lineProgress,
+                index - 1,
+                total,
+              );
+        if (a != null && b != null && progress > 0) {
+          paint.color = color.withValues(
+            alpha: .83 * math.min(1, progress * 4),
+          );
+          canvas.drawLine(a, Offset.lerp(a, b, progress)!, paint);
+        }
       }
     }
   }
@@ -601,5 +702,6 @@ final class _WinningLinesPainter extends CustomPainter {
       oldDelegate.snapshot != snapshot ||
       oldDelegate.layers != layers ||
       oldDelegate.color != color ||
+      oldDelegate.victory?.key != victory?.key ||
       oldDelegate.devicePixelRatio != devicePixelRatio;
 }

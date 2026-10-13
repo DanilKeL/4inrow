@@ -2,13 +2,20 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:four3/src/feature/appearance/domain/model/skin_catalog.dart';
 
 void main() {
-  test('default catalog contains the four web built-ins', () {
+  test('default catalog contains the six web built-ins', () {
     final SkinCatalog catalog = defaultSkinCatalog();
 
     expect(catalog.activeSkinId, 'coffee-board');
     expect(
       catalog.skins.map((skin) => skin.id),
-      containsAll(['classic', 'coffee-board', 'coffee-pieces', 'nocturne']),
+      containsAll([
+        'classic',
+        'coffee-board',
+        'coffee-pieces',
+        'nocturne',
+        'pickmi',
+        'sakura-nocturne',
+      ]),
     );
     expect(
       catalog.skins.firstWhere((skin) => skin.id == 'nocturne').artwork,
@@ -87,12 +94,41 @@ void main() {
     expect(SkinCatalog.decode('{broken'), isNull);
     final Map<String, Object?> catalog = defaultSkinCatalog().toJson();
     catalog['unknown'] = true;
-    expect(SkinCatalog.fromJson(catalog), isNull);
+    expect(SkinCatalog.fromJson(catalog), isNotNull);
 
     final Map<String, Object?> badSkin = defaultSkinCatalog().skins.first
         .toJson();
     final palette = badSkin['palette']! as Map<String, Object?>;
     palette['room'] = 'white';
     expect(Skin.fromJson(badSkin), isNull);
+  });
+
+  test('future built-ins and unsupported decoration degrade safely', () {
+    final Map<String, Object?> json = defaultSkinCatalog().toJson();
+    final Map<String, Object?> future =
+        Map<String, Object?>.from(builtinSkins.first.toJson())
+          ..['id'] = 'future-skin'
+          ..['name'] = 'Future'
+          ..['builtin'] = true
+          ..['futureField'] = true;
+    final Map<String, Object?> design = pickmiDesign().toJson();
+    final surfaces = design['surfaces']! as Map<String, Object?>;
+    final board = surfaces['board']! as Map<String, Object?>;
+    board['pattern'] = 'future-pattern';
+    final layers = board['layers']! as List<Object?>;
+    layers.add({'kind': 'future-layer'});
+    future['design'] = design;
+    (json['skins']! as List<Object?>).add(future);
+    json['activeSkinId'] = 'future-skin';
+
+    final SkinCatalog? catalog = SkinCatalog.fromJson(json);
+    final Skin skin = catalog!.activeSkin;
+
+    expect(skin.id, 'future-skin');
+    expect(skin.design![SkinSurface.board].pattern, SkinPattern.none);
+    expect(
+      skin.design![SkinSurface.board].layers,
+      hasLength(pickmiDesign()[SkinSurface.board].layers.length),
+    );
   });
 }

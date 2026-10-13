@@ -89,4 +89,30 @@ void main() {
     expect(artwork.metallicRoughness, isNotNull);
     expect(artwork.metallicRoughness!.width, 1024);
   });
+
+  for (final String id in const ['pickmi', 'sakura-nocturne']) {
+    test('$id produces every web surface at the expected size', () async {
+      final Directory directory = await Directory.systemTemp.createTemp(
+        'skin-$id-test',
+      );
+      final cache = SkinImageCache(
+        baseUri: Uri.parse('https://example.test'),
+        directory: directory,
+      );
+      addTearDown(() async {
+        cache.dispose();
+        await directory.delete(recursive: true);
+      });
+      final Skin skin = builtinSkins.firstWhere((skin) => skin.id == id);
+      final SkinArtwork? artwork = await SkinTexturePainter(cache)
+          .paint(skin, preloadImages: false);
+      if (artwork != null) addTearDown(artwork.dispose);
+
+      expect(artwork, isNotNull);
+      expect(artwork!.images, hasLength(SkinSurface.values.length));
+      expect(artwork[SkinSurface.board].width, 1024);
+      expect(artwork[SkinSurface.darkCap].height, 512);
+      expect(artwork[SkinSurface.lightBody].height, 256);
+    });
+  }
 }

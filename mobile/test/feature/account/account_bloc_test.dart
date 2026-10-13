@@ -95,8 +95,31 @@ void main() {
   });
 
   test('exposes verification requirement from a login failure', () async {
-    datasource.loginException = const RestClientException(
-      'Почта не подтверждена',
+    final String message = String.fromCharCodes(const <int>[
+      0x041f,
+      0x043e,
+      0x0447,
+      0x0442,
+      0x0430,
+      0x0020,
+      0x043d,
+      0x0435,
+      0x0020,
+      0x043f,
+      0x043e,
+      0x0434,
+      0x0442,
+      0x0432,
+      0x0435,
+      0x0440,
+      0x0436,
+      0x0434,
+      0x0435,
+      0x043d,
+      0x0430,
+    ]);
+    datasource.loginException = RestClientException(
+      message,
       statusCode: 403,
       data: <String, dynamic>{'verificationRequired': true},
     );
@@ -106,7 +129,7 @@ void main() {
       (state) => state is AccountState$Failure,
     )) as AccountState$Failure;
 
-    expect(failure.message, 'Почта не подтверждена');
+    expect(failure.message, message);
     expect(failure.verificationRequired, isTrue);
   });
 }

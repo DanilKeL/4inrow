@@ -29,6 +29,7 @@ import 'package:four3/src/feature/game/bloc/game_state.dart';
 import 'package:four3/src/feature/game/model/game_models.dart';
 import 'package:four3/src/feature/game/model/game_view_data.dart';
 import 'package:four3/src/feature/game/service/game_engine.dart';
+import 'package:four3/src/feature/game/service/victory_presentation.dart';
 import 'package:four3/src/feature/game/widget/game_root_scope.dart';
 import 'package:four3/src/feature/game/widget/game_scene_view.dart';
 import 'package:four3/src/feature/game/widget/game_setup_view.dart';
@@ -77,6 +78,7 @@ class GameShell extends StatelessWidget {
           GameState$Ready(:final data) => _GameShellBody(
             data: data,
             settings: settingsBloc.settings,
+            reduceMotion: MediaQuery.disableAnimationsOf(context),
           ),
           GameState$Failure(:final message) => Scaffold(
             body: Center(child: Text(message)),
@@ -90,12 +92,100 @@ class GameShell extends StatelessWidget {
   }
 }
 
-class _GameShellBody extends StatelessWidget {
-  const new({required this.data, required this.settings});
+class _GameShellBody extends StatefulWidget {
+  const new({
+    required this.data,
+    required this.settings,
+    required this.reduceMotion,
+  });
   final GameViewData data;
   final AppSettings settings;
+  final bool reduceMotion;
+
+  @override
+  State<_GameShellBody> createState() => _GameShellBodyState();
+}
+
+class _GameShellBodyState extends State<_GameShellBody>
+    with WidgetsBindingObserver {
+  VictoryPresentationSession? _victory;
+  Timer? _resultTimer;
+  bool _resultVisible = false;
+
+  GameViewData get data => widget.data;
+  AppSettings get settings => widget.settings;
 
   bool get isMenu => data.phase == GamePhase.menu;
+
+  bool get _animations => settings.animations && !widget.reduceMotion;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    _syncPresentation();
+  }
+
+  @override
+  void didUpdateWidget(covariant _GameShellBody oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    _syncPresentation();
+  }
+
+  void _syncPresentation() {
+    final bool replay = data.phase == GamePhase.replay;
+    final bool finished = data.snapshot.status != GameStatus.playing;
+    if (isMenu || !finished || replay) {
+      _resultTimer?.cancel();
+      _resultTimer = null;
+      _victory?.pause();
+      _victory = null;
+      _resultVisible = replay;
+      return;
+    }
+    final String key = victoryPresentationKey(data);
+    if (_victory?.key != key) {
+      _resultTimer?.cancel();
+      _victory?.pause();
+      _victory = VictoryPresentationSession(
+        key: key,
+        animations: _animations && hasPhysicalVictory(data),
+      );
+      _resultVisible = false;
+      _scheduleResultReveal();
+    }
+  }
+
+  void _scheduleResultReveal() {
+    _resultTimer?.cancel();
+    final VictoryPresentationSession? session = _victory;
+    if (session == null || _resultVisible) return;
+    final Duration delay = gameResultDelay(data, animations: _animations);
+    final Duration remaining = delay - session.elapsed;
+    if (remaining <= Duration.zero) {
+      _resultVisible = true;
+      return;
+    }
+    _resultTimer = Timer(remaining, () {
+      if (!mounted || _victory != session) return;
+      setState(() => _resultVisible = true);
+    });
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      _victory?.resume();
+      _scheduleResultReveal();
+    } else if (state == AppLifecycleState.inactive ||
+        state == AppLifecycleState.paused ||
+        state == AppLifecycleState.hidden ||
+        state == AppLifecycleState.detached) {
+      _victory?.pause();
+      _resultTimer?.cancel();
+      _resultTimer = null;
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -140,6 +230,7 @@ class _GameShellBody extends StatelessWidget {
                             settings: settings,
                             skin: skin,
                             imageCache: appearance.imageCache,
+                            victory: _victory,
                             demo: isMenu,
                             onPlace: (x, y) {
                               gameBloc.add(GameEvent$MakeMove(x, y));
@@ -153,9 +244,7 @@ class _GameShellBody extends StatelessWidget {
                             final bool shortLandscape =
                                 constraints.maxWidth >= 651 &&
                                 constraints.maxHeight <= 550;
-                            final bool result =
-                                data.snapshot.status != GameStatus.playing ||
-                                data.phase == GamePhase.replay;
+                            final bool result = _resultVisible;
                             final Widget board = shortLandscape
                                 ? Stack(
                                     fit: StackFit.expand,
@@ -294,7 +383,8 @@ class _GameShellBody extends StatelessWidget {
                   data: data,
                 ),
             if (data.onlineSnapshot case final snapshot?)
-              if (snapshot.game.status != GameStatus.playing &&
+              if (_resultVisible &&
+                  snapshot.game.status != GameStatus.playing &&
                   snapshot.ranking?.rated == true &&
                   snapshot.ranking?.changes != null)
                 _RankedResultOverlay(
@@ -305,6 +395,14 @@ class _GameShellBody extends StatelessWidget {
         ),
       ),
     );
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    _resultTimer?.cancel();
+    _victory?.pause();
+    super.dispose();
   }
 
   void _openSetup(BuildContext context, GameMode mode) => showAppDialog<void>(

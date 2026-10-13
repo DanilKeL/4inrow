@@ -5,15 +5,43 @@ import 'package:flutter/foundation.dart';
 const String defaultRoomColor = '#ebeae7';
 
 final RegExp _colorPattern = RegExp(r'^#[0-9a-fA-F]{6}$');
-final RegExp _customSkinPattern = RegExp(r'^custom-[a-f0-9]{32}$');
+final RegExp _skinIdPattern = RegExp(r'^[a-z0-9][a-z0-9-]{0,63}$');
 final RegExp _imageIdPattern = RegExp(r'^[a-f0-9]{64}$');
 final RegExp _layerIdPattern = RegExp(r'^[a-zA-Z0-9_-]{1,48}$');
 
 enum SkinSurface { board, darkCap, darkBody, lightCap, lightBody }
 
-enum SkinPattern { none, celestial, botanical, artdeco, guilloche, marble }
+enum SkinPattern {
+  none,
+  celestial,
+  botanical,
+  artdeco,
+  guilloche,
+  marble,
+  gingham,
+  sakuraWaves,
+}
 
-enum SkinMotif { moon, sun, star, lotus, laurel, diamond, rings }
+enum SkinMotif {
+  moon,
+  sun,
+  star,
+  lotus,
+  laurel,
+  diamond,
+  rings,
+  heart,
+  bow,
+  blossom,
+  sakura,
+  kitsune,
+  crest,
+}
+
+String _patternName(SkinPattern pattern) => switch (pattern) {
+  SkinPattern.sakuraWaves => 'sakura-waves',
+  _ => pattern.name,
+};
 
 enum LayerPlacement { single, corners, grid }
 
@@ -28,7 +56,7 @@ final class PiecePalette {
 
   static PiecePalette? fromJson(Object? value) {
     final Map<String, Object?>? map = _record(value);
-    if (map == null || !_exactKeys(map, const {'body', 'cap', 'mark'})) {
+    if (map == null || !_hasKeys(map, const {'body', 'cap', 'mark'})) {
       return null;
     }
     if (!_color(map['body']) || !_color(map['cap']) || !_color(map['mark'])) {
@@ -53,7 +81,7 @@ final class BoardPalette {
 
   static BoardPalette? fromJson(Object? value) {
     final Map<String, Object?>? map = _record(value);
-    if (map == null || !_exactKeys(map, const {'body', 'rim', 'dot'})) {
+    if (map == null || !_hasKeys(map, const {'body', 'rim', 'dot'})) {
       return null;
     }
     if (!_color(map['body']) || !_color(map['rim']) || !_color(map['dot'])) {
@@ -94,7 +122,7 @@ final class SkinPalette {
     final Map<String, Object?>? source = _record(value);
     if (source == null) return null;
     final map = <String, Object?>{'room': defaultRoomColor, ...source};
-    if (!_exactKeys(map, const {'room', 'board', 'dark', 'light', 'accent'})) {
+    if (!_hasKeys(map, const {'room', 'board', 'dark', 'light', 'accent'})) {
       return null;
     }
     final BoardPalette? board = BoardPalette.fromJson(map['board']);
@@ -158,20 +186,7 @@ sealed class DesignLayer {
     final Map<String, Object?>? map = _record(value);
     if (map == null) return null;
     final Object? kind = map['kind'];
-    final expected = <String>{
-      'id',
-      'kind',
-      'x',
-      'y',
-      'size',
-      'rotation',
-      'opacity',
-      'color',
-      'tint',
-      'placement',
-      if (kind == 'motif') 'motif' else if (kind == 'image') 'imageId',
-    };
-    if ((kind != 'motif' && kind != 'image') || !_exactKeys(map, expected)) {
+    if (kind != 'motif' && kind != 'image') {
       return null;
     }
     final Object? id = map['id'];
@@ -301,7 +316,7 @@ final class SurfaceDesign {
   bool get decorated => pattern != SkinPattern.none || layers.isNotEmpty;
 
   Map<String, Object?> toJson() => {
-    'pattern': pattern.name,
+    'pattern': _patternName(pattern),
     'ink': ink,
     'patternScale': patternScale,
     'patternOpacity': patternOpacity,
@@ -314,7 +329,7 @@ final class SurfaceDesign {
   static SurfaceDesign? fromJson(Object? value) {
     final Map<String, Object?>? map = _record(value);
     if (map == null ||
-        !_exactKeys(map, const {
+        !_hasKeys(map, const {
           'pattern',
           'ink',
           'patternScale',
@@ -326,17 +341,15 @@ final class SurfaceDesign {
         })) {
       return null;
     }
-    final SkinPattern? pattern = _enumByName(
-      SkinPattern.values,
-      map['pattern'],
-    );
+    final SkinPattern pattern = map['pattern'] == 'sakura-waves'
+        ? SkinPattern.sakuraWaves
+        : _enumByName(SkinPattern.values, map['pattern']) ?? SkinPattern.none;
     final double? patternScale = _number(map['patternScale'], .5, 3);
     final double? patternOpacity = _number(map['patternOpacity'], 0, 1);
     final double? roughness = _number(map['roughness'], 0, 1);
     final double? metalness = _number(map['metalness'], 0, 1);
     final Object? rawLayers = map['layers'];
-    if (pattern == null ||
-        !_color(map['ink']) ||
+    if (!_color(map['ink']) ||
         patternScale == null ||
         patternOpacity == null ||
         roughness == null ||
@@ -346,11 +359,10 @@ final class SurfaceDesign {
         rawLayers.length > 12) {
       return null;
     }
-    final List<DesignLayer?> layers = rawLayers
+    final List<DesignLayer> typed = rawLayers
         .map(DesignLayer.fromJson)
+        .whereType<DesignLayer>()
         .toList();
-    if (layers.any((layer) => layer == null)) return null;
-    final List<DesignLayer> typed = layers.cast<DesignLayer>();
     if (typed.map((layer) => layer.id).toSet().length != typed.length) {
       return null;
     }
@@ -390,17 +402,12 @@ final class SkinDesign {
 
   static SkinDesign? fromJson(Object? value) {
     final Map<String, Object?>? map = _record(value);
-    if (map == null ||
-        !_exactKeys(map, const {'version', 'surfaces'}) ||
-        map['version'] != 1) {
+    if (map == null || map['version'] != 1) {
       return null;
     }
     final Map<String, Object?>? raw = _record(map['surfaces']);
     if (raw == null ||
-        !_exactKeys(
-          raw,
-          SkinSurface.values.map((value) => value.name).toSet(),
-        )) {
+        !SkinSurface.values.every((surface) => raw.containsKey(surface.name))) {
       return null;
     }
     final surfaces = <SkinSurface, SurfaceDesign>{};
@@ -443,29 +450,20 @@ final class Skin {
   static Skin? fromJson(Object? value) {
     final Map<String, Object?>? map = _record(value);
     if (map == null) return null;
-    final allowed = {'id', 'name', 'builtin', 'palette', 'artwork', 'design'};
-    if (map.keys.any((key) => !allowed.contains(key))) return null;
     final Object? id = map['id'];
     final Object? name = map['name'];
     final Object? builtin = map['builtin'];
     final SkinPalette? palette = SkinPalette.fromJson(map['palette']);
     final Object? artwork = map['artwork'];
-    final SkinDesign? design = map.containsKey('design')
-        ? SkinDesign.fromJson(map['design'])
-        : null;
-    final Skin? builtinDefinition = builtinSkins
-        .where((skin) => skin.id == id)
-        .firstOrNull;
+    final SkinDesign? design = SkinDesign.fromJson(map['design']);
     if (id is! String ||
         name is! String ||
         name.trim().isEmpty ||
         name.length > 48 ||
         builtin is! bool ||
         palette == null ||
-        (builtinDefinition == null && !_customSkinPattern.hasMatch(id)) ||
-        builtin != (builtinDefinition != null) ||
-        (artwork != null && artwork != 'nocturne') ||
-        (map.containsKey('design') && design == null)) {
+        !_skinIdPattern.hasMatch(id) ||
+        (artwork != null && artwork is! String)) {
       return null;
     }
     return Skin(
@@ -473,7 +471,7 @@ final class Skin {
       name: name,
       builtin: builtin,
       palette: palette,
-      artwork: artwork as String?,
+      artwork: artwork == 'nocturne' ? 'nocturne' : null,
       design: design,
     );
   }
@@ -485,11 +483,13 @@ final class SkinCatalog {
     required this.revision,
     required this.activeSkinId,
     required this.skins,
+    this.sourceJson,
   });
 
   final int revision;
   final String activeSkinId;
   final List<Skin> skins;
+  final String? sourceJson;
 
   Skin get activeSkin => skins.firstWhere(
     (skin) => skin.id == activeSkinId,
@@ -505,18 +505,20 @@ final class SkinCatalog {
 
   String encode() => jsonEncode(toJson());
 
+  String get cacheValue => sourceJson ?? encode();
+
   static SkinCatalog? decode(String value) {
     try {
-      return fromJson(jsonDecode(value));
+      return fromJson(jsonDecode(value), sourceJson: value);
     } on Object {
       return null;
     }
   }
 
-  static SkinCatalog? fromJson(Object? value) {
+  static SkinCatalog? fromJson(Object? value, {String? sourceJson}) {
     final Map<String, Object?>? map = _record(value);
     if (map == null ||
-        !_exactKeys(map, const {
+        !_hasKeys(map, const {
           'schemaVersion',
           'revision',
           'activeSkinId',
@@ -531,22 +533,27 @@ final class SkinCatalog {
       return null;
     }
     final rawSkins = List<Object?>.from(map['skins']! as List<Object?>);
-    final List<Skin?> parsed = rawSkins.map(Skin.fromJson).toList();
-    if (parsed.any((skin) => skin == null)) return null;
-    final List<Skin> skins = parsed.cast<Skin>().toList();
+    final List<Skin> skins = rawSkins
+        .map(Skin.fromJson)
+        .whereType<Skin>()
+        .toList();
     for (final Skin builtin in builtinSkins) {
       if (!skins.any((skin) => skin.id == builtin.id)) skins.add(builtin);
     }
-    if (skins.length < builtinSkins.length ||
-        skins.length > builtinSkins.length + 32 ||
+    if (skins.length > 64 ||
         skins.map((skin) => skin.id).toSet().length != skins.length ||
-        !skins.any((skin) => skin.id == map['activeSkinId'])) {
+        skins.isEmpty) {
       return null;
     }
+    final String requestedActive = map['activeSkinId']! as String;
+    final String active = skins.any((skin) => skin.id == requestedActive)
+        ? requestedActive
+        : 'coffee-board';
     return SkinCatalog(
       revision: map['revision']! as int,
-      activeSkinId: map['activeSkinId']! as String,
+      activeSkinId: active,
       skins: List.unmodifiable(skins),
+      sourceJson: sourceJson,
     );
   }
 
@@ -564,6 +571,269 @@ const SkinPalette classicPalette = SkinPalette(
   dark: PiecePalette(body: '#24272c', cap: '#24292f', mark: '#858992'),
   light: PiecePalette(body: '#eee4d2', cap: '#f5edde', mark: '#969286'),
   accent: '#3661ee',
+);
+
+const String moonlitSakuraImageId =
+    'bc22fbff3d878f25892d3bd09227dfe92c943adfabbbe88309788c40eceed6fb';
+
+SurfaceDesign _surface({
+  SkinPattern pattern = SkinPattern.none,
+  String ink = '#c8a970',
+  double patternScale = 1,
+  double patternOpacity = .65,
+  bool border = false,
+  double roughness = .5,
+  double metalness = 0,
+  List<DesignLayer> layers = const [],
+}) => SurfaceDesign(
+  pattern: pattern,
+  ink: ink,
+  patternScale: patternScale,
+  patternOpacity: patternOpacity,
+  border: border,
+  roughness: roughness,
+  metalness: metalness,
+  layers: List.unmodifiable(layers),
+);
+
+MotifDesignLayer _motif(
+  String id,
+  SkinMotif motif, {
+  String color = '#c8a970',
+  double x = .5,
+  double y = .5,
+  double size = .56,
+  double opacity = 1,
+  LayerPlacement placement = LayerPlacement.single,
+}) => MotifDesignLayer(
+  id: id,
+  motif: motif,
+  x: x,
+  y: y,
+  size: size,
+  rotation: 0,
+  opacity: opacity,
+  color: color,
+  tint: false,
+  placement: placement,
+);
+
+SkinDesign pickmiDesign() => SkinDesign(
+  surfaces: {
+    SkinSurface.board: _surface(
+      pattern: SkinPattern.gingham,
+      ink: '#cf91a1',
+      patternScale: 1.1,
+      patternOpacity: .18,
+      border: true,
+      roughness: .34,
+      metalness: .04,
+      layers: [
+        _motif(
+          'corner-ribbons',
+          SkinMotif.bow,
+          color: '#b96583',
+          size: .11,
+          opacity: .9,
+          placement: LayerPlacement.corners,
+        ),
+        _motif(
+          'little-heart',
+          SkinMotif.heart,
+          color: '#bd718c',
+          y: .927,
+          size: .073,
+        ),
+        _motif(
+          'porcelain-flowers',
+          SkinMotif.blossom,
+          color: '#fffbf3',
+          size: .05,
+          opacity: .72,
+          placement: LayerPlacement.grid,
+        ),
+      ],
+    ),
+    SkinSurface.darkCap: _surface(
+      ink: '#ffe8ec',
+      border: true,
+      roughness: .28,
+      metalness: .02,
+      layers: [
+        _motif('cream-heart', SkinMotif.heart, color: '#ffecdf', size: .5),
+        _motif(
+          'tiny-sparkle',
+          SkinMotif.star,
+          color: '#ffe7e9',
+          x: .74,
+          y: .26,
+          size: .11,
+          opacity: .8,
+        ),
+      ],
+    ),
+    SkinSurface.lightCap: _surface(
+      ink: '#bf8599',
+      border: true,
+      roughness: .3,
+      metalness: .02,
+      layers: [
+        _motif('berry-bow', SkinMotif.bow, color: '#b65074', size: .58),
+        _motif(
+          'tiny-flower',
+          SkinMotif.blossom,
+          color: '#d58aa2',
+          x: .27,
+          y: .26,
+          size: .13,
+        ),
+      ],
+    ),
+    SkinSurface.darkBody: _surface(
+      pattern: SkinPattern.gingham,
+      ink: '#fff0e8',
+      patternScale: 1.5,
+      patternOpacity: .12,
+      border: true,
+      roughness: .32,
+      metalness: .03,
+      layers: [
+        _motif(
+          'ribbon-hearts',
+          SkinMotif.heart,
+          color: '#ffdfdf',
+          size: .13,
+          opacity: .7,
+          placement: LayerPlacement.grid,
+        ),
+      ],
+    ),
+    SkinSurface.lightBody: _surface(
+      pattern: SkinPattern.gingham,
+      ink: '#d694aa',
+      patternScale: 1.5,
+      patternOpacity: .24,
+      border: true,
+      roughness: .32,
+      metalness: .03,
+      layers: [
+        _motif(
+          'ribbon-flowers',
+          SkinMotif.blossom,
+          color: '#b97b96',
+          size: .14,
+          opacity: .75,
+          placement: LayerPlacement.grid,
+        ),
+      ],
+    ),
+  },
+);
+
+SkinDesign animeDesign() => SkinDesign(
+  surfaces: {
+    SkinSurface.board: _surface(
+      pattern: SkinPattern.sakuraWaves,
+      ink: '#abcce2',
+      patternScale: .95,
+      patternOpacity: .6,
+      border: true,
+      roughness: .31,
+      metalness: .22,
+      layers: [
+        _motif(
+          'silver-seals',
+          SkinMotif.crest,
+          color: '#b3d7ef',
+          size: .13,
+          opacity: .85,
+          placement: LayerPlacement.corners,
+        ),
+        _motif(
+          'fox-seal',
+          SkinMotif.kitsune,
+          color: '#ee9fab',
+          y: .935,
+          size: .07,
+        ),
+      ],
+    ),
+    SkinSurface.darkCap: _surface(
+      ink: '#c6e4f4',
+      border: true,
+      roughness: .3,
+      metalness: .1,
+      layers: [
+        const ImageDesignLayer(
+          id: 'moonlit-heroine',
+          imageId: moonlitSakuraImageId,
+          x: .5,
+          y: .48,
+          size: .86,
+          rotation: 0,
+          opacity: 1,
+          color: '#ffffff',
+          tint: false,
+          placement: LayerPlacement.single,
+        ),
+      ],
+    ),
+    SkinSurface.lightCap: _surface(
+      ink: '#93718e',
+      border: true,
+      roughness: .34,
+      metalness: .08,
+      layers: [
+        _motif('silver-fox', SkinMotif.kitsune, color: '#34436b', size: .66),
+        _motif(
+          'sakura-mark',
+          SkinMotif.sakura,
+          color: '#d3779d',
+          x: .74,
+          y: .25,
+          size: .18,
+        ),
+      ],
+    ),
+    SkinSurface.darkBody: _surface(
+      pattern: SkinPattern.sakuraWaves,
+      ink: '#a7cbe7',
+      patternScale: 1.4,
+      patternOpacity: .24,
+      border: true,
+      roughness: .34,
+      metalness: .12,
+      layers: [
+        _motif(
+          'falling-sakura',
+          SkinMotif.sakura,
+          color: '#ec9ab3',
+          size: .2,
+          opacity: .68,
+          placement: LayerPlacement.grid,
+        ),
+      ],
+    ),
+    SkinSurface.lightBody: _surface(
+      pattern: SkinPattern.sakuraWaves,
+      ink: '#7d89b4',
+      patternScale: 1.6,
+      patternOpacity: .17,
+      border: true,
+      roughness: .35,
+      metalness: .07,
+      layers: [
+        _motif(
+          'moon-ribbon',
+          SkinMotif.crest,
+          color: '#4b5b87',
+          size: .15,
+          opacity: .6,
+          placement: LayerPlacement.grid,
+        ),
+      ],
+    ),
+  },
 );
 
 final List<Skin> builtinSkins = List<Skin>.unmodifiable([
@@ -657,6 +927,52 @@ final List<Skin> builtinSkins = List<Skin>.unmodifiable([
       accent: '#d2b473',
     ),
   ),
+  Skin(
+    id: 'pickmi',
+    name: String.fromCharCodes(const <int>[
+      0x041f,
+      0x0438,
+      0x043a,
+      0x043c,
+      0x0438,
+    ]),
+    builtin: true,
+    palette: const SkinPalette(
+      room: '#eee6e8',
+      board: BoardPalette(body: '#f4dce3', rim: '#c19aa3', dot: '#aa7389'),
+      dark: PiecePalette(body: '#9f4263', cap: '#ae4c71', mark: '#ffe5e4'),
+      light: PiecePalette(body: '#fff0dc', cap: '#fff7e9', mark: '#bd8297'),
+      accent: '#d7749e',
+    ),
+    design: pickmiDesign(),
+  ),
+  Skin(
+    id: 'sakura-nocturne',
+    name: String.fromCharCodes(const <int>[
+      0x041b,
+      0x0443,
+      0x043d,
+      0x043d,
+      0x0430,
+      0x044f,
+      0x0020,
+      0x0441,
+      0x0430,
+      0x043a,
+      0x0443,
+      0x0440,
+      0x0430,
+    ]),
+    builtin: true,
+    palette: const SkinPalette(
+      room: '#e1e4ec',
+      board: BoardPalette(body: '#1b2848', rim: '#a9c8df', dot: '#8199c7'),
+      dark: PiecePalette(body: '#1c2a4a', cap: '#26375c', mark: '#d7e2f9'),
+      light: PiecePalette(body: '#e4e2f0', cap: '#f9ebed', mark: '#896780'),
+      accent: '#f08dac',
+    ),
+    design: animeDesign(),
+  ),
 ]);
 
 SkinCatalog defaultSkinCatalog() =>
@@ -666,8 +982,8 @@ Map<String, Object?>? _record(Object? value) => value is Map<Object?, Object?>
     ? value.map((key, value) => MapEntry(key.toString(), value))
     : null;
 
-bool _exactKeys(Map<String, Object?> map, Set<String> keys) =>
-    map.length == keys.length && map.keys.every(keys.contains);
+bool _hasKeys(Map<String, Object?> map, Set<String> keys) =>
+    keys.every(map.containsKey);
 
 bool _color(Object? value) => value is String && _colorPattern.hasMatch(value);
 
@@ -683,8 +999,4 @@ T? _enumByName<T extends Enum>(List<T> values, Object? name) {
     if (value.name == name) return value;
   }
   return null;
-}
-
-extension _FirstOrNull<T> on Iterable<T> {
-  T? get firstOrNull => isEmpty ? null : first;
 }

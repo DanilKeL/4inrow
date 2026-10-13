@@ -8,6 +8,7 @@ import 'package:four3/src/feature/appearance/domain/model/skin_catalog.dart';
 import 'package:four3/src/feature/appearance/service/skin_texture_painter.dart';
 import 'package:four3/src/feature/game/model/game_models.dart';
 import 'package:four3/src/feature/game/service/game_engine.dart';
+import 'package:four3/src/feature/game/service/victory_presentation.dart';
 import 'package:vector_math/vector_math.dart' as vm;
 
 final class GameSceneController {
@@ -36,6 +37,7 @@ final class GameSceneController {
   bool _xray = false;
   bool _animations = true;
   bool _introduction = false;
+  bool _victoryAnimated = false;
   bool _ready = false;
   bool _disposed = false;
   Skin _skin = builtinSkins[1];
@@ -124,6 +126,7 @@ final class GameSceneController {
     required bool xray,
     required List<int> layers,
     required bool animations,
+    bool victoryAnimated = false,
     bool introduction = false,
   }) {
     if (!_ready) return;
@@ -131,6 +134,7 @@ final class GameSceneController {
     _xray = xray;
     _layers = layers;
     _animations = animations;
+    _victoryAnimated = victoryAnimated;
     _introduction = introduction;
     _updatePickGeometry();
     for (var index = 0; index < _boardDots.length; index++) {
@@ -156,14 +160,18 @@ final class GameSceneController {
     _updatePieceAppearance();
   }
 
-  void tick(double elapsedSeconds, double deltaSeconds) {
+  void tick(
+    double elapsedSeconds,
+    double deltaSeconds, {
+    VictoryProgress? victory,
+  }) {
     if (!_ready || _snapshot == null) return;
     for (final _PieceVisual visual in _pieces.values) {
       final double age = elapsedSeconds - visual.createdAt;
-      final double fall =
-          _animations &&
-              !_introduction &&
-              visual.move.index == _snapshot!.history.length - 1
+      final bool latest = visual.move.index == _snapshot!.history.length - 1;
+      final double fall = victory != null && latest
+          ? victory.fallOffset
+          : _animations && !_introduction && latest && !_victoryAnimated
           ? fallingOffset(age)
           : 0;
       final vm.Vector3 base = position(visual.move.position);
@@ -183,7 +191,16 @@ final class GameSceneController {
         base.y + fall + introFall,
         base.z,
       );
-      if (visual.opacityElapsed < opacityDuration) {
+      if (victory != null) {
+        visual.opacity = _xray
+            ? .43
+            : visual.winner
+            ? 1
+            : 1 - .48 * victory.dimProgress;
+        visual.opacityFrom = visual.opacity;
+        visual.targetOpacity = visual.opacity;
+        visual.opacityElapsed = opacityDuration;
+      } else if (visual.opacityElapsed < opacityDuration) {
         visual.opacityElapsed = math.min(
           opacityDuration,
           visual.opacityElapsed + deltaSeconds,
@@ -202,9 +219,29 @@ final class GameSceneController {
       visual.symbolMaterial.alphaMode = renderedOpacity < 1
           ? fs.AlphaMode.blend
           : fs.AlphaMode.opaque;
-      _opacity(visual.ringMaterial, renderedOpacity);
+      final double ringOpacity = victory != null && visual.winner
+          ? renderedOpacity * victory.ringProgress
+          : renderedOpacity;
+      _opacity(visual.ringMaterial, ringOpacity);
+      visual.ring.visible = victory != null
+          ? visual.winner && victory.ringProgress > 0
+          : visual.winner || latest;
       if (visual.winner && _animations) {
-        final double strength = .6 + math.sin(elapsedSeconds * 3) * .3;
+        final double strength = victory == null
+            ? .6 + math.sin(elapsedSeconds * 3) * .3
+            : .6 +
+                  math.sin(
+                        math.max(
+                              0,
+                              elapsedSeconds -
+                                  visual.createdAt -
+                                  (winCameraDuration + winFallDuration)
+                                          .inMilliseconds /
+                                      1000,
+                            ) *
+                            1.8,
+                      ) *
+                      .12;
         visual.ringMaterial.emissiveStrength = strength;
       }
     }
@@ -342,7 +379,7 @@ final class GameSceneController {
     for (final point in points) {
       result.add(position(point));
     }
-    result.scale(.42 / points.length);
+    result.scale(1 / points.length);
     return result;
   }
 
@@ -555,7 +592,7 @@ final class GameSceneController {
       palette.mark,
       visual.opacity * .85,
     );
-    final bool hasArtwork = _skin.artwork == 'nocturne' || _skin.design != null;
+    final bool hasArtwork = _skin.artwork == 'nocturne';
     visual.symbol.visible = !(capDesign?.decorated ?? false) && !hasArtwork;
     visual.ringMaterial
       ..baseColorFactor = _linearHex(
@@ -586,11 +623,7 @@ final class GameSceneController {
         null => true,
       };
       visual.root.visible = _layers.contains(visual.move.z) && introduced;
-      final double opacity = _xray
-          ? .43
-          : _snapshot!.status == GameStatus.won && !visual.winner
-          ? .52
-          : 1.0;
+      final double opacity = _xray ? .43 : 1.0;
       if (!visual.opacityInitialized || !_animations) {
         visual.opacityInitialized = true;
         visual.opacity = opacity;
@@ -609,7 +642,8 @@ final class GameSceneController {
           ? fs.AlphaMode.blend
           : fs.AlphaMode.opaque;
       _opacity(visual.ringMaterial, visual.opacity);
-      visual.ring.visible = visual.winner || visual.move.index == latest;
+      visual.ring.visible =
+          !_victoryAnimated && (visual.winner || visual.move.index == latest);
     }
   }
 

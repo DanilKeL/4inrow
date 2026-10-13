@@ -114,7 +114,7 @@ final class AppearanceRepository {
   Future<bool> save(SkinCatalog catalog) async {
     if (catalog.revision < _highestRevision) return false;
     _highestRevision = catalog.revision;
-    await _preferences.setString(cacheKey, catalog.encode());
+    await _preferences.setString(cacheKey, catalog.cacheValue);
     return true;
   }
 

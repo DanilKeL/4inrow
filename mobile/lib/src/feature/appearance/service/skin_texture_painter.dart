@@ -106,6 +106,12 @@ final class SkinTexturePainter {
       case SkinPattern.marble:
         _marble(canvas, size, design.patternScale, patternPaint);
         break;
+      case SkinPattern.gingham:
+        _gingham(canvas, size, design.patternScale, patternPaint);
+        break;
+      case SkinPattern.sakuraWaves:
+        _sakuraWaves(canvas, size, design.patternScale, surface, patternPaint);
+        break;
     }
     if (design.border) _border(canvas, size, surface, color(design.ink));
     _layers(canvas, size, design.layers);
@@ -213,6 +219,74 @@ final class SkinTexturePainter {
     final double r = size / 2;
     paint.strokeWidth = math.max(1, size * .009);
     switch (motif) {
+      case SkinMotif.heart:
+        final path = ui.Path()
+          ..moveTo(0, r * .82)
+          ..cubicTo(-r * .28, r * .51, -r * .92, r * .12, -r * .86, -r * .35)
+          ..cubicTo(-r * .8, -r * .91, -r * .22, -r * .97, 0, -r * .51)
+          ..cubicTo(r * .22, -r * .97, r * .8, -r * .91, r * .86, -r * .35)
+          ..cubicTo(r * .92, r * .12, r * .28, r * .51, 0, r * .82)
+          ..close();
+        canvas.drawPath(path, paint..style = ui.PaintingStyle.fill);
+        break;
+      case SkinMotif.bow:
+        for (final side in const [-1, 1]) {
+          canvas.save();
+          canvas.scale(side.toDouble(), 1);
+          final loop = ui.Path()
+            ..moveTo(0, 0)
+            ..cubicTo(r * .35, -r * .52, r * .96, -r * .7, r * .92, -r * .32)
+            ..cubicTo(r * .9, r * .2, r * .52, r * .32, 0, 0)
+            ..close();
+          final tail = ui.Path()
+            ..moveTo(r * .02, r * .01)
+            ..lineTo(r * .61, r * .76)
+            ..lineTo(r * .61, r * .42)
+            ..lineTo(r * .34, r * .52)
+            ..lineTo(-r * .06, r * .07)
+            ..close();
+          canvas.drawPath(loop, paint..style = ui.PaintingStyle.fill);
+          canvas.drawPath(tail, paint);
+          canvas.restore();
+        }
+        canvas.drawOval(
+          ui.Rect.fromCenter(
+            center: ui.Offset.zero,
+            width: r * .38,
+            height: r * .46,
+          ),
+          paint,
+        );
+        break;
+      case SkinMotif.blossom:
+        for (var petal = 0; petal < 6; petal++) {
+          canvas.save();
+          canvas.rotate(petal * math.pi / 3);
+          canvas.drawOval(
+            ui.Rect.fromCenter(
+              center: ui.Offset(0, -r * .52),
+              width: r * .56,
+              height: r * .88,
+            ),
+            paint..style = ui.PaintingStyle.fill,
+          );
+          canvas.restore();
+        }
+        canvas.drawCircle(
+          ui.Offset.zero,
+          r * .23,
+          ui.Paint()..color = const ui.Color(0xFFE7BF7D),
+        );
+        break;
+      case SkinMotif.sakura:
+        _sakuraFlower(canvas, r * .96, paint);
+        break;
+      case SkinMotif.kitsune:
+        _kitsuneMask(canvas, r * .97, paint);
+        break;
+      case SkinMotif.crest:
+        _lunarCrest(canvas, r, paint);
+        break;
       case SkinMotif.star:
         _star(canvas, ui.Offset.zero, r * .85, paint);
         _circle(canvas, ui.Offset.zero, r * .97, paint);
@@ -294,6 +368,110 @@ final class SkinTexturePainter {
         }
         break;
     }
+  }
+
+  ui.Path _sakuraPetal(double radius) => ui.Path()
+    ..moveTo(0, radius * .08)
+    ..cubicTo(
+      -radius * .42,
+      -radius * .23,
+      -radius * .41,
+      -radius * .73,
+      -radius * .12,
+      -radius,
+    )
+    ..quadraticBezierTo(-radius * .04, -radius * .96, 0, -radius * .81)
+    ..quadraticBezierTo(radius * .04, -radius * .96, radius * .12, -radius)
+    ..cubicTo(
+      radius * .41,
+      -radius * .73,
+      radius * .42,
+      -radius * .23,
+      0,
+      radius * .08,
+    )
+    ..close();
+
+  void _sakuraFlower(ui.Canvas canvas, double radius, ui.Paint source) {
+    for (var petal = 0; petal < 5; petal++) {
+      canvas.save();
+      canvas.rotate(petal * math.pi * 2 / 5);
+      canvas.drawPath(
+        _sakuraPetal(radius),
+        ui.Paint()
+          ..color = source.color
+          ..style = ui.PaintingStyle.fill,
+      );
+      canvas.drawPath(
+        _sakuraPetal(radius),
+        ui.Paint()
+          ..color = const ui.Color(0x8FFFE5E1)
+          ..style = ui.PaintingStyle.stroke
+          ..strokeWidth = math.max(.5, radius * .014),
+      );
+      canvas.restore();
+    }
+    canvas.drawCircle(
+      ui.Offset.zero,
+      radius * .105,
+      ui.Paint()..color = const ui.Color(0xFFF3DDD4),
+    );
+  }
+
+  void _kitsuneMask(ui.Canvas canvas, double r, ui.Paint source) {
+    final mask = ui.Path()
+      ..moveTo(0, -r * .61)
+      ..cubicTo(-r * .21, -r * .65, -r * .35, -r * .56, -r * .45, -r * .5)
+      ..lineTo(-r * .82, -r * .98)
+      ..quadraticBezierTo(-r * .98, -r * .39, -r * .88, -r * .1)
+      ..cubicTo(-r * .95, r * .22, -r * .67, r * .54, -r * .42, r * .67)
+      ..cubicTo(-r * .22, r * .85, -r * .15, r * .87, 0, r * .95)
+      ..cubicTo(r * .15, r * .87, r * .22, r * .85, r * .42, r * .67)
+      ..cubicTo(r * .67, r * .54, r * .95, r * .22, r * .88, -r * .1)
+      ..quadraticBezierTo(r * .98, -r * .39, r * .82, -r * .98)
+      ..lineTo(r * .45, -r * .5)
+      ..cubicTo(r * .35, -r * .56, r * .21, -r * .65, 0, -r * .61)
+      ..close();
+    canvas.drawPath(mask, source..style = ui.PaintingStyle.fill);
+    for (final side in const [-1, 1]) {
+      final eye = ui.Path()
+        ..moveTo(side * r * .13, -r * .07)
+        ..quadraticBezierTo(side * r * .43, -r * .3, side * r * .73, -r * .12)
+        ..quadraticBezierTo(side * r * .46, r * .12, side * r * .13, -r * .07)
+        ..close();
+      canvas.drawPath(eye, ui.Paint()..color = const ui.Color(0xFF182843));
+    }
+    final nose = ui.Path()
+      ..moveTo(-r * .13, r * .48)
+      ..quadraticBezierTo(0, r * .42, r * .13, r * .48)
+      ..quadraticBezierTo(r * .075, r * .6, 0, r * .63)
+      ..quadraticBezierTo(-r * .075, r * .6, -r * .13, r * .48)
+      ..close();
+    canvas.drawPath(nose, ui.Paint()..color = const ui.Color(0xFF182843));
+  }
+
+  void _lunarCrest(ui.Canvas canvas, double r, ui.Paint paint) {
+    for (final extent in const [.93, .87, .55]) {
+      _circle(canvas, ui.Offset.zero, r * extent, paint);
+    }
+    for (var index = 0; index < 16; index++) {
+      final double angle = index * math.pi / 8;
+      canvas.drawLine(
+        ui.Offset(math.cos(angle) * r * .8, math.sin(angle) * r * .8),
+        ui.Offset(
+          math.cos(angle) * r * (index % 4 == 0 ? .72 : .84),
+          math.sin(angle) * r * (index % 4 == 0 ? .72 : .84),
+        ),
+        paint,
+      );
+    }
+    final moon = ui.Path()
+      ..moveTo(r * .15, -r * .43)
+      ..cubicTo(-r * .56, -r * .53, -r * .65, r * .4, -r * .01, r * .47)
+      ..cubicTo(-r * .26, r * .14, -r * .19, -r * .24, r * .15, -r * .43)
+      ..close();
+    canvas.drawPath(moon, paint..style = ui.PaintingStyle.fill);
+    _star(canvas, ui.Offset(r * .26, r * .01), r * .145, paint);
   }
 
   void _celestial(
@@ -459,6 +637,189 @@ final class SkinTexturePainter {
           ..lineTo(center.dx + step * .48, center.dy);
         canvas.drawPath(base, paint..style = ui.PaintingStyle.stroke);
       }
+    }
+  }
+
+  void _gingham(ui.Canvas canvas, ui.Size size, double scale, ui.Paint paint) {
+    final double step = math.min(size.width, size.height) * .12 / scale;
+    final ui.Paint fill = ui.Paint()
+      ..color = paint.color.withValues(alpha: paint.color.a * .6)
+      ..style = ui.PaintingStyle.fill;
+    for (double x = 0; x < size.width; x += step * 2) {
+      canvas.drawRect(ui.Rect.fromLTWH(x, 0, step, size.height), fill);
+    }
+    for (double y = 0; y < size.height; y += step * 2) {
+      canvas.drawRect(ui.Rect.fromLTWH(0, y, size.width, step), fill);
+    }
+  }
+
+  void _sakuraSprig(ui.Canvas canvas, double length, ui.Paint source) {
+    final ui.Path limb = ui.Path()
+      ..moveTo(0, 0)
+      ..cubicTo(
+        length * .25,
+        -length * .04,
+        length * .6,
+        -length * .04,
+        length,
+        -length * .14,
+      )
+      ..moveTo(length * .24, -length * .025)
+      ..quadraticBezierTo(
+        length * .3,
+        -length * .17,
+        length * .43,
+        -length * .23,
+      )
+      ..moveTo(length * .5, -length * .045)
+      ..quadraticBezierTo(length * .65, length * .1, length * .83, length * .11)
+      ..moveTo(length * .68, -length * .075)
+      ..quadraticBezierTo(
+        length * .72,
+        -length * .21,
+        length * .79,
+        -length * .29,
+      )
+      ..moveTo(length * .86, -length * .1)
+      ..quadraticBezierTo(
+        length * .91,
+        -length * .015,
+        length * .99,
+        length * .04,
+      );
+    canvas.drawPath(
+      limb,
+      ui.Paint()
+        ..color = const ui.Color(0xB3BFBDCD)
+        ..style = ui.PaintingStyle.stroke
+        ..strokeWidth = math.max(.7, length * .0033),
+    );
+    const flowers = <(double, double, double)>[
+      (.43, -.23, .059),
+      (.36, -.19, .033),
+      (.79, -.29, .052),
+      (.73, -.22, .034),
+      (.83, .11, .062),
+      (.74, .085, .035),
+      (.99, .04, .046),
+      (1, -.14, .039),
+    ];
+    for (var index = 0; index < flowers.length; index++) {
+      final (double, double, double) flower = flowers[index];
+      canvas.save();
+      canvas.translate(flower.$1 * length, flower.$2 * length);
+      canvas.rotate(index * 1.17);
+      _sakuraFlower(
+        canvas,
+        flower.$3 * length,
+        ui.Paint()
+          ..color = index % 3 == 0
+              ? const ui.Color(0xFFF0BEB8)
+              : const ui.Color(0xFFEF9B9E),
+      );
+      canvas.restore();
+    }
+  }
+
+  void _sakuraWaves(
+    ui.Canvas canvas,
+    ui.Size size,
+    double scale,
+    SkinSurface surface,
+    ui.Paint source,
+  ) {
+    final double s = math.min(size.width, size.height);
+    final bool body = surface.name.endsWith('Body');
+    final int bands = ((body ? 2.5 : 4.5) * scale).round().clamp(3, 8);
+    for (var band = 0; band < bands; band++) {
+      for (final double offset in const [0, .01, .023]) {
+        final double y =
+            (-.16 + band * 1.32 / (bands - 1) + offset) * size.height;
+        final ui.Path path = ui.Path()
+          ..moveTo(-size.width * .08, y + size.height * .13)
+          ..cubicTo(
+            size.width * .14,
+            y + size.height * .12,
+            size.width * .25,
+            y - size.height * .12,
+            size.width * .46,
+            y - size.height * .025,
+          )
+          ..cubicTo(
+            size.width * .67,
+            y + size.height * .15,
+            size.width * .86,
+            y + size.height * .06,
+            size.width * 1.08,
+            y - size.height * .11,
+          );
+        canvas.drawPath(
+          path,
+          ui.Paint()
+            ..color = source.color.withValues(
+              alpha:
+                  source.color.a *
+                  (body
+                      ? .24
+                      : offset == 0
+                      ? .46
+                      : .25),
+            )
+            ..style = ui.PaintingStyle.stroke
+            ..strokeWidth = math.max(.65, s * (offset == 0 ? .00115 : .0008))
+            ..strokeCap = ui.StrokeCap.round
+            ..strokeJoin = ui.StrokeJoin.round,
+        );
+      }
+    }
+    if (surface == SkinSurface.board) {
+      for (final sprig in const <(double, double, double)>[
+        (-.02, .175, -.2),
+        (1.02, .825, math.pi - .2),
+      ]) {
+        canvas.save();
+        canvas.translate(sprig.$1 * size.width, sprig.$2 * size.height);
+        canvas.rotate(sprig.$3);
+        _sakuraSprig(canvas, s * .39 / math.sqrt(scale), source);
+        canvas.restore();
+      }
+    } else if (!body) {
+      canvas.save();
+      canvas.translate(size.width * .19, size.height * .78);
+      canvas.rotate(-.36);
+      _sakuraSprig(canvas, s * .55 / math.sqrt(scale), source);
+      canvas.restore();
+    }
+    final List<(double, double)> petals = body
+        ? const [(.16, .32), (.51, .68), (.85, .29)]
+        : const [
+            (.17, .4),
+            (.1, .69),
+            (.42, .11),
+            (.68, .075),
+            (.9, .37),
+            (.87, .59),
+            (.56, .87),
+            (.31, .94),
+          ];
+    for (var index = 0; index < petals.length; index++) {
+      canvas.save();
+      canvas.translate(
+        petals[index].$1 * size.width,
+        petals[index].$2 * size.height,
+      );
+      canvas.rotate(index * 1.31 + .4);
+      canvas.scale(.7, 1);
+      canvas.drawPath(
+        _sakuraPetal(s * (index.isOdd ? .012 : .016) / math.sqrt(scale)),
+        ui.Paint()
+          ..color =
+              (index % 3 == 0
+                      ? const ui.Color(0xFFD8CBD7)
+                      : const ui.Color(0xFFED939F))
+                  .withValues(alpha: body ? .3 : .57),
+      );
+      canvas.restore();
     }
   }
 
