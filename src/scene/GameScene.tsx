@@ -23,11 +23,13 @@ import {
   Vector2,
   Vector3,
   Spherical,
+  PerspectiveCamera,
   type CanvasTexture,
 } from 'three';
 import type { Line2, LineSegments2, OrbitControls as OrbitControlsImpl } from 'three-stdlib';
 import type { GameState, Move, Position } from '../game/core';
 import { WIN_CAMERA_MS, WIN_FALL_MS, WIN_LINE_MS } from '../game/victoryPresentation';
+import { preserveVictoryFraming, releaseVictoryOrbit } from './victoryCamera';
 import { displayedHeight, visibleLineSegments } from './layers';
 import {
   rankedSegmentProgress,
@@ -113,6 +115,7 @@ type VictoryPresentationState = ReturnType<typeof rankedVictoryProgress> & {
   cameraPosition?: number[];
   cameraTarget?: number[];
   cameraLocked?: boolean;
+  cameraPixelScale?: number;
 };
 type VictoryDiagnostics = RefObject<(() => VictoryPresentationState | null) | null>;
 
@@ -538,6 +541,7 @@ function Piece({
 function CameraRig({
   cameraView,
   cameraReset,
+  cameraFov,
   animations,
   game,
   layers,
@@ -547,7 +551,14 @@ function CameraRig({
   victoryDiagnostics,
 }: Pick<
   GameSceneProps,
-  'cameraView' | 'cameraReset' | 'animations' | 'game' | 'layers' | 'demo' | 'victoryPresentation'
+  | 'cameraView'
+  | 'cameraReset'
+  | 'cameraFov'
+  | 'animations'
+  | 'game'
+  | 'layers'
+  | 'demo'
+  | 'victoryPresentation'
 > & {
   victoryDiagnostics: VictoryDiagnostics;
   victoryClock: RankedVictoryClock | null;
@@ -564,6 +575,9 @@ function CameraRig({
     toTarget: Vector3;
     offset: Vector3;
     pose: Spherical;
+    height: number;
+    fov: number;
+    released: boolean;
   } | null>(null);
   const previousView = useRef({ cameraView, cameraReset });
   const isLocked = useCallback(
@@ -579,6 +593,8 @@ function CameraRig({
     if (!orbit) return;
     if (!victoryClock || !victoryPresentation) {
       cinematic.current = null;
+      orbit.minDistance = 7;
+      orbit.maxDistance = 23;
       orbit.enabled = true;
       orbit.enableDamping = true;
       return;
@@ -612,11 +628,18 @@ function CameraRig({
     cinematic.current = {
       key: victoryClock.key,
       from,
-      to: new Spherical(Math.max(from.radius, 12.5 * fit), 0.82, from.theta + turn),
+      to: new Spherical(
+        Math.max(7, Math.min(from.radius * 0.9, 10.5 * fit)),
+        0.82,
+        from.theta + turn,
+      ),
       fromTarget,
       toTarget: center.multiplyScalar(0.65),
       offset: new Vector3(),
       pose: new Spherical(),
+      height: size.height,
+      fov: cameraFov ?? 35,
+      released: false,
     };
     // Cleanup also restores input when leaving the game mid-animation.
     return () => {
@@ -626,6 +649,16 @@ function CameraRig({
     // A single pose per victory; repeated network snapshots must not restart it.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [victoryClock, victoryPresentation]);
+  useLayoutEffect(() => {
+    if (!(camera instanceof PerspectiveCamera)) return;
+    const shot = cinematic.current;
+    if (victoryClock && shot?.key === victoryClock.key) {
+      preserveVictoryFraming(camera, size.height, shot);
+    } else if (camera.fov !== (cameraFov ?? 35)) {
+      camera.fov = cameraFov ?? 35;
+      camera.updateProjectionMatrix();
+    }
+  }, [camera, cameraFov, size.height, victoryClock, victoryPresentation]);
   useEffect(() => {
     const manualChange =
       previousView.current.cameraView !== cameraView ||
@@ -673,6 +706,10 @@ function CameraRig({
               cameraPosition: camera.position.toArray(),
               cameraTarget: controls.current?.target.toArray(),
               cameraLocked: !controls.current?.enabled,
+              cameraPixelScale:
+                camera instanceof PerspectiveCamera
+                  ? size.height / (2 * Math.tan((camera.fov * Math.PI) / 360))
+                  : undefined,
             }
           : null;
       },
@@ -724,7 +761,7 @@ function CameraRig({
     return () => {
       if (window.__fourScene === api) delete window.__fourScene;
     };
-  }, [camera, gl, scene, game.heights, layers, victoryDiagnostics]);
+  }, [camera, gl, scene, game.heights, layers, victoryDiagnostics, size.height]);
   useFrame((_, delta) => {
     const orbit = controls.current;
     if (!orbit) return;
@@ -746,10 +783,13 @@ function CameraRig({
       camera.lookAt(orbit.target);
       return;
     }
-    if (!orbit.enabled) {
+    if (victoryClock && shot?.key === victoryClock.key && !shot.released) {
+      releaseVictoryOrbit(orbit);
+      shot.released = true;
+      destination.current = null;
+    } else if (!orbit.enabled) {
       orbit.enabled = true;
       orbit.enableDamping = true;
-      orbit.update();
     }
     if (!destination.current) return;
     const speed = animations ? 1 - Math.exp(-delta * 6) : 1;

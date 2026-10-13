@@ -9,6 +9,8 @@ interface Sample {
   controls: boolean;
   cameraLocked?: boolean;
   cameraPosition?: number[];
+  cameraTarget?: number[];
+  cameraPixelScale?: number;
 }
 interface Timeline {
   early: Sample | null;
@@ -99,6 +101,9 @@ async function checkVictory(page: Page, title: RegExp | string) {
   expect(timeline.settled!.cameraPosition).toEqual(timeline.dragged!.cameraPosition);
   expect(timeline.dragged!.cameraLocked).toBe(true);
   expect(timeline.line!.cameraLocked).toBe(false);
+  expect(timeline.line!.cameraPixelScale).toBeCloseTo(timeline.settled!.cameraPixelScale!, 5);
+  for (const [index, value] of timeline.settled!.cameraPosition!.entries())
+    expect(timeline.line!.cameraPosition![index]).toBeCloseTo(value, 6);
   expect(timeline.drop!.renderedFallOffset).toBeGreaterThan(0.05);
   expect(timeline.drop!.renderedWinningLines).toBe(0);
   expect(Math.abs(timeline.line!.renderedFallOffset)).toBeLessThan(0.02);
@@ -108,6 +113,10 @@ async function checkVictory(page: Page, title: RegExp | string) {
   await expect(page.getByRole('heading', { name: title })).toBeVisible();
   await expect(page.getByRole('dialog')).toHaveCount(0);
   await expect(page.getByTestId('ranked-result')).toHaveCount(0);
+  const finalFrame = await page.evaluate(() => window.__fourScene!.getVictoryPresentationState()!);
+  expect(finalFrame.cameraPixelScale).toBeCloseTo(timeline.settled!.cameraPixelScale!, 5);
+  for (const [index, value] of timeline.settled!.cameraPosition!.entries())
+    expect(finalFrame.cameraPosition![index]).toBeCloseTo(value, 6);
   const finishedPose = await page.evaluate(
     () => window.__fourScene!.getVictoryPresentationState()!.cameraPosition,
   );
