@@ -1,5 +1,6 @@
 import type { GameState } from './core';
 
+export const WIN_CAMERA_MS = 750;
 export const WIN_FALL_MS = 1150;
 export const WIN_LINE_MS = 700;
 export const RESULT_DELAY_MS = 3600;
@@ -22,5 +23,5 @@ export function moveAnimationDelay(
   endReason?: string,
 ): number {
   if (!animations) return 80;
-  return hasWinningLine(game, endReason) && !reducedMotion ? WIN_FALL_MS : 440;
+  return hasWinningLine(game, endReason) && !reducedMotion ? WIN_CAMERA_MS + WIN_FALL_MS : 440;
 }

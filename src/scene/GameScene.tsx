@@ -2,6 +2,7 @@ import {
   Component,
   Suspense,
   useEffect,
+  useCallback,
   useLayoutEffect,
   useMemo,
   useRef,
@@ -21,11 +22,12 @@ import {
   MeshStandardMaterial,
   Vector2,
   Vector3,
+  Spherical,
   type CanvasTexture,
 } from 'three';
 import type { Line2, LineSegments2, OrbitControls as OrbitControlsImpl } from 'three-stdlib';
 import type { GameState, Move, Position } from '../game/core';
-import { WIN_FALL_MS, WIN_LINE_MS } from '../game/victoryPresentation';
+import { WIN_CAMERA_MS, WIN_FALL_MS, WIN_LINE_MS } from '../game/victoryPresentation';
 import { displayedHeight, visibleLineSegments } from './layers';
 import {
   rankedSegmentProgress,
@@ -108,6 +110,9 @@ type VictoryPresentationState = ReturnType<typeof rankedVictoryProgress> & {
   elapsedMs: number;
   renderedFallOffset: number;
   renderedWinningLines: number;
+  cameraPosition?: number[];
+  cameraTarget?: number[];
+  cameraLocked?: boolean;
 };
 type VictoryDiagnostics = RefObject<(() => VictoryPresentationState | null) | null>;
 
@@ -415,7 +420,7 @@ function Piece({
       !latest &&
       !winner &&
       (!victory ||
-        (victoryAge >= WIN_FALL_MS + WIN_LINE_MS &&
+        (victoryAge >= WIN_CAMERA_MS + WIN_FALL_MS + WIN_LINE_MS &&
           appliedOpacity.current === opacity * (opacity === 1 ? 0.52 : 1))) &&
       introFinished &&
       fade.current.elapsed >= 0.15 &&
@@ -470,7 +475,8 @@ function Piece({
       ringMaterial.current.emissiveIntensity =
         winner && animate
           ? victory
-            ? 0.5 + Math.sin((Math.max(0, victoryAge - WIN_FALL_MS) / 1000) * 1.8) * 0.12
+            ? 0.5 +
+              Math.sin((Math.max(0, victoryAge - WIN_CAMERA_MS - WIN_FALL_MS) / 1000) * 1.8) * 0.12
             : 0.6 + Math.sin(state.clock.elapsedTime * 3) * 0.3
           : 0.35;
   });
@@ -537,28 +543,96 @@ function CameraRig({
   layers,
   demo,
   victoryPresentation,
+  victoryClock,
   victoryDiagnostics,
 }: Pick<
   GameSceneProps,
   'cameraView' | 'cameraReset' | 'animations' | 'game' | 'layers' | 'demo' | 'victoryPresentation'
 > & {
   victoryDiagnostics: VictoryDiagnostics;
+  victoryClock: RankedVictoryClock | null;
 }) {
   const controls = useRef<OrbitControlsImpl>(null);
   const { camera, size, gl, scene } = useThree();
   const destination = useRef<Vector3 | null>(null);
   const targetDestination = useRef(new Vector3(0, 0.25, 0));
-  const winningPoints = game.winningLines.flat();
-  const winningCenter = winningPoints.length
-    ? winningPoints
-        .reduce<Vector3>((sum, point) => sum.add(new Vector3(...position(point))), new Vector3())
-        .divideScalar(winningPoints.length)
-    : null;
-  const centerX = winningCenter?.x ?? 0;
-  const centerY = winningCenter?.y ?? 0;
-  const centerZ = winningCenter?.z ?? 0;
-  const hasWinningCenter = winningCenter !== null;
+  const cinematic = useRef<{
+    key: string;
+    from: Spherical;
+    to: Spherical;
+    fromTarget: Vector3;
+    toTarget: Vector3;
+    offset: Vector3;
+    pose: Spherical;
+  } | null>(null);
+  const previousView = useRef({ cameraView, cameraReset });
+  const isLocked = useCallback(
+    () =>
+      Boolean(
+        victoryClock &&
+        performance.now() - victoryClock.startedAt < WIN_CAMERA_MS + WIN_FALL_MS + WIN_LINE_MS,
+      ),
+    [victoryClock],
+  );
+  useLayoutEffect(() => {
+    const orbit = controls.current;
+    if (!orbit) return;
+    if (!victoryClock || !victoryPresentation) {
+      cinematic.current = null;
+      orbit.enabled = true;
+      orbit.enableDamping = true;
+      return;
+    }
+    if (!isLocked()) return;
+    orbit.enabled = false;
+    // Drain any residual drag before capturing the start pose.
+    orbit.enableDamping = false;
+    orbit.update();
+    destination.current = null;
+    if (cinematic.current?.key === victoryClock.key) return;
+    const points = game.winningLines[0];
+    const center = points
+      .reduce<Vector3>((sum, p) => sum.add(new Vector3(...position(p))), new Vector3())
+      .divideScalar(points.length);
+    const fromTarget = orbit.target.clone();
+    const from = new Spherical().setFromVector3(camera.position.clone().sub(fromTarget));
+    const direction = new Vector3(...position(points.at(-1)!)).sub(
+      new Vector3(...position(points[0])),
+    );
+    const wrap = (angle: number) => Math.atan2(Math.sin(angle), Math.cos(angle));
+    // View across the line instead of looking along it; take the shortest orbit.
+    const normal = Math.atan2(-direction.z, direction.x);
+    const turn =
+      Math.hypot(direction.x, direction.z) < 0.01
+        ? 0.28
+        : [wrap(normal - from.theta), wrap(normal + Math.PI - from.theta)].sort(
+            (a, b) => Math.abs(a) - Math.abs(b),
+          )[0];
+    const fit = Math.max(1, 0.9 / (size.width / size.height));
+    cinematic.current = {
+      key: victoryClock.key,
+      from,
+      to: new Spherical(Math.max(from.radius, 12.5 * fit), 0.82, from.theta + turn),
+      fromTarget,
+      toTarget: center.multiplyScalar(0.65),
+      offset: new Vector3(),
+      pose: new Spherical(),
+    };
+    // Cleanup also restores input when leaving the game mid-animation.
+    return () => {
+      orbit.enabled = true;
+      orbit.enableDamping = true;
+    };
+    // A single pose per victory; repeated network snapshots must not restart it.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [victoryClock, victoryPresentation]);
   useEffect(() => {
+    const manualChange =
+      previousView.current.cameraView !== cameraView ||
+      previousView.current.cameraReset !== cameraReset;
+    previousView.current = { cameraView, cameraReset };
+    // Result panels resize the canvas. Keep the completed cinematic pose stable.
+    if (victoryPresentation && (!manualChange || isLocked())) return;
     const fit = Math.max(1, 0.9 / (size.width / size.height));
     const view =
       cameraView === 'top'
@@ -576,16 +650,32 @@ function CameraRig({
       controls.current?.update();
       destination.current = null;
     }
-  }, [cameraView, cameraReset, camera, size.width, size.height, animations, demo]);
-  useEffect(() => {
-    if (game.status !== 'won' || !hasWinningCenter) return;
-    targetDestination.current.set(centerX, centerY, centerZ).multiplyScalar(0.42);
-    destination.current = camera.position.clone();
-  }, [game.status, hasWinningCenter, centerX, centerY, centerZ, camera]);
+  }, [
+    cameraView,
+    cameraReset,
+    camera,
+    size.width,
+    size.height,
+    animations,
+    demo,
+    victoryPresentation,
+    victoryClock,
+    isLocked,
+  ]);
   useEffect(() => {
     if (!import.meta.env.DEV) return;
     const api = {
-      getVictoryPresentationState: () => victoryDiagnostics.current?.() ?? null,
+      getVictoryPresentationState: () => {
+        const state = victoryDiagnostics.current?.();
+        return state
+          ? {
+              ...state,
+              cameraPosition: camera.position.toArray(),
+              cameraTarget: controls.current?.target.toArray(),
+              cameraLocked: !controls.current?.enabled,
+            }
+          : null;
+      },
       getRenderedWinningLines: () => {
         const lines: Array<{
           visible: boolean;
@@ -636,14 +726,39 @@ function CameraRig({
     };
   }, [camera, gl, scene, game.heights, layers, victoryDiagnostics]);
   useFrame((_, delta) => {
-    if (!destination.current || !controls.current) return;
-    const speed = animations ? 1 - Math.exp(-delta * (victoryPresentation ? 1.8 : 6)) : 1;
+    const orbit = controls.current;
+    if (!orbit) return;
+    const shot = cinematic.current;
+    if (victoryClock && shot?.key === victoryClock.key && isLocked()) {
+      orbit.enabled = false;
+      const progress = Math.min(
+        1,
+        Math.max(0, (performance.now() - victoryClock.startedAt) / WIN_CAMERA_MS),
+      );
+      const eased = progress * progress * (3 - 2 * progress);
+      const pose = shot.pose.set(
+        shot.from.radius + (shot.to.radius - shot.from.radius) * eased,
+        shot.from.phi + (shot.to.phi - shot.from.phi) * eased,
+        shot.from.theta + (shot.to.theta - shot.from.theta) * eased,
+      );
+      orbit.target.copy(shot.fromTarget).lerp(shot.toTarget, eased);
+      camera.position.copy(orbit.target).add(shot.offset.setFromSpherical(pose));
+      camera.lookAt(orbit.target);
+      return;
+    }
+    if (!orbit.enabled) {
+      orbit.enabled = true;
+      orbit.enableDamping = true;
+      orbit.update();
+    }
+    if (!destination.current) return;
+    const speed = animations ? 1 - Math.exp(-delta * 6) : 1;
     camera.position.lerp(destination.current, speed);
-    controls.current.target.lerp(targetDestination.current, speed);
-    controls.current.update();
+    orbit.target.lerp(targetDestination.current, speed);
+    orbit.update();
     if (
       camera.position.distanceTo(destination.current) < 0.008 &&
-      controls.current.target.distanceTo(targetDestination.current) < 0.008
+      orbit.target.distanceTo(targetDestination.current) < 0.008
     )
       destination.current = null;
   });
@@ -653,6 +768,10 @@ function CameraRig({
       makeDefault
       target={[0, 0.25, 0]}
       enablePan={false}
+      enabled={
+        !victoryClock ||
+        performance.now() - victoryClock.startedAt >= WIN_CAMERA_MS + WIN_FALL_MS + WIN_LINE_MS
+      }
       enableDamping
       dampingFactor={0.09}
       rotateSpeed={0.65}
@@ -752,13 +871,13 @@ function Board({
   skin,
   gesture,
   clearHover,
-  victoryPresentation,
-  victoryId,
+  victoryClock,
   victoryDiagnostics,
 }: GameSceneProps & {
   skin: Skin;
   gesture: RefObject<Gesture>;
   clearHover: RefObject<(() => void) | null>;
+  victoryClock: RankedVictoryClock | null;
   victoryDiagnostics: VictoryDiagnostics;
 }) {
   const [hover, setHover] = useState<number | null>(null);
@@ -794,18 +913,6 @@ function Board({
   }, [hover, interactive, game.heights, gl]);
   const winners = new Set(game.winningLines.flat().map((p) => `${p.x},${p.y},${p.z}`));
   const last = game.history.at(-1);
-  const victoryKey =
-    animations && !demo
-      ? (victoryId ??
-        (victoryPresentation && last
-          ? `${last.index}-${last.x}-${last.y}-${last.z}-${last.player}`
-          : null))
-      : null;
-  const presentationClock = useMemo(
-    () => (victoryKey ? { key: victoryKey, startedAt: performance.now() } : null),
-    [victoryKey],
-  );
-  const victoryClock = victoryPresentation ? presentationClock : null;
   const lastPiece = useRef<Group | null>(null);
   const lastY = last ? position(last)[1] : 0;
   useEffect(() => {
@@ -1095,6 +1202,20 @@ export default function GameScene(props: GameSceneProps) {
   });
   const pointerEvents = useRef<((enabled: boolean) => void) | null>(null);
   const clearHover = useRef<(() => void) | null>(null);
+  const { animations, demo, victoryId, victoryPresentation } = props;
+  const last = props.game.history.at(-1);
+  const victoryKey =
+    animations && !demo
+      ? (victoryId ??
+        (victoryPresentation && last
+          ? `${last.index}-${last.x}-${last.y}-${last.z}-${last.player}`
+          : null))
+      : null;
+  const presentationClock = useMemo(
+    () => (victoryKey ? { key: victoryKey, startedAt: performance.now() } : null),
+    [victoryKey],
+  );
+  const victoryClock = victoryPresentation ? presentationClock : null;
   const victoryDiagnostics = useRef<(() => VictoryPresentationState | null) | null>(null);
   useEffect(() => {
     const finish = (event: PointerEvent) => {
@@ -1181,11 +1302,16 @@ export default function GameScene(props: GameSceneProps) {
               skin={skin}
               gesture={gesture}
               clearHover={clearHover}
+              victoryClock={victoryClock}
               victoryDiagnostics={victoryDiagnostics}
             />
             <SceneReady onReady={props.onReady} />
           </Suspense>
-          <CameraRig {...props} victoryDiagnostics={victoryDiagnostics} />
+          <CameraRig
+            {...props}
+            victoryClock={victoryClock}
+            victoryDiagnostics={victoryDiagnostics}
+          />
         </Canvas>
       </SceneBoundary>
     </div>

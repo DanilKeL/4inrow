@@ -3,7 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createGame, replay } from '../game/core';
 import type { OnlineHandlers } from '../network/client';
 import type { LobbySnapshot } from '../network/protocol';
-import { WIN_FALL_MS } from '../game/victoryPresentation';
+import { WIN_CAMERA_MS, WIN_FALL_MS } from '../game/victoryPresentation';
 
 const mocked = vi.hoisted(() => ({
   sound: vi.fn(),
@@ -94,7 +94,7 @@ describe('ranked victory landing', () => {
       expect(mocked.sound).not.toHaveBeenCalled();
       mocked.handlers!.onEvent({ type: 'state', snapshot: { ...won, revision: 9, rematch: [2] } });
       expect(useGame.getState().phase).toBe('animating');
-      vi.advanceTimersByTime(WIN_FALL_MS - 441);
+      vi.advanceTimersByTime(WIN_CAMERA_MS + WIN_FALL_MS - 441);
       expect(mocked.sound).not.toHaveBeenCalled();
       vi.advanceTimersByTime(1);
       expect(mocked.sound).toHaveBeenCalledExactlyOnceWith('win');

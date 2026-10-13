@@ -10,7 +10,7 @@ import { useMatchHistory } from './matchHistory';
 import { readSavedGame } from './savedGame';
 import { useAccount } from './accountStore';
 import { DAILY_BOT_OPTIONS, dailyExpiresAt } from '../game/daily';
-import { WIN_FALL_MS } from '../game/victoryPresentation';
+import { WIN_CAMERA_MS, WIN_FALL_MS } from '../game/victoryPresentation';
 
 const mocked = vi.hoisted(() => ({
   bot: vi.fn(),
@@ -221,7 +221,7 @@ describe('input and animation coordination', () => {
     useGame.setState({ game: replay(winMoves, 6), phase: 'playing' });
     state().place(3, 0);
     expect(state().phase).toBe('animating');
-    await vi.advanceTimersByTimeAsync(WIN_FALL_MS - 1);
+    await vi.advanceTimersByTimeAsync(WIN_CAMERA_MS + WIN_FALL_MS - 1);
     expect(state().phase).toBe('animating');
     expect(mocked.sound).not.toHaveBeenCalledWith('win');
     await vi.advanceTimersByTimeAsync(1);
@@ -258,7 +258,7 @@ describe('AI turn lifecycle', () => {
       expect(state().phase).toBe('animating');
       state().place(4, 0);
       expect(state().game.history).toHaveLength(8);
-      await vi.advanceTimersByTimeAsync(WIN_FALL_MS - 1);
+      await vi.advanceTimersByTimeAsync(WIN_CAMERA_MS + WIN_FALL_MS - 1);
       expect(mocked.sound).not.toHaveBeenCalledWith('win');
       await vi.advanceTimersByTimeAsync(1);
       expect(mocked.sound).toHaveBeenCalledExactlyOnceWith('win');

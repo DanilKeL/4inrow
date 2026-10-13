@@ -7,15 +7,26 @@ interface Sample {
   renderedWinningLines: number;
   canvasHeight: number;
   controls: boolean;
+  cameraLocked?: boolean;
+  cameraPosition?: number[];
 }
 interface Timeline {
+  early: Sample | null;
+  settled: Sample | null;
+  dragged: Sample | null;
   drop: Sample | null;
   line: Sample | null;
 }
 
 async function observeVictory(page: Page) {
   await page.evaluate(() => {
-    const timeline: Timeline = { drop: null, line: null };
+    const timeline: Timeline = {
+      early: null,
+      settled: null,
+      dragged: null,
+      drop: null,
+      line: null,
+    };
     (window as unknown as { victoryTimeline: Timeline }).victoryTimeline = timeline;
     const sample = () => {
       const scene = window.__fourScene?.getVictoryPresentationState();
@@ -25,8 +36,48 @@ async function observeVictory(page: Page) {
           canvasHeight: document.querySelector('canvas')!.getBoundingClientRect().height,
           controls: Boolean(document.querySelector('aside button')),
         };
+        if (!timeline.early && scene.elapsedMs >= 100) timeline.early = frame;
+        if (!timeline.settled && scene.elapsedMs >= 900) {
+          timeline.settled = frame;
+          const canvas = document.querySelector('canvas')!;
+          canvas.dispatchEvent(
+            new PointerEvent('pointerdown', {
+              pointerId: 10,
+              pointerType: 'mouse',
+              clientX: 120,
+              clientY: 220,
+              buttons: 1,
+              button: 0,
+              bubbles: true,
+            }),
+          );
+          canvas.dispatchEvent(
+            new PointerEvent('pointermove', {
+              pointerId: 10,
+              pointerType: 'mouse',
+              clientX: 260,
+              clientY: 320,
+              buttons: 1,
+              bubbles: true,
+            }),
+          );
+          canvas.dispatchEvent(
+            new PointerEvent('pointerup', {
+              pointerId: 10,
+              pointerType: 'mouse',
+              clientX: 260,
+              clientY: 320,
+              buttons: 0,
+              bubbles: true,
+            }),
+          );
+          canvas.dispatchEvent(
+            new WheelEvent('wheel', { deltaY: -250, bubbles: true, cancelable: true }),
+          );
+        }
+        if (!timeline.dragged && scene.elapsedMs >= 1400) timeline.dragged = frame;
         if (!timeline.drop && scene.elapsedMs >= 600) timeline.drop = frame;
-        if (!timeline.line && scene.elapsedMs >= 2000) timeline.line = frame;
+        if (!timeline.line && scene.elapsedMs >= 2700) timeline.line = frame;
       }
       if (!timeline.line) requestAnimationFrame(sample);
     };
@@ -41,6 +92,13 @@ async function checkVictory(page: Page, title: RegExp | string) {
   const timeline = await page.evaluate(
     () => (window as unknown as { victoryTimeline: Timeline }).victoryTimeline,
   );
+  expect(timeline.early!.renderedFallOffset).toBeCloseTo(2.2);
+  expect(timeline.early!.cameraLocked).toBe(true);
+  expect(timeline.drop!.cameraLocked).toBe(true);
+  expect(timeline.early!.cameraPosition).not.toEqual(timeline.drop!.cameraPosition);
+  expect(timeline.settled!.cameraPosition).toEqual(timeline.dragged!.cameraPosition);
+  expect(timeline.dragged!.cameraLocked).toBe(true);
+  expect(timeline.line!.cameraLocked).toBe(false);
   expect(timeline.drop!.renderedFallOffset).toBeGreaterThan(0.05);
   expect(timeline.drop!.renderedWinningLines).toBe(0);
   expect(Math.abs(timeline.line!.renderedFallOffset)).toBeLessThan(0.02);
@@ -50,6 +108,23 @@ async function checkVictory(page: Page, title: RegExp | string) {
   await expect(page.getByRole('heading', { name: title })).toBeVisible();
   await expect(page.getByRole('dialog')).toHaveCount(0);
   await expect(page.getByTestId('ranked-result')).toHaveCount(0);
+  const finishedPose = await page.evaluate(
+    () => window.__fourScene!.getVictoryPresentationState()!.cameraPosition,
+  );
+  await page.waitForTimeout(350);
+  expect(
+    await page.evaluate(() => window.__fourScene!.getVictoryPresentationState()!.cameraPosition),
+  ).toEqual(finishedPose);
+  const bounds = await page.getByTestId('game-canvas').boundingBox();
+  await page.mouse.move(bounds!.x + bounds!.width / 2, bounds!.y + bounds!.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(bounds!.x + bounds!.width / 2 + 65, bounds!.y + bounds!.height / 2, {
+    steps: 8,
+  });
+  await page.mouse.up();
+  expect(
+    await page.evaluate(() => window.__fourScene!.getVictoryPresentationState()!.cameraPosition),
+  ).not.toEqual(finishedPose);
 }
 
 test('a local win shows the slow final move on mobile, keeping the board size and inline result', async ({

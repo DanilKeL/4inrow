@@ -58,7 +58,7 @@ async function recordVictoryTimeline(page: Page) {
           resultVisible: Boolean(document.querySelector('[data-testid="ranked-result"]')),
         };
         if (timeline.drop === null && presentation.elapsedMs >= 600) timeline.drop = sample;
-        if (timeline.line === null && presentation.elapsedMs >= 2000) timeline.line = sample;
+        if (timeline.line === null && presentation.elapsedMs >= 2700) timeline.line = sample;
       }
       if (timeline.resultAt === null) requestAnimationFrame(sampleFrame);
     };

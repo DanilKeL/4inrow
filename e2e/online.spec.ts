@@ -229,6 +229,8 @@ test.describe('online lobbies', () => {
     browser,
     baseURL,
   }) => {
+    // Two software WebGL clients also render the complete victory camera sequence.
+    test.setTimeout(90000);
     const guest = await browser.newPage({ baseURL, viewport: { width: 1440, height: 1000 } });
     const errors = [collectErrors(host), collectErrors(guest)];
     try {
