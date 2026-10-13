@@ -97,6 +97,12 @@ declare global {
         screenY: number;
       }>;
       getVictoryPresentationState: () => VictoryPresentationState | null;
+      getRenderedPieces: () => Array<{
+        index: number;
+        opacities: number[];
+        transparent: boolean[];
+        depthWrite: boolean[];
+      }>;
       getRenderedWinningLines: () => Array<{
         visible: boolean;
         materialVisible: boolean;
@@ -419,15 +425,16 @@ function Piece({
       introduction === undefined ||
       !animate ||
       (revealed && introAge.current >= introduction + 0.8);
+    // Preset pieces survive retries. A finished victory may have dimmed their
+    // materials even when the opacity prop stays at 1 in the next attempt.
+    const settledOpacity = opacity * (victory && opacity === 1 ? 0.52 : 1);
     if (
       !latest &&
       !winner &&
-      (!victory ||
-        (victoryAge >= WIN_CAMERA_MS + WIN_FALL_MS + WIN_LINE_MS &&
-          appliedOpacity.current === opacity * (opacity === 1 ? 0.52 : 1))) &&
+      (!victory || victoryAge >= WIN_CAMERA_MS + WIN_FALL_MS + WIN_LINE_MS) &&
       introFinished &&
       fade.current.elapsed >= 0.15 &&
-      appliedOpacity.current !== null &&
+      appliedOpacity.current === settledOpacity &&
       group.current?.visible === visible &&
       Math.abs((group.current?.position.y ?? settledY) - settledY) < 0.0001
     )
@@ -441,7 +448,9 @@ function Piece({
     if (transition.elapsed < 0.15) {
       transition.elapsed = animate ? Math.min(0.15, transition.elapsed + delta) : 0.15;
       transition.value =
-        transition.from + (transition.target - transition.from) * (transition.elapsed / 0.15);
+        transition.elapsed === 0.15
+          ? transition.target
+          : transition.from + (transition.target - transition.from) * (transition.elapsed / 0.15);
     }
     const dimming = victory && !winner && opacity === 1 ? 1 - 0.48 * victory.dimProgress : 1;
     const renderedOpacity = transition.value * entranceOpacity * dimming;
@@ -484,7 +493,12 @@ function Piece({
           : 0.35;
   });
   return (
-    <group ref={group} position={pos} visible={visible && (introduction === undefined || !animate)}>
+    <group
+      ref={group}
+      name={import.meta.env.DEV && !ghost ? `game-piece-${move.index}` : undefined}
+      position={pos}
+      visible={visible && (introduction === undefined || !animate)}
+    >
       <mesh geometry={geometry}>
         <meshStandardMaterial
           ref={bodyMaterial}
@@ -698,6 +712,31 @@ function CameraRig({
   useEffect(() => {
     if (!import.meta.env.DEV) return;
     const api = {
+      getRenderedPieces: () => {
+        const pieces: Array<{
+          index: number;
+          opacities: number[];
+          transparent: boolean[];
+          depthWrite: boolean[];
+        }> = [];
+        scene.traverse((object) => {
+          if (!object.name.startsWith('game-piece-')) return;
+          const materials = object.children
+            .slice(0, 2)
+            .flatMap((child) =>
+              child instanceof Mesh && child.material instanceof MeshStandardMaterial
+                ? [child.material]
+                : [],
+            );
+          pieces.push({
+            index: Number(object.name.slice('game-piece-'.length)),
+            opacities: materials.map((material) => material.opacity),
+            transparent: materials.map((material) => material.transparent),
+            depthWrite: materials.map((material) => material.depthWrite),
+          });
+        });
+        return pieces;
+      },
       getVictoryPresentationState: () => {
         const state = victoryDiagnostics.current?.();
         return state
