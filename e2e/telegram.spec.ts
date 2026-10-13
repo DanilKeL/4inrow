@@ -1,7 +1,89 @@
-import { expect, test } from '@playwright/test';
+import { expect, test, devices } from '@playwright/test';
 import { openGame, place } from './helpers';
 
 test.use({ viewport: { width: 390, height: 844 }, hasTouch: true });
+
+test('iPhone Mini App suppresses game selection while login fields remain editable', async ({
+  browser,
+  baseURL,
+}) => {
+  const phone = devices['iPhone 13'];
+  const context = await browser.newContext({
+    viewport: phone.viewport,
+    userAgent: phone.userAgent,
+    deviceScaleFactor: phone.deviceScaleFactor,
+    isMobile: true,
+    hasTouch: true,
+    baseURL,
+  });
+  const page = await context.newPage();
+  try {
+    await page.addInitScript(() => {
+      const noop = () => {};
+      window.Telegram = {
+        WebApp: {
+          platform: 'ios',
+          initData: '',
+          viewportStableHeight: 844,
+          isVersionAtLeast: () => false,
+          ready: noop,
+          expand: noop,
+          setHeaderColor: noop,
+          setBackgroundColor: noop,
+          enableClosingConfirmation: noop,
+          disableClosingConfirmation: noop,
+          onEvent: noop,
+          offEvent: noop,
+          BackButton: { show: noop, hide: noop, onClick: noop, offClick: noop },
+        },
+      };
+    });
+    await page.goto('/');
+    await expect(page.getByTestId('loading-screen')).toBeHidden();
+    await expect(page.locator('html')).toHaveAttribute('data-telegram', 'true');
+    const heading = page.getByRole('heading', { name: 'Четыре в ряд', exact: true });
+    await expect(heading).toHaveCSS('user-select', 'none');
+    await expect(page.locator('html')).toHaveCSS('touch-action', 'manipulation');
+    await expect(page.locator('body')).toHaveCSS('touch-action', 'manipulation');
+    const point = await heading.boundingBox();
+    for (let tap = 0; tap < 2; tap++)
+      await page.touchscreen.tap(point!.x + point!.width / 2, point!.y + point!.height / 2);
+    expect(await page.evaluate(() => getSelection()?.toString())).toBe('');
+    expect(await page.evaluate(() => visualViewport?.scale)).toBe(1);
+    expect(
+      await heading.evaluate((element) => {
+        const event = new Event('selectstart', { cancelable: true, bubbles: true });
+        element.dispatchEvent(event);
+        return event.defaultPrevented;
+      }),
+    ).toBe(true);
+    await page.getByRole('button', { name: /Аккаунт:/ }).click();
+    const account = page.getByRole('dialog', { name: 'Личный кабинет', exact: true });
+    await account.getByRole('button', { name: 'Вход', exact: true }).click();
+    const username = account.getByLabel('Имя пользователя');
+    await expect(username).toHaveCSS('user-select', 'text');
+    await username.fill('TouchPlayer');
+    await username.selectText();
+    expect(
+      await username.evaluate((element: HTMLInputElement) => [
+        element.selectionStart,
+        element.selectionEnd,
+      ]),
+    ).toEqual([0, 11]);
+    expect(
+      await username.evaluate((element) => {
+        const event = new Event('contextmenu', { cancelable: true, bubbles: true });
+        element.dispatchEvent(event);
+        return event.defaultPrevented;
+      }),
+    ).toBe(false);
+    await account.getByRole('button', { name: 'Закрыть', exact: true }).click();
+    await page.evaluate(() => document.documentElement.removeAttribute('data-telegram'));
+    await expect(heading).not.toHaveCSS('user-select', 'none');
+  } finally {
+    await context.close();
+  }
+});
 test('Telegram fullscreen, safe areas, navigation, moves and minimize work on a phone', async ({
   page,
 }) => {

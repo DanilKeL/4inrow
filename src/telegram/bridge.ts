@@ -1,3 +1,5 @@
+import { installTelegramTouchGuard } from './touchGuard';
+
 /** Native presentation and raw launch data. Telegram identity is verified only on the server. */
 interface Insets {
   top: number;
@@ -65,6 +67,7 @@ export function initializeTelegram(): () => void {
   const app = telegramApp();
   if (!app) return () => {};
   document.documentElement.dataset.telegram = 'true';
+  const stopTouchGuard = installTelegramTouchGuard();
   const sync = () => syncTelegramViewport(app);
   sync();
   app.expand();
@@ -88,7 +91,10 @@ export function initializeTelegram(): () => void {
     }
     sync();
   }
-  return () => events.forEach((event) => app.offEvent(event, sync));
+  return () => {
+    stopTouchGuard();
+    events.forEach((event) => app.offEvent(event, sync));
+  };
 }
 
 export async function loadTelegramSDK(): Promise<void> {
