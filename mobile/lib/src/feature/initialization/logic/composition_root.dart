@@ -6,6 +6,8 @@ import 'package:four3/src/common/services/analytics/server_analytics.dart';
 import 'package:four3/src/feature/account/data/datasource/account_datasource_rest_client.dart';
 import 'package:four3/src/feature/account/data/datasource/account_preferences_datasource.dart';
 import 'package:four3/src/feature/account/data/repository/account_repository.dart';
+import 'package:four3/src/feature/appearance/data/appearance_repository.dart';
+import 'package:four3/src/feature/appearance/data/skin_image_cache.dart';
 import 'package:four3/src/feature/audio/service/audio_service.dart';
 import 'package:four3/src/feature/daily/data/datasource/daily_datasource.dart';
 import 'package:four3/src/feature/daily/data/datasource/daily_preferences_datasource.dart';
@@ -29,6 +31,7 @@ import 'package:four3/src/feature/matchmaking/data/datasource/online_session_dat
 import 'package:four3/src/feature/matchmaking/service/online_transport.dart';
 import 'package:four3/src/feature/settings/data/datasource/settings_datasource_preferences.dart';
 import 'package:four3/src/feature/settings/data/repository/settings_repository.dart';
+import 'package:path_provider/path_provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 final class CompositionRoot {
@@ -70,6 +73,15 @@ final class CompositionRoot {
       cookieStorage: cookieStorage,
     );
     final AudioService audioService = AudioService();
+    final Uri apiBaseUri = Uri.parse(config.apiBaseUrl);
+    final AppearanceRepository appearanceRepository = AppearanceRepository(
+      baseUri: apiBaseUri,
+      preferences: preferencesDatasourceTool,
+    );
+    final SkinImageCache skinImageCache = SkinImageCache(
+      baseUri: apiBaseUri,
+      directory: await getApplicationCacheDirectory(),
+    );
     return RootDependenciesContainer(
       config: config,
       preferencesDatasourceTool: preferencesDatasourceTool,
@@ -106,6 +118,8 @@ final class CompositionRoot {
       ),
       deepLinkService: deepLinkService,
       accountRepository: accountRepository,
+      appearanceRepository: appearanceRepository,
+      skinImageCache: skinImageCache,
       onlineTransport: onlineTransport,
       matchHistoryRepository: MatchHistoryRepository$Api(
         datasource: MatchHistoryDatasource$RestClient(restClient: restClient),

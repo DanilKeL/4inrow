@@ -36,6 +36,10 @@ void main() {
       find.byKey(const ValueKey('tutorial-media')),
     );
     expect(lastTab.bottom, lessThanOrEqualTo(media.top));
+    final Size stage = tester.getSize(
+      find.byKey(const ValueKey('tutorial-media-stage')),
+    );
+    expect(stage.width / stage.height, closeTo(2, .001));
   });
 
   testWidgets('landscape video stays to the right of the lesson selector', (
@@ -50,5 +54,9 @@ void main() {
       find.byKey(const ValueKey('tutorial-media')),
     );
     expect(selector.right, lessThanOrEqualTo(media.left));
+    final Size stage = tester.getSize(
+      find.byKey(const ValueKey('tutorial-media-stage')),
+    );
+    expect(stage.width / stage.height, closeTo(2, .001));
   });
 }

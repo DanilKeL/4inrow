@@ -162,6 +162,7 @@ class _GameSetupViewState extends State<GameSetupView> {
         wide: true,
         builder: (_) => TutorialView(
           starting: true,
+          animations: settings.settings.animations,
           onDone: () {
             settings.add(
               SettingsEvent$Update(

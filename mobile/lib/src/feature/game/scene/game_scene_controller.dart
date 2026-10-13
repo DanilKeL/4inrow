@@ -1,19 +1,31 @@
+import 'dart:async';
 import 'dart:math' as math;
 import 'dart:typed_data';
 
 import 'package:flutter_scene/scene.dart' as fs;
+import 'package:four3/src/feature/appearance/data/skin_image_cache.dart';
+import 'package:four3/src/feature/appearance/domain/model/skin_catalog.dart';
+import 'package:four3/src/feature/appearance/service/skin_texture_painter.dart';
 import 'package:four3/src/feature/game/model/game_models.dart';
 import 'package:four3/src/feature/game/service/game_engine.dart';
 import 'package:vector_math/vector_math.dart' as vm;
 
 final class GameSceneController {
+  new({SkinImageCache? imageCache})
+    : _texturePainter = imageCache == null
+          ? null
+          : SkinTexturePainter(imageCache);
+
   static const spacing = 1.09;
   static const step = 0.5;
   static const firstHeight = 0.365;
 
   final fs.Scene scene = fs.Scene();
+  final SkinTexturePainter? _texturePainter;
   final Map<int, _PieceVisual> _pieces = {};
   final List<fs.Node> _pickNodes = [];
+  final List<_BoardMaterial> _boardMaterials = [];
+  final List<_BoardDot> _boardDots = [];
   _PieceVisual? _ghost;
   int? _ghostColumn;
   fs.Node? _invalidColumnRoot;
@@ -25,19 +37,86 @@ final class GameSceneController {
   bool _animations = true;
   bool _introduction = false;
   bool _ready = false;
+  bool _disposed = false;
+  Skin _skin = builtinSkins[1];
+  _GpuArtwork? _artwork;
+  int _skinGeneration = 0;
 
   bool get ready => _ready;
   ({int x, int y})? get invalidColumn => _invalidColumn;
 
-  Future<void> initialize() async {
+  Future<void> initialize([Skin? skin]) async {
+    _skin = skin ?? _skin;
     await fs.Scene.initializeStaticResources();
     _configureLighting();
     _pieceGeometry = _makePieceGeometry();
     final fs.Node board = await fs.loadScene('assets/models/four-board.glb');
+    if (_disposed) return;
     board.name = 'board';
+    _prepareBoard(board);
     scene.add(board);
+    _addBoardDots();
     _addPickGeometry();
     _ready = true;
+    _applyPalette();
+    unawaited(applySkin(_skin));
+  }
+
+  Future<void> applySkin(Skin skin) async {
+    if (_disposed) return;
+    _skin = skin;
+    final int generation = ++_skinGeneration;
+    _artwork = null;
+    if (_ready) _applyPalette();
+    final SkinTexturePainter? painter = _texturePainter;
+    if (painter == null) return;
+    final bool hasImages = skin.design?.imageIds.isNotEmpty ?? false;
+    SkinArtwork? initial;
+    try {
+      initial = await painter.paint(skin, preloadImages: false);
+    } on Object {
+      return;
+    }
+    if (initial == null) return;
+    if (!await _installArtwork(initial, generation) || !hasImages) return;
+    SkinArtwork? hydrated;
+    try {
+      hydrated = await painter.paint(skin);
+    } on Object {
+      return;
+    }
+    if (hydrated != null) await _installArtwork(hydrated, generation);
+  }
+
+  Future<bool> _installArtwork(SkinArtwork painted, int generation) async {
+    if (_disposed || generation != _skinGeneration) {
+      painted.dispose();
+      return false;
+    }
+    try {
+      final List<fs.Texture2D> textures = await Future.wait<fs.Texture2D>([
+        for (final surface in SkinSurface.values)
+          fs.Texture2D.fromImage(painted[surface]),
+      ]);
+      final fs.Texture2D? metallicRoughness = painted.metallicRoughness == null
+          ? null
+          : await fs.Texture2D.fromImage(
+              painted.metallicRoughness!,
+              content: fs.TextureContent.data,
+            );
+      if (_disposed || generation != _skinGeneration) return false;
+      _artwork = _GpuArtwork({
+        for (var index = 0; index < SkinSurface.values.length; index++)
+          SkinSurface.values[index]: textures[index],
+      }, metallicRoughness: metallicRoughness);
+      if (_ready) _applyPalette();
+      return true;
+    } on Object {
+      // Palette updates remain usable even when texture generation fails.
+      return false;
+    } finally {
+      painted.dispose();
+    }
   }
 
   void sync({
@@ -54,6 +133,9 @@ final class GameSceneController {
     _animations = animations;
     _introduction = introduction;
     _updatePickGeometry();
+    for (var index = 0; index < _boardDots.length; index++) {
+      _boardDots[index].node.visible = snapshot.heights[index] == 0;
+    }
     final Map<int, GameMove> nextMoves = {
       for (final GameMove move in snapshot.history) move.index: move,
     };
@@ -164,6 +246,10 @@ final class GameSceneController {
       ),
     );
     visual.root.position = visual.root.position + vm.Vector3(0, .045, 0);
+    visual.opacity = .23;
+    visual.opacityFrom = .23;
+    visual.targetOpacity = .23;
+    visual.opacityInitialized = true;
     _opacity(visual.bodyMaterial, .23);
     _opacity(visual.capMaterial, .23);
     visual.symbolMaterial.baseColorFactor.a = .23 * .85;
@@ -268,23 +354,24 @@ final class GameSceneController {
 
   _PieceVisual _createPiece(GameMove move) {
     final dark = move.player == Player.one;
+    final PiecePalette palette = dark
+        ? _skin.palette.dark
+        : _skin.palette.light;
     final fs.PhysicallyBasedMaterial bodyMaterial = _pbr(
-      dark ? _linearColor(0x24272C) : _linearColor(0xEEE4D2),
+      _linearHex(palette.body),
       roughness: dark ? .34 : .48,
       metallic: dark ? .2 : .08,
     );
     final fs.PhysicallyBasedMaterial capMaterial = _pbr(
-      dark ? _linearColor(0x24292F) : _linearColor(0xF5EDDE),
+      _linearHex(palette.cap),
       roughness: .52,
     );
     final symbolMaterial = fs.UnlitMaterial()
-      ..baseColorFactor = dark
-          ? _linearColor(0x858992, .85)
-          : _linearColor(0x969286, .85)
+      ..baseColorFactor = _linearHex(palette.mark, .85)
       ..alphaMode = fs.AlphaMode.blend;
     final fs.PhysicallyBasedMaterial ringMaterial =
-        _pbr(_linearColor(0x3661EE), roughness: 1, metallic: 0)
-          ..emissiveFactor = _linearColor(0x3661EE)
+        _pbr(_linearHex(_skin.palette.accent), roughness: 1, metallic: 0)
+          ..emissiveFactor = _linearHex(_skin.palette.accent)
           ..emissiveStrength = .35;
 
     final root = fs.Node(name: 'piece_${move.index}');
@@ -328,19 +415,154 @@ final class GameSceneController {
       ),
     )..position = vm.Vector3(0, .242, 0);
     root.add(ring);
-    return _PieceVisual(
+    final visual = _PieceVisual(
       root: root,
       move: move,
+      dark: dark,
       bodyMaterial: bodyMaterial,
       capMaterial: capMaterial,
       symbolMaterial: symbolMaterial,
       ringMaterial: ringMaterial,
       ring: ring,
+      symbol: symbol,
       createdAt: _clockSeconds,
       introductionDelay: _introduction
           ? .45 + (move.x + move.y) * .055 + move.z * .14
           : null,
     );
+    _applyPieceSkin(visual);
+    return visual;
+  }
+
+  void _prepareBoard(fs.Node board) {
+    for (final fs.Node node in board.meshNodes) {
+      for (final fs.MeshPrimitive primitive in node.mesh!.primitives) {
+        final fs.Material material = primitive.material;
+        if (material is! fs.PhysicallyBasedMaterial) continue;
+        _boardMaterials.add(
+          _BoardMaterial(
+            material: material,
+            originalColor: material.baseColorFactor.clone(),
+            originalRoughness: material.roughnessFactor,
+            originalMetalness: material.metallicFactor,
+          ),
+        );
+        if (material.name.startsWith('Porcelain') &&
+            primitive.geometry.isReadable) {
+          final fs.MeshData data = primitive.geometry.extractMeshData();
+          final Float32List positions = data.positions;
+          final Float32List texCoords = planarTexCoords(positions);
+          primitive.geometry = fs.MeshGeometry.fromArrays(
+            positions: positions,
+            normals: data.normals,
+            texCoords: texCoords,
+            colors: data.colors,
+            tangents: data.tangents,
+            indices: data.indices,
+            primitiveType: data.primitiveType,
+          );
+        }
+      }
+    }
+  }
+
+  void _addBoardDots() {
+    final geometry = fs.DiscGeometry(radius: .025, segments: 16);
+    for (var y = 0; y < 5; y++) {
+      for (var x = 0; x < 5; x++) {
+        final fs.UnlitMaterial material = fs.UnlitMaterial()
+          ..baseColorFactor = _linearHex(_skin.palette.board.dot);
+        final fs.Node node = fs.Node(mesh: fs.Mesh(geometry, material))
+          ..name = 'board_dot_${x}_$y'
+          ..position = vm.Vector3((x - 2) * spacing, .108, (y - 2) * spacing)
+          ..castsShadows = false;
+        _boardDots.add(_BoardDot(node: node, material: material));
+        scene.add(node);
+      }
+    }
+  }
+
+  void _applyPalette() {
+    final _GpuArtwork? artwork = _artwork;
+    final SurfaceDesign? boardDesign = _surfaceDesign(SkinSurface.board);
+    for (final _BoardMaterial entry in _boardMaterials) {
+      final fs.PhysicallyBasedMaterial material = entry.material;
+      if (material.name.startsWith('Porcelain')) {
+        material
+          ..baseColorFactor = artwork == null
+              ? _linearHex(_skin.palette.board.body)
+              : _linearColor(0xFFFFFF)
+          ..baseColorTexture = artwork?[SkinSurface.board]
+          ..metallicRoughnessTexture = artwork?.metallicRoughness
+          ..roughnessFactor =
+              boardDesign?.roughness ??
+              (artwork == null ? entry.originalRoughness : .3)
+          ..metallicFactor =
+              boardDesign?.metalness ??
+              (artwork == null ? entry.originalMetalness : .86);
+      } else if (material.name == 'Satin champagne') {
+        material
+          ..baseColorFactor = _linearHex(_skin.palette.board.rim)
+          ..roughnessFactor = artwork == null ? entry.originalRoughness : .26
+          ..metallicFactor = artwork == null ? entry.originalMetalness : .85;
+      } else if (material.name == 'Anodized graphite') {
+        material.baseColorFactor = artwork == null
+            ? entry.originalColor.clone()
+            : _linearColor(0x101C23);
+      } else if (material.name == 'Cobalt enamel') {
+        material.baseColorFactor = _linearHex(_skin.palette.accent);
+      }
+    }
+    for (final _BoardDot dot in _boardDots) {
+      dot.material.baseColorFactor = _linearHex(_skin.palette.board.dot);
+    }
+    for (final _PieceVisual visual in _pieces.values) {
+      _applyPieceSkin(visual);
+    }
+    if (_ghost case final ghost?) _applyPieceSkin(ghost);
+  }
+
+  SurfaceDesign? _surfaceDesign(SkinSurface surface) => _skin.design?[surface];
+
+  void _applyPieceSkin(_PieceVisual visual) {
+    final PiecePalette palette = visual.dark
+        ? _skin.palette.dark
+        : _skin.palette.light;
+    final SkinSurface bodySurface = visual.dark
+        ? SkinSurface.darkBody
+        : SkinSurface.lightBody;
+    final SkinSurface capSurface = visual.dark
+        ? SkinSurface.darkCap
+        : SkinSurface.lightCap;
+    final SurfaceDesign? bodyDesign = _surfaceDesign(bodySurface);
+    final SurfaceDesign? capDesign = _surfaceDesign(capSurface);
+    final _GpuArtwork? artwork = _artwork;
+    visual.bodyMaterial
+      ..baseColorFactor = artwork == null
+          ? _linearHex(palette.body, visual.opacity)
+          : _linearColor(0xFFFFFF, visual.opacity)
+      ..baseColorTexture = artwork?[bodySurface]
+      ..roughnessFactor = bodyDesign?.roughness ?? (visual.dark ? .34 : .48)
+      ..metallicFactor = bodyDesign?.metalness ?? (visual.dark ? .2 : .08);
+    visual.capMaterial
+      ..baseColorFactor = artwork == null
+          ? _linearHex(palette.cap, visual.opacity)
+          : _linearColor(0xFFFFFF, visual.opacity)
+      ..baseColorTexture = artwork?[capSurface]
+      ..roughnessFactor = capDesign?.roughness ?? (artwork == null ? .52 : .48)
+      ..metallicFactor = capDesign?.metalness ?? (artwork == null ? 0 : .12);
+    visual.symbolMaterial.baseColorFactor = _linearHex(
+      palette.mark,
+      visual.opacity * .85,
+    );
+    final bool hasArtwork = _skin.artwork == 'nocturne' || _skin.design != null;
+    visual.symbol.visible = !(capDesign?.decorated ?? false) && !hasArtwork;
+    visual.ringMaterial
+      ..baseColorFactor = _linearHex(
+        _skin.palette.accent,
+        visual.move.index == -1 ? .8 : visual.opacity,
+      )
+      ..emissiveFactor = _linearHex(_skin.palette.accent);
   }
 
   double _clockSeconds = 0;
@@ -470,6 +692,32 @@ final class GameSceneController {
     return result;
   }
 
+  static Float32List planarTexCoords(Float32List positions) {
+    if (positions.length % 3 != 0) {
+      throw ArgumentError.value(positions.length, 'positions');
+    }
+    if (positions.isEmpty) return Float32List(0);
+    double minX = double.infinity;
+    double maxX = double.negativeInfinity;
+    double minZ = double.infinity;
+    double maxZ = double.negativeInfinity;
+    for (var index = 0; index < positions.length; index += 3) {
+      minX = math.min(minX, positions[index]);
+      maxX = math.max(maxX, positions[index]);
+      minZ = math.min(minZ, positions[index + 2]);
+      maxZ = math.max(maxZ, positions[index + 2]);
+    }
+    final double width = math.max(.0001, maxX - minX);
+    final double depth = math.max(.0001, maxZ - minZ);
+    final texCoords = Float32List(positions.length ~/ 3 * 2);
+    for (var vertex = 0; vertex < positions.length ~/ 3; vertex++) {
+      texCoords[vertex * 2] = (positions[vertex * 3] - minX) / width;
+      texCoords[vertex * 2 + 1] =
+          1 - (positions[vertex * 3 + 2] - minZ) / depth;
+    }
+    return texCoords;
+  }
+
   static double fallingOffset(double age) {
     if (age <= 0) return 2.2;
     if (age < .27) return 2.2 * (1 - math.pow(age / .27, 2));
@@ -529,6 +777,9 @@ final class GameSceneController {
     alpha,
   );
 
+  static vm.Vector4 _linearHex(String value, [double alpha = 1]) =>
+      _linearColor(int.parse(value.substring(1), radix: 16), alpha);
+
   static vm.Vector3 _linearColor3(int rgb) => vm.Vector3(
     _srgbChannel(rgb >> 16 & 0xFF),
     _srgbChannel(rgb >> 8 & 0xFF),
@@ -571,31 +822,42 @@ final class GameSceneController {
       (0, .25),
     ];
     const segments = 48;
-    final positions = Float32List(profile.length * segments * 3);
+    const int columns = segments + 1;
+    final positions = Float32List(profile.length * columns * 3);
+    final texCoords = Float32List(profile.length * columns * 2);
     var cursor = 0;
-    for (final point in profile) {
-      for (var segment = 0; segment < segments; segment++) {
+    var texCursor = 0;
+    for (var row = 0; row < profile.length; row++) {
+      final (double, double) point = profile[row];
+      for (var segment = 0; segment <= segments; segment++) {
         final double angle = segment / segments * math.pi * 2;
         positions[cursor++] = point.$1 * math.cos(angle);
         positions[cursor++] = point.$2;
         positions[cursor++] = point.$1 * math.sin(angle);
+        texCoords[texCursor++] = segment / segments;
+        texCoords[texCursor++] = row / (profile.length - 1);
       }
     }
     final indices = <int>[];
     for (var row = 0; row < profile.length - 1; row++) {
       for (var segment = 0; segment < segments; segment++) {
-        final int next = (segment + 1) % segments;
-        final int a = row * segments + segment;
-        final int b = row * segments + next;
-        final int c = (row + 1) * segments + segment;
-        final int d = (row + 1) * segments + next;
+        final int a = row * columns + segment;
+        final int b = row * columns + segment + 1;
+        final int c = (row + 1) * columns + segment;
+        final int d = (row + 1) * columns + segment + 1;
         indices.addAll([a, c, b, b, c, d]);
       }
     }
-    return fs.MeshGeometry.fromArrays(positions: positions, indices: indices);
+    return fs.MeshGeometry.fromArrays(
+      positions: positions,
+      texCoords: texCoords,
+      indices: indices,
+    );
   }
 
   void dispose() {
+    _disposed = true;
+    _skinGeneration++;
     _ghost = null;
     _invalidColumnRoot = null;
     _invalidColumn = null;
@@ -607,21 +869,25 @@ final class _PieceVisual {
   new({
     required this.root,
     required this.move,
+    required this.dark,
     required this.bodyMaterial,
     required this.capMaterial,
     required this.symbolMaterial,
     required this.ringMaterial,
     required this.ring,
+    required this.symbol,
     required this.createdAt,
     required this.introductionDelay,
   });
   final fs.Node root;
   final GameMove move;
+  final bool dark;
   final fs.PhysicallyBasedMaterial bodyMaterial;
   final fs.PhysicallyBasedMaterial capMaterial;
   final fs.UnlitMaterial symbolMaterial;
   final fs.PhysicallyBasedMaterial ringMaterial;
   final fs.Node ring;
+  final fs.Node symbol;
   final double createdAt;
   final double? introductionDelay;
   double opacity = 1;
@@ -630,4 +896,34 @@ final class _PieceVisual {
   double opacityElapsed = GameSceneController.opacityDuration;
   bool opacityInitialized = false;
   bool winner = false;
+}
+
+final class _BoardMaterial {
+  const new({
+    required this.material,
+    required this.originalColor,
+    required this.originalRoughness,
+    required this.originalMetalness,
+  });
+
+  final fs.PhysicallyBasedMaterial material;
+  final vm.Vector4 originalColor;
+  final double originalRoughness;
+  final double originalMetalness;
+}
+
+final class _BoardDot {
+  const new({required this.node, required this.material});
+
+  final fs.Node node;
+  final fs.UnlitMaterial material;
+}
+
+final class _GpuArtwork {
+  const new(this.textures, {this.metallicRoughness});
+
+  final Map<SkinSurface, fs.Texture2D> textures;
+  final fs.Texture2D? metallicRoughness;
+
+  fs.Texture2D operator [](SkinSurface surface) => textures[surface]!;
 }

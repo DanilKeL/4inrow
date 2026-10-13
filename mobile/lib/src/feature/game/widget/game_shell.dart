@@ -12,6 +12,8 @@ import 'package:four3/src/feature/account/widget/account_root_scope.dart';
 import 'package:four3/src/feature/account/widget/account_view.dart';
 import 'package:four3/src/feature/app_theme/utils/app_theme.dart';
 import 'package:four3/src/feature/app_theme/utils/theme_context_extension.dart';
+import 'package:four3/src/feature/appearance/domain/model/skin_catalog.dart';
+import 'package:four3/src/feature/appearance/widget/appearance_root_scope.dart';
 import 'package:four3/src/feature/components/modals/app_dialog.dart';
 import 'package:four3/src/feature/components/progress/app_circular_progress_indicator.dart';
 import 'package:four3/src/feature/daily/bloc/daily_bloc.dart';
@@ -45,6 +47,9 @@ import 'package:four3/src/feature/settings/widget/settings_root_scope.dart';
 import 'package:four3/src/feature/settings/widget/settings_view.dart';
 import 'package:four3/src/feature/tutorial/widget/tutorial_view.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
+
+Color _appearanceColor(String value) =>
+    Color(int.parse('ff${value.substring(1)}', radix: 16));
 
 String _gameMessage(BuildContext context, GameViewData data) {
   if (data.remoteMessage.isNotEmpty) return data.remoteMessage;
@@ -94,6 +99,8 @@ class _GameShellBody extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final GameBloc gameBloc = GameRootScope.of(context);
+    final AppearanceController appearance = AppearanceRootScope.of(context);
+    final Skin skin = appearance.skin;
     final GameViewData shownData = isMenu
         ? GameViewData(
             snapshot: _demoGame,
@@ -125,6 +132,8 @@ class _GameShellBody extends StatelessWidget {
                           final Widget sceneView = GameSceneView(
                             data: shownData,
                             settings: settings,
+                            skin: skin,
+                            imageCache: appearance.imageCache,
                             demo: isMenu,
                             onPlace: (x, y) {
                               gameBloc.add(GameEvent$MakeMove(x, y));
@@ -145,7 +154,11 @@ class _GameShellBody extends StatelessWidget {
                                 ? Stack(
                                     fit: StackFit.expand,
                                     children: [
-                                      _SceneCard(menu: false, child: sceneView),
+                                      _SceneCard(
+                                        menu: false,
+                                        room: skin.palette.room,
+                                        child: sceneView,
+                                      ),
                                       if (_gameMessage(
                                         context,
                                         data,
@@ -157,6 +170,7 @@ class _GameShellBody extends StatelessWidget {
                                   )
                                 : _PortraitGameBoard(
                                     data: data,
+                                    room: skin.palette.room,
                                     scene: sceneView,
                                   );
                             final Widget content = result && !shortLandscape
@@ -196,6 +210,7 @@ class _GameShellBody extends StatelessWidget {
                           }
                           final Widget scene = _SceneCard(
                             menu: true,
+                            room: skin.palette.room,
                             child: sceneView,
                           );
                           final bool landscape =
@@ -338,6 +353,7 @@ class _Header extends StatelessWidget {
                   titleBuilder: (context) => context.l10n.howToPlay,
                   wide: true,
                   builder: (_) => TutorialView(
+                    animations: settingsBloc.settings.animations,
                     onDone: () {
                       settingsBloc.add(
                         SettingsEvent$Update(
@@ -466,9 +482,10 @@ class _HeaderAction extends StatelessWidget {
 }
 
 class _SceneCard extends StatelessWidget {
-  const new({required this.menu, required this.child});
+  const new({required this.menu, required this.room, required this.child});
 
   final bool menu;
+  final String room;
   final Widget child;
 
   @override
@@ -476,7 +493,7 @@ class _SceneCard extends StatelessWidget {
     borderRadius: BorderRadius.circular(menu ? 14 : 12),
     child: DecoratedBox(
       decoration: BoxDecoration(
-        color: const Color(0xFFEBEAE7),
+        color: _appearanceColor(room),
         borderRadius: BorderRadius.circular(menu ? 14 : 12),
         border: Border.all(color: const Color(0xFFE1E2DD)),
       ),
@@ -1090,9 +1107,10 @@ class _LandscapeGameRail extends StatelessWidget {
 }
 
 class _PortraitGameBoard extends StatelessWidget {
-  const new({required this.data, required this.scene});
+  const new({required this.data, required this.room, required this.scene});
 
   final GameViewData data;
+  final String room;
   final Widget scene;
 
   @override
@@ -1136,7 +1154,7 @@ class _PortraitGameBoard extends StatelessWidget {
             child: Stack(
               fit: StackFit.expand,
               children: [
-                scene,
+                ColoredBox(color: _appearanceColor(room), child: scene),
                 if (_gameMessage(context, data).isNotEmpty)
                   _GameMessage(message: _gameMessage(context, data), bottom: 8),
               ],
