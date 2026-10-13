@@ -1,5 +1,6 @@
 import 'package:flutter/widgets.dart';
 import 'package:four3/src/feature/account/widget/account_root_scope.dart';
+import 'package:four3/src/feature/appearance/widget/appearance_root_scope.dart';
 import 'package:four3/src/feature/daily/widget/daily_root_scope.dart';
 import 'package:four3/src/feature/game/widget/game_root_scope.dart';
 import 'package:four3/src/feature/game/widget/game_shell.dart';
@@ -14,13 +15,15 @@ class FourApp extends StatelessWidget {
   const new({super.key});
 
   static Widget _buildFeatureScopes(Widget child) => InitializationRootScope(
-    child: SettingsRootScope(
-      child: AccountRootScope(
-        child: GameRootScope(
-          child: DailyRootScope(
-            child: MatchmakingRootScope(
-              child: MatchHistoryRootScope(
-                child: LeaderboardRootScope(child: child),
+    child: AppearanceRootScope(
+      child: SettingsRootScope(
+        child: AccountRootScope(
+          child: GameRootScope(
+            child: DailyRootScope(
+              child: MatchmakingRootScope(
+                child: MatchHistoryRootScope(
+                  child: LeaderboardRootScope(child: child),
+                ),
               ),
             ),
           ),

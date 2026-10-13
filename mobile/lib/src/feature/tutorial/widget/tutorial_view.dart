@@ -1,3 +1,6 @@
+import 'dart:async';
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 import 'package:four3/l10n/generated/app_localizations.dart';
 import 'package:four3/src/common/utils/build_context_extension.dart';
@@ -29,12 +32,14 @@ class TutorialView extends StatefulWidget {
     this.starting = false,
     this.onDone,
     this.loadVideos = true,
+    this.animations = true,
     super.key,
   });
 
   final bool starting;
   final VoidCallback? onDone;
   final bool loadVideos;
+  final bool animations;
 
   @override
   State<TutorialView> createState() => _TutorialViewState();
@@ -45,20 +50,60 @@ class _TutorialViewState extends State<TutorialView> {
   VideoPlayerController? _video;
   bool _failed = false;
   bool _ended = false;
+  bool _frameReady = false;
+  int _loadGeneration = 0;
+  bool _loadStarted = false;
+  bool _autoPlay = false;
 
   @override
   void initState() {
     super.initState();
-    if (widget.loadVideos) {
-      _load();
-    } else {
-      _failed = true;
+    if (!widget.loadVideos) _failed = true;
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _updateAutoPlay(
+      widget.animations && !MediaQuery.disableAnimationsOf(context),
+    );
+    if (widget.loadVideos && !_loadStarted) {
+      _loadStarted = true;
+      unawaited(_load());
     }
   }
 
+  @override
+  void didUpdateWidget(covariant TutorialView oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    _updateAutoPlay(
+      widget.animations && !MediaQuery.disableAnimationsOf(context),
+    );
+    if (widget.loadVideos && !_loadStarted) {
+      _loadStarted = true;
+      unawaited(_load());
+    }
+  }
+
+  void _updateAutoPlay(bool value) {
+    if (_autoPlay == value) return;
+    _autoPlay = value;
+    final VideoPlayerController? video = _video;
+    if (video == null) return;
+    unawaited(value ? video.play() : video.pause());
+  }
+
   Future<void> _load() async {
+    final int generation = ++_loadGeneration;
     final VideoPlayerController? previous = _video;
-    _video = null;
+    if (mounted) {
+      setState(() {
+        _video = null;
+        _failed = false;
+        _ended = false;
+        _frameReady = false;
+      });
+    }
     await previous?.dispose();
     final String lessonId = _lessonIds[_selected];
     final controller = VideoPlayerController.asset(
@@ -67,28 +112,47 @@ class _TutorialViewState extends State<TutorialView> {
     try {
       await controller.initialize();
       await controller.setLooping(false);
-      await controller.play();
-      if (mounted) {
-        setState(() {
-          _video = controller;
-          _failed = false;
-          _ended = false;
-        });
-        controller.addListener(_syncPlayback);
+      await controller.setVolume(0);
+      if (!mounted || generation != _loadGeneration) {
+        await controller.dispose();
+        return;
       }
+      controller.addListener(_syncPlayback);
+      setState(() => _video = controller);
+      if (_autoPlay) await controller.play();
     } on Exception {
       await controller.dispose();
-      if (mounted) setState(() => _failed = true);
+      if (mounted && generation == _loadGeneration) {
+        setState(() {
+          _video = null;
+          _failed = true;
+        });
+      }
     }
   }
 
   void _syncPlayback() {
     final VideoPlayerController? video = _video;
     if (!mounted || video == null || !video.value.isInitialized) return;
+    if (video.value.hasError) {
+      if (!_failed) {
+        setState(() {
+          _failed = true;
+          _frameReady = false;
+        });
+      }
+      return;
+    }
     final bool ended =
         video.value.duration > Duration.zero &&
         video.value.position >= video.value.duration;
-    if (ended != _ended) setState(() => _ended = ended);
+    final bool frameReady = video.value.position > Duration.zero;
+    if (ended != _ended || (frameReady && !_frameReady)) {
+      setState(() {
+        _ended = ended;
+        _frameReady = _frameReady || frameReady;
+      });
+    }
   }
 
   @override
@@ -138,12 +202,13 @@ class _TutorialViewState extends State<TutorialView> {
                 Expanded(
                   child: Column(
                     children: [
-                      Expanded(
+                      Flexible(
                         child: _TutorialMedia(
                           lesson: lesson,
                           video: _video,
                           failed: _failed,
                           ended: _ended,
+                          frameReady: _frameReady,
                           onTogglePlayback: _togglePlayback,
                           onReplay: _replay,
                         ),
@@ -178,12 +243,13 @@ class _TutorialViewState extends State<TutorialView> {
           onSelected: _selectLesson,
         ),
         const SizedBox(height: 10),
-        Expanded(
+        Flexible(
           child: _TutorialMedia(
             lesson: lesson,
             video: _video,
             failed: _failed,
             ended: _ended,
+            frameReady: _frameReady,
             onTogglePlayback: _togglePlayback,
             onReplay: _replay,
           ),
@@ -314,6 +380,7 @@ class _TutorialMedia extends StatelessWidget {
     required this.video,
     required this.failed,
     required this.ended,
+    required this.frameReady,
     required this.onTogglePlayback,
     required this.onReplay,
   });
@@ -322,117 +389,144 @@ class _TutorialMedia extends StatelessWidget {
   final VideoPlayerController? video;
   final bool failed;
   final bool ended;
+  final bool frameReady;
   final Future<void> Function() onTogglePlayback;
   final Future<void> Function() onReplay;
 
   @override
-  Widget build(BuildContext context) => ClipRRect(
+  Widget build(BuildContext context) => LayoutBuilder(
     key: const ValueKey('tutorial-media'),
-    borderRadius: BorderRadius.circular(12),
-    child: ColoredBox(
-      color: const Color(0xFFEEEEE8),
-      child: Stack(
-        children: [
-          Positioned.fill(
-            child: Column(
-              children: [
-                Expanded(
-                  child: ClipRect(
-                    child: Center(
-                      child: failed
-                          ? Image.asset(
-                              'assets/tutorial/${lesson.id}.webp',
-                              fit: BoxFit.contain,
-                            )
-                          : video?.value.isInitialized == true
-                          ? AspectRatio(
+    builder: (context, constraints) {
+      final bool controls = !failed && video?.value.isInitialized == true;
+      final double controlHeight = controls ? 36 : 0;
+      final double availableHeight = math.max(
+        0,
+        constraints.maxHeight - controlHeight,
+      );
+      final double stageWidth = math.min(
+        constraints.maxWidth,
+        availableHeight * 2,
+      );
+      final double stageHeight = stageWidth / 2;
+      return Align(
+        alignment: Alignment.topCenter,
+        widthFactor: 1,
+        heightFactor: 1,
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(12),
+          child: ColoredBox(
+            color: const Color(0xFFEEEEE8),
+            child: SizedBox(
+              width: stageWidth,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  SizedBox(
+                    key: const ValueKey('tutorial-media-stage'),
+                    width: stageWidth,
+                    height: stageHeight,
+                    child: Stack(
+                      fit: StackFit.expand,
+                      children: [
+                        Image.asset(
+                          failed
+                              ? 'assets/tutorial/${lesson.id}.webp'
+                              : 'assets/tutorial/${lesson.id}-start.webp',
+                          fit: BoxFit.contain,
+                        ),
+                        if (!failed && frameReady && controls)
+                          Center(
+                            child: AspectRatio(
                               aspectRatio: video!.value.aspectRatio,
                               child: VideoPlayer(video!),
-                            )
-                          : const AppCircularProgressIndicator(),
-                    ),
-                  ),
-                ),
-                if (video?.value.isInitialized == true)
-                  SizedBox(
-                    height: 36,
-                    child: ColoredBox(
-                      color: const Color(0xF2EEEEE8),
-                      child: Row(
-                        children: [
-                          IconButton(
-                            tooltip: video!.value.isPlaying
-                                ? context.l10n.pauseExample
-                                : context.l10n.playExample,
-                            onPressed: onTogglePlayback,
-                            icon: Icon(
-                              video!.value.isPlaying
-                                  ? LucideIcons.pause
-                                  : LucideIcons.play,
-                              size: 16,
                             ),
                           ),
-                          Expanded(
-                            child: Semantics(
-                              label: context.l10n.videoPosition,
-                              child: VideoProgressIndicator(
-                                video!,
-                                allowScrubbing: true,
-                                colors: const VideoProgressColors(
-                                  playedColor: AppColors.accent,
+                        if (!failed && video == null)
+                          const Center(child: AppCircularProgressIndicator()),
+                        if (ended && lesson.id != 'stacking')
+                          Positioned(
+                            left: 12,
+                            top: 12,
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 10,
+                                vertical: 6,
+                              ),
+                              decoration: BoxDecoration(
+                                color: const Color(0xE8FAFBF7),
+                                borderRadius: BorderRadius.circular(20),
+                              ),
+                              child: Text(
+                                context.l10n.fourInRowWin,
+                                style: const TextStyle(
+                                  color: AppColors.accent,
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w700,
                                 ),
                               ),
                             ),
                           ),
-                          IconButton(
-                            tooltip: context.l10n.replayExample,
-                            onPressed: onReplay,
-                            icon: const Icon(LucideIcons.rotateCcw, size: 16),
+                        if (failed)
+                          Positioned(
+                            left: 8,
+                            right: 8,
+                            bottom: 4,
+                            child: Text(
+                              context.l10n.videoUnavailable,
+                              textAlign: TextAlign.center,
+                              style: const TextStyle(fontSize: 11),
+                            ),
                           ),
-                        ],
-                      ),
+                      ],
                     ),
                   ),
-              ],
+                  if (controls)
+                    SizedBox(
+                      height: controlHeight,
+                      child: ColoredBox(
+                        color: const Color(0xF2EEEEE8),
+                        child: Row(
+                          children: [
+                            IconButton(
+                              tooltip: video!.value.isPlaying
+                                  ? context.l10n.pauseExample
+                                  : context.l10n.playExample,
+                              onPressed: onTogglePlayback,
+                              icon: Icon(
+                                video!.value.isPlaying
+                                    ? LucideIcons.pause
+                                    : LucideIcons.play,
+                                size: 16,
+                              ),
+                            ),
+                            Expanded(
+                              child: Semantics(
+                                label: context.l10n.videoPosition,
+                                child: VideoProgressIndicator(
+                                  video!,
+                                  allowScrubbing: true,
+                                  colors: const VideoProgressColors(
+                                    playedColor: AppColors.accent,
+                                  ),
+                                ),
+                              ),
+                            ),
+                            IconButton(
+                              tooltip: context.l10n.replayExample,
+                              onPressed: onReplay,
+                              icon: const Icon(LucideIcons.rotateCcw, size: 16),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                ],
+              ),
             ),
           ),
-          if (ended && lesson.id != 'stacking')
-            Positioned(
-              left: 12,
-              top: 12,
-              child: Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 10,
-                  vertical: 6,
-                ),
-                decoration: BoxDecoration(
-                  color: const Color(0xE8FAFBF7),
-                  borderRadius: BorderRadius.circular(20),
-                ),
-                child: Text(
-                  context.l10n.fourInRowWin,
-                  style: const TextStyle(
-                    color: AppColors.accent,
-                    fontSize: 11,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-              ),
-            ),
-          if (failed)
-            Positioned(
-              left: 8,
-              right: 8,
-              bottom: 4,
-              child: Text(
-                context.l10n.videoUnavailable,
-                textAlign: TextAlign.center,
-                style: const TextStyle(fontSize: 11),
-              ),
-            ),
-        ],
-      ),
-    ),
+        ),
+      );
+    },
   );
 }
 

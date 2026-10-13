@@ -6,6 +6,8 @@ import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_scene/scene.dart' as fs;
 import 'package:four3/src/common/utils/build_context_extension.dart';
+import 'package:four3/src/feature/appearance/data/skin_image_cache.dart';
+import 'package:four3/src/feature/appearance/domain/model/skin_catalog.dart';
 import 'package:four3/src/feature/components/progress/app_circular_progress_indicator.dart';
 import 'package:four3/src/feature/game/model/game_models.dart';
 import 'package:four3/src/feature/game/model/game_view_data.dart';
@@ -19,6 +21,8 @@ class GameSceneView extends StatefulWidget {
   const new({
     required this.data,
     required this.settings,
+    required this.skin,
+    required this.imageCache,
     required this.onPlace,
     this.demo = false,
     super.key,
@@ -26,6 +30,8 @@ class GameSceneView extends StatefulWidget {
 
   final GameViewData data;
   final AppSettings settings;
+  final Skin skin;
+  final SkinImageCache imageCache;
   final void Function(int x, int y) onPlace;
   final bool demo;
 
@@ -34,7 +40,7 @@ class GameSceneView extends StatefulWidget {
 }
 
 class _GameSceneViewState extends State<GameSceneView> {
-  late final GameSceneController _controller = GameSceneController();
+  late final GameSceneController _controller;
   bool _ready = false;
   Object? _error;
   double _azimuth = 0;
@@ -60,13 +66,14 @@ class _GameSceneViewState extends State<GameSceneView> {
   @override
   void initState() {
     super.initState();
+    _controller = GameSceneController(imageCache: widget.imageCache);
     WidgetsBinding.instance.addTimingsCallback(_onTimings);
     _initialize();
   }
 
   Future<void> _initialize() async {
     try {
-      await _controller.initialize();
+      await _controller.initialize(widget.skin);
       _sync();
       if (mounted) setState(() => _ready = true);
     } on Exception catch (error, stackTrace) {
@@ -78,6 +85,9 @@ class _GameSceneViewState extends State<GameSceneView> {
   @override
   void didUpdateWidget(covariant GameSceneView oldWidget) {
     super.didUpdateWidget(oldWidget);
+    if (oldWidget.skin != widget.skin) {
+      unawaited(_controller.applySkin(widget.skin));
+    }
     _sync();
     if (!widget.settings.hints || !widget.data.canPlace) {
       _controller.hideGhost();
@@ -300,7 +310,7 @@ class _GameSceneViewState extends State<GameSceneView> {
   Widget build(BuildContext context) {
     if (_error != null) {
       return ColoredBox(
-        color: const Color(0xFFE8E5DF),
+        color: _skinColor(widget.skin.palette.room),
         child: Center(
           child: Padding(
             padding: const EdgeInsets.all(32),
@@ -313,9 +323,9 @@ class _GameSceneViewState extends State<GameSceneView> {
       );
     }
     if (!_ready) {
-      return const ColoredBox(
-        color: Color(0xFFE8E5DF),
-        child: Center(child: AppCircularProgressIndicator()),
+      return ColoredBox(
+        color: _skinColor(widget.skin.palette.room),
+        child: const Center(child: AppCircularProgressIndicator()),
       );
     }
     return LayoutBuilder(
@@ -361,6 +371,7 @@ class _GameSceneViewState extends State<GameSceneView> {
                       painter: _WinningLinesPainter(
                         snapshot: widget.data.displayedSnapshot,
                         layers: widget.data.layers,
+                        color: _skinColor(widget.skin.palette.accent),
                         camera: _camera,
                         devicePixelRatio: dpr,
                         repaint: _sceneRepaint,
@@ -386,10 +397,14 @@ class _GameSceneViewState extends State<GameSceneView> {
   }
 }
 
+Color _skinColor(String value) =>
+    Color(int.parse('ff${value.substring(1)}', radix: 16));
+
 final class _WinningLinesPainter extends CustomPainter {
   new({
     required this.snapshot,
     required this.layers,
+    required this.color,
     required this.camera,
     required this.devicePixelRatio,
     required Listenable repaint,
@@ -397,6 +412,7 @@ final class _WinningLinesPainter extends CustomPainter {
 
   final GameSnapshot snapshot;
   final List<int> layers;
+  final Color color;
   final fs.PerspectiveCamera Function() camera;
   final double devicePixelRatio;
 
@@ -404,7 +420,7 @@ final class _WinningLinesPainter extends CustomPainter {
   void paint(Canvas canvas, Size size) {
     final fs.PerspectiveCamera activeCamera = camera();
     final Paint paint = Paint()
-      ..color = const Color(0xFF2955E7).withValues(alpha: .83)
+      ..color = color.withValues(alpha: .83)
       ..strokeWidth = 4 / devicePixelRatio
       ..strokeCap = StrokeCap.round
       ..style = PaintingStyle.stroke;
@@ -428,5 +444,6 @@ final class _WinningLinesPainter extends CustomPainter {
   bool shouldRepaint(covariant _WinningLinesPainter oldDelegate) =>
       oldDelegate.snapshot != snapshot ||
       oldDelegate.layers != layers ||
+      oldDelegate.color != color ||
       oldDelegate.devicePixelRatio != devicePixelRatio;
 }

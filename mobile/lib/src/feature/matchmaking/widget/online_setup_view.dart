@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -267,7 +268,7 @@ class _QuickSearching extends StatelessWidget {
     padding: const EdgeInsets.fromLTRB(0, 12, 0, 2),
     child: Column(
       children: [
-        const Icon(LucideIcons.search, size: 32, color: Color(0xFF2955E7)),
+        const QuickSearchOrbitIcon(),
         const SizedBox(height: 14),
         Text(
           reconnecting
@@ -299,6 +300,68 @@ class _QuickSearching extends StatelessWidget {
       ],
     ),
   );
+}
+
+class QuickSearchOrbitIcon extends StatefulWidget {
+  const new({super.key});
+
+  @override
+  State<QuickSearchOrbitIcon> createState() => _QuickSearchOrbitIconState();
+}
+
+class _QuickSearchOrbitIconState extends State<QuickSearchOrbitIcon>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _orbit = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 1800),
+  );
+  bool _disabled = false;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final bool disabled =
+        MediaQuery.maybeOf(context)?.disableAnimations ?? false;
+    _disabled = disabled;
+    if (disabled) {
+      _orbit
+        ..stop()
+        ..value = 0;
+    } else if (!_orbit.isAnimating) {
+      _orbit.repeat();
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) => SizedBox.square(
+    dimension: 48,
+    child: Center(
+      child: AnimatedBuilder(
+        animation: _orbit,
+        builder: (context, child) {
+          final double angle = _orbit.value * math.pi * 2;
+          return Transform.translate(
+            key: const ValueKey('quick-search-orbit'),
+            offset: _disabled
+                ? Offset.zero
+                : Offset(math.cos(angle) * 6, math.sin(angle) * 6),
+            child: child,
+          );
+        },
+        child: const Icon(
+          LucideIcons.search,
+          size: 32,
+          color: Color(0xFF2955E7),
+        ),
+      ),
+    ),
+  );
+
+  @override
+  void dispose() {
+    _orbit.dispose();
+    super.dispose();
+  }
 }
 
 class _QuickFound extends StatelessWidget {

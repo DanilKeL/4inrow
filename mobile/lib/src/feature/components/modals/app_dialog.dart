@@ -53,91 +53,97 @@ Future<T?> showAppDialog<T>({
           final double inset = compact ? 10 : 24;
           final VoidCallback? onBack = onBackBuilder?.call(context);
           final String title = titleBuilder(context);
-          return Center(
-            child: Container(
-              width: double.infinity,
-              constraints: BoxConstraints(
-                maxWidth: shortLandscape
-                    ? 760
-                    : wide
-                    ? 800
-                    : 480,
-                maxHeight: constraints.maxHeight - inset * 2,
-              ),
-              margin: EdgeInsets.all(inset),
-              padding: EdgeInsets.fromLTRB(
-                compact ? 14 : 30,
-                compact ? 14 : 24,
-                compact ? 14 : 30,
-                (compact ? 14 : 30) + MediaQuery.viewInsetsOf(context).bottom,
-              ),
-              decoration: BoxDecoration(
-                color: const Color(0xFFFAFBF7),
-                borderRadius: BorderRadius.circular(18),
-                border: Border.all(color: const Color(0x80FFFFFF)),
-                boxShadow: const [
-                  BoxShadow(
-                    color: Color(0x26162311),
-                    blurRadius: 80,
-                    offset: Offset(0, 24),
-                  ),
-                ],
-              ),
-              child: Material(
-                color: Colors.transparent,
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Row(
-                      children: [
-                        AnimatedSize(
-                          duration: const Duration(milliseconds: 180),
-                          curve: Curves.easeOutCubic,
-                          child: onBack == null
-                              ? const SizedBox.shrink()
-                              : IconButton(
-                                  tooltip: MaterialLocalizations.of(context)
-                                      .backButtonTooltip,
-                                  onPressed: onBack,
-                                  icon: const Icon(
-                                    Icons.arrow_back_rounded,
-                                    size: 20,
-                                  ),
-                                ),
-                        ),
-                        Expanded(
-                          child: AnimatedSwitcher(
+          return PopScope(
+            canPop: onBack == null,
+            onPopInvokedWithResult: (didPop, _) {
+              if (!didPop) onBack?.call();
+            },
+            child: Center(
+              child: Container(
+                width: double.infinity,
+                constraints: BoxConstraints(
+                  maxWidth: shortLandscape
+                      ? 760
+                      : wide
+                      ? 800
+                      : 480,
+                  maxHeight: constraints.maxHeight - inset * 2,
+                ),
+                margin: EdgeInsets.all(inset),
+                padding: EdgeInsets.fromLTRB(
+                  compact ? 14 : 30,
+                  compact ? 14 : 24,
+                  compact ? 14 : 30,
+                  (compact ? 14 : 30) + MediaQuery.viewInsetsOf(context).bottom,
+                ),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFFAFBF7),
+                  borderRadius: BorderRadius.circular(18),
+                  border: Border.all(color: const Color(0x80FFFFFF)),
+                  boxShadow: const [
+                    BoxShadow(
+                      color: Color(0x26162311),
+                      blurRadius: 80,
+                      offset: Offset(0, 24),
+                    ),
+                  ],
+                ),
+                child: Material(
+                  color: Colors.transparent,
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Row(
+                        children: [
+                          AnimatedSize(
                             duration: const Duration(milliseconds: 180),
-                            switchInCurve: Curves.easeOutCubic,
-                            switchOutCurve: Curves.easeInCubic,
-                            child: Align(
-                              key: ValueKey<String>(title),
-                              alignment: Alignment.centerLeft,
-                              child: Text(
-                                title,
-                                style: context.textStyle.title.copyWith(
-                                  fontSize: compact ? 21 : 23,
-                                  letterSpacing: -.6,
+                            curve: Curves.easeOutCubic,
+                            child: onBack == null
+                                ? const SizedBox.shrink()
+                                : IconButton(
+                                    tooltip: MaterialLocalizations.of(context)
+                                        .backButtonTooltip,
+                                    onPressed: onBack,
+                                    icon: const Icon(
+                                      Icons.arrow_back_rounded,
+                                      size: 20,
+                                    ),
+                                  ),
+                          ),
+                          Expanded(
+                            child: AnimatedSwitcher(
+                              duration: const Duration(milliseconds: 180),
+                              switchInCurve: Curves.easeOutCubic,
+                              switchOutCurve: Curves.easeInCubic,
+                              child: Align(
+                                key: ValueKey<String>(title),
+                                alignment: Alignment.centerLeft,
+                                child: Text(
+                                  title,
+                                  style: context.textStyle.title.copyWith(
+                                    fontSize: compact ? 21 : 23,
+                                    letterSpacing: -.6,
+                                  ),
                                 ),
                               ),
                             ),
                           ),
-                        ),
-                        IconButton(
-                          tooltip: context.l10n.close,
-                          onPressed: () => Navigator.pop(context),
-                          icon: const Icon(Icons.close_rounded, size: 20),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 6),
-                    if (wide)
-                      Flexible(child: builder(context))
-                    else
-                      Flexible(
-                        child: SingleChildScrollView(child: builder(context)),
+                          IconButton(
+                            tooltip: context.l10n.close,
+                            onPressed: () => Navigator.pop(context),
+                            icon: const Icon(Icons.close_rounded, size: 20),
+                          ),
+                        ],
                       ),
-                  ],
+                      const SizedBox(height: 6),
+                      if (wide)
+                        Flexible(child: builder(context))
+                      else
+                        Flexible(
+                          child: SingleChildScrollView(child: builder(context)),
+                        ),
+                    ],
+                  ),
                 ),
               ),
             ),

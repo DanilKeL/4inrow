@@ -3,6 +3,8 @@ import 'package:four3/src/common/preferences/preferences_datasource_tool.dart';
 import 'package:four3/src/common/rest_client/rest_client.dart';
 import 'package:four3/src/common/services/analytics/analytics_service.dart';
 import 'package:four3/src/feature/account/domain/repository/account_repository.dart';
+import 'package:four3/src/feature/appearance/data/appearance_repository.dart';
+import 'package:four3/src/feature/appearance/data/skin_image_cache.dart';
 import 'package:four3/src/feature/audio/service/audio_service.dart';
 import 'package:four3/src/feature/daily/domain/repository/daily_repository.dart';
 import 'package:four3/src/feature/game/domain/repository/game_storage_repository.dart';
@@ -29,6 +31,8 @@ final class RootDependenciesContainer {
     required this.levelRepository,
     required this.deepLinkService,
     required this.accountRepository,
+    required this.appearanceRepository,
+    required this.skinImageCache,
     required this.onlineTransport,
     required this.matchHistoryRepository,
     required this.leaderboardRepository,
@@ -48,6 +52,8 @@ final class RootDependenciesContainer {
   final LevelRepository levelRepository;
   final DeepLinkService deepLinkService;
   final AccountRepository accountRepository;
+  final AppearanceRepository appearanceRepository;
+  final SkinImageCache skinImageCache;
   final OnlineTransport onlineTransport;
   final MatchHistoryRepository matchHistoryRepository;
   final LeaderboardRepository leaderboardRepository;
@@ -59,6 +65,8 @@ final class RootDependenciesContainer {
     await onlineTransport.dispose();
     await audioService.dispose();
     await analyticsService.dispose();
+    appearanceRepository.dispose();
+    skinImageCache.dispose();
     restClient.dispose();
   }
 }

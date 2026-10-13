@@ -66,7 +66,7 @@ void main() {
     expect(find.byIcon(Icons.arrow_back_rounded), findsOneWidget);
     expect(find.byIcon(Icons.close_rounded), findsOneWidget);
 
-    await tester.tap(find.byIcon(Icons.arrow_back_rounded));
+    await tester.binding.handlePopRoute();
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 140));
     final double transitionHeight = tester.getSize(transition).height;
@@ -82,6 +82,55 @@ void main() {
 
     await tester.tap(find.byIcon(Icons.close_rounded));
     await tester.pumpAndSettle();
+  });
+
+  testWidgets('backdrop dismiss does not tap the control below it', (
+    tester,
+  ) async {
+    var underlyingTaps = 0;
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: AppTheme.light,
+        locale: const Locale('en'),
+        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        supportedLocales: AppLocalizations.supportedLocales,
+        home: Builder(
+          builder: (context) => Scaffold(
+            body: Stack(
+              children: [
+                Positioned.fill(
+                  child: TextButton(
+                    onPressed: () => underlyingTaps++,
+                    child: const Text('Under dialog'),
+                  ),
+                ),
+                Center(
+                  child: FilledButton(
+                    onPressed: () => showAppDialog<void>(
+                      context: context,
+                      titleBuilder: (_) => 'Dialog',
+                      builder: (_) => const SizedBox(
+                        height: 80,
+                        child: Text('Dialog body'),
+                      ),
+                    ),
+                    child: const Text('Open dialog'),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+
+    await tester.tap(find.text('Open dialog'));
+    await tester.pumpAndSettle();
+    await tester.tapAt(const Offset(4, 4));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Dialog body'), findsNothing);
+    expect(underlyingTaps, 0);
   });
 }
 
