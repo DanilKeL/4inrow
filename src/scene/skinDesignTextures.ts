@@ -78,9 +78,238 @@ function branch(c: Painter, length: number, bend = 0) {
   }
 }
 
+function sakuraPetal(c: Painter, radius: number) {
+  c.beginPath();
+  c.moveTo(0, radius * 0.08);
+  c.bezierCurveTo(
+    -radius * 0.42,
+    -radius * 0.23,
+    -radius * 0.41,
+    -radius * 0.73,
+    -radius * 0.12,
+    -radius,
+  );
+  c.quadraticCurveTo(-radius * 0.04, -radius * 0.96, 0, -radius * 0.81);
+  c.quadraticCurveTo(radius * 0.04, -radius * 0.96, radius * 0.12, -radius);
+  c.bezierCurveTo(radius * 0.41, -radius * 0.73, radius * 0.42, -radius * 0.23, 0, radius * 0.08);
+  c.closePath();
+}
+
+function sakuraFlower(c: Painter, radius: number) {
+  c.save();
+  const opacity = c.globalAlpha;
+  c.lineJoin = 'round';
+  for (let petal = 0; petal < 5; petal++) {
+    c.save();
+    c.rotate((petal * Math.PI * 2) / 5);
+    sakuraPetal(c, radius);
+    c.fill();
+    c.strokeStyle = '#ffe5e1';
+    c.globalAlpha = opacity * 0.56;
+    c.lineWidth = Math.max(0.5, radius * 0.014);
+    c.stroke();
+    c.globalAlpha = opacity * 0.38;
+    c.lineWidth = Math.max(0.4, radius * 0.012);
+    c.beginPath();
+    c.moveTo(0, -radius * 0.2);
+    c.quadraticCurveTo(-radius * 0.065, -radius * 0.46, 0, -radius * 0.68);
+    c.stroke();
+    c.restore();
+  }
+  c.fillStyle = '#f3ddd4';
+  c.beginPath();
+  c.arc(0, 0, radius * 0.105, 0, Math.PI * 2);
+  c.fill();
+  c.fillStyle = '#fff4e8';
+  for (let i = 0; i < 5; i++) {
+    const a = (i * Math.PI * 2) / 5 - Math.PI / 2;
+    c.beginPath();
+    c.arc(Math.cos(a) * radius * 0.17, Math.sin(a) * radius * 0.17, radius * 0.025, 0, Math.PI * 2);
+    c.fill();
+  }
+  c.restore();
+}
+
+function kitsuneMask(c: Painter, radius: number) {
+  c.save();
+  c.lineJoin = c.lineCap = 'round';
+  c.beginPath();
+  c.moveTo(0, -radius * 0.61);
+  c.bezierCurveTo(
+    -radius * 0.21,
+    -radius * 0.65,
+    -radius * 0.35,
+    -radius * 0.56,
+    -radius * 0.45,
+    -radius * 0.5,
+  );
+  c.lineTo(-radius * 0.82, -radius * 0.98);
+  c.quadraticCurveTo(-radius * 0.98, -radius * 0.39, -radius * 0.88, -radius * 0.1);
+  c.bezierCurveTo(
+    -radius * 0.95,
+    radius * 0.22,
+    -radius * 0.67,
+    radius * 0.54,
+    -radius * 0.42,
+    radius * 0.67,
+  );
+  c.bezierCurveTo(-radius * 0.22, radius * 0.85, -radius * 0.15, radius * 0.87, 0, radius * 0.95);
+  c.bezierCurveTo(
+    radius * 0.15,
+    radius * 0.87,
+    radius * 0.22,
+    radius * 0.85,
+    radius * 0.42,
+    radius * 0.67,
+  );
+  c.bezierCurveTo(
+    radius * 0.67,
+    radius * 0.54,
+    radius * 0.95,
+    radius * 0.22,
+    radius * 0.88,
+    -radius * 0.1,
+  );
+  c.quadraticCurveTo(radius * 0.98, -radius * 0.39, radius * 0.82, -radius * 0.98);
+  c.lineTo(radius * 0.45, -radius * 0.5);
+  c.bezierCurveTo(radius * 0.35, -radius * 0.56, radius * 0.21, -radius * 0.65, 0, -radius * 0.61);
+  c.closePath();
+  c.fill();
+  c.strokeStyle = '#dce8f0';
+  c.lineWidth = radius * 0.025;
+  c.stroke();
+  for (const side of [-1, 1]) {
+    c.save();
+    c.scale(side, 1);
+    c.fillStyle = '#df7c85';
+    c.beginPath();
+    c.moveTo(radius * 0.56, -radius * 0.46);
+    c.lineTo(radius * 0.79, -radius * 0.78);
+    c.quadraticCurveTo(radius * 0.87, -radius * 0.38, radius * 0.76, -radius * 0.21);
+    c.closePath();
+    c.fill();
+    c.fillStyle = '#182843';
+    c.beginPath();
+    c.moveTo(radius * 0.13, -radius * 0.07);
+    c.quadraticCurveTo(radius * 0.43, -radius * 0.3, radius * 0.73, -radius * 0.12);
+    c.quadraticCurveTo(radius * 0.46, radius * 0.12, radius * 0.13, -radius * 0.07);
+    c.closePath();
+    c.fill();
+    c.strokeStyle = '#d87683';
+    c.lineWidth = radius * 0.045;
+    c.beginPath();
+    c.moveTo(radius * 0.2, -radius * 0.17);
+    c.quadraticCurveTo(radius * 0.47, -radius * 0.37, radius * 0.72, -radius * 0.25);
+    c.stroke();
+    c.lineWidth = radius * 0.052;
+    c.beginPath();
+    c.moveTo(radius * 0.49, radius * 0.22);
+    c.quadraticCurveTo(radius * 0.61, radius * 0.24, radius * 0.72, radius * 0.19);
+    c.moveTo(radius * 0.43, radius * 0.33);
+    c.quadraticCurveTo(radius * 0.54, radius * 0.38, radius * 0.64, radius * 0.34);
+    c.stroke();
+    c.strokeStyle = '#fff5e9';
+    c.globalAlpha *= 0.48;
+    c.lineWidth = radius * 0.018;
+    c.beginPath();
+    c.moveTo(radius * 0.27, radius * 0.08);
+    c.quadraticCurveTo(radius * 0.21, radius * 0.32, radius * 0.14, radius * 0.48);
+    c.stroke();
+    c.restore();
+  }
+  c.fillStyle = '#8fceda';
+  c.beginPath();
+  c.moveTo(0, -radius * 0.5);
+  c.lineTo(radius * 0.075, -radius * 0.33);
+  c.lineTo(0, -radius * 0.18);
+  c.lineTo(-radius * 0.075, -radius * 0.33);
+  c.closePath();
+  c.fill();
+  c.fillStyle = c.strokeStyle = '#182843';
+  c.beginPath();
+  c.moveTo(-radius * 0.13, radius * 0.48);
+  c.quadraticCurveTo(0, radius * 0.42, radius * 0.13, radius * 0.48);
+  c.quadraticCurveTo(radius * 0.075, radius * 0.6, 0, radius * 0.63);
+  c.quadraticCurveTo(-radius * 0.075, radius * 0.6, -radius * 0.13, radius * 0.48);
+  c.fill();
+  c.lineWidth = radius * 0.025;
+  c.beginPath();
+  c.moveTo(0, radius * 0.63);
+  c.lineTo(0, radius * 0.73);
+  c.moveTo(-radius * 0.11, radius * 0.74);
+  c.quadraticCurveTo(0, radius * 0.79, radius * 0.11, radius * 0.74);
+  c.stroke();
+  c.restore();
+}
+
+function lunarCrest(c: Painter, radius: number) {
+  c.save();
+  c.lineJoin = c.lineCap = 'round';
+  c.lineWidth = Math.max(0.8, radius * 0.02);
+  circle(c, 0, 0, radius * 0.93);
+  circle(c, 0, 0, radius * 0.87);
+  circle(c, 0, 0, radius * 0.55);
+  for (let i = 0; i < 16; i++) {
+    const a = (i * Math.PI) / 8;
+    c.beginPath();
+    c.moveTo(Math.cos(a) * radius * 0.8, Math.sin(a) * radius * 0.8);
+    c.lineTo(
+      Math.cos(a) * radius * (i % 4 ? 0.84 : 0.72),
+      Math.sin(a) * radius * (i % 4 ? 0.84 : 0.72),
+    );
+    c.stroke();
+  }
+  for (let i = 0; i < 4; i++) {
+    c.save();
+    c.rotate((i * Math.PI) / 2);
+    c.beginPath();
+    c.moveTo(0, -radius * 0.78);
+    c.lineTo(radius * 0.075, -radius * 0.67);
+    c.lineTo(0, -radius * 0.59);
+    c.lineTo(-radius * 0.075, -radius * 0.67);
+    c.closePath();
+    c.stroke();
+    c.restore();
+  }
+  c.beginPath();
+  c.moveTo(radius * 0.15, -radius * 0.43);
+  c.bezierCurveTo(
+    -radius * 0.56,
+    -radius * 0.53,
+    -radius * 0.65,
+    radius * 0.4,
+    -radius * 0.01,
+    radius * 0.47,
+  );
+  c.bezierCurveTo(
+    -radius * 0.26,
+    radius * 0.14,
+    -radius * 0.19,
+    -radius * 0.24,
+    radius * 0.15,
+    -radius * 0.43,
+  );
+  c.fill();
+  star(c, radius * 0.26, radius * 0.01, radius * 0.145);
+  star(c, radius * 0.2, radius * 0.29, radius * 0.035);
+  c.restore();
+}
+
 export function paintMotif(c: Painter, motif: Motif, size: number) {
   const r = size / 2;
   c.lineWidth = Math.max(1, size * 0.009);
+  if (motif === 'sakura') {
+    sakuraFlower(c, r * 0.96);
+    return;
+  }
+  if (motif === 'kitsune') {
+    kitsuneMask(c, r * 0.97);
+    return;
+  }
+  if (motif === 'crest') {
+    lunarCrest(c, r);
+    return;
+  }
   if (motif === 'heart') {
     c.save();
     c.beginPath();
@@ -387,6 +616,143 @@ function marble(c: Painter, w: number, h: number, scale: number) {
   c.globalAlpha = opacity;
 }
 
+function sakuraSprig(c: Painter, length: number) {
+  c.save();
+  const opacity = c.globalAlpha;
+  const limb = new Path2D();
+  limb.moveTo(0, 0);
+  limb.bezierCurveTo(
+    length * 0.25,
+    -length * 0.04,
+    length * 0.6,
+    -length * 0.04,
+    length,
+    -length * 0.14,
+  );
+  limb.moveTo(length * 0.24, -length * 0.025);
+  limb.quadraticCurveTo(length * 0.3, -length * 0.17, length * 0.43, -length * 0.23);
+  limb.moveTo(length * 0.5, -length * 0.045);
+  limb.quadraticCurveTo(length * 0.65, length * 0.1, length * 0.83, length * 0.11);
+  limb.moveTo(length * 0.68, -length * 0.075);
+  limb.quadraticCurveTo(length * 0.72, -length * 0.21, length * 0.79, -length * 0.29);
+  limb.moveTo(length * 0.86, -length * 0.1);
+  limb.quadraticCurveTo(length * 0.91, -length * 0.015, length * 0.99, length * 0.04);
+  c.strokeStyle = '#6eb6ca';
+  c.globalAlpha = opacity * 0.14;
+  c.lineWidth = length * 0.018;
+  c.stroke(limb);
+  c.strokeStyle = '#bfbdcd';
+  c.globalAlpha = opacity * 0.7;
+  c.lineWidth = Math.max(0.7, length * 0.0033);
+  c.stroke(limb);
+  const flowers = [
+    [0.43, -0.23, 0.059],
+    [0.36, -0.19, 0.033],
+    [0.79, -0.29, 0.052],
+    [0.73, -0.22, 0.034],
+    [0.83, 0.11, 0.062],
+    [0.74, 0.085, 0.035],
+    [0.99, 0.04, 0.046],
+    [1, -0.14, 0.039],
+  ];
+  for (const [index, [x, y, radius]] of flowers.entries()) {
+    c.save();
+    c.translate(x * length, y * length);
+    c.rotate(index * 1.17);
+    c.globalAlpha = opacity * (index % 3 ? 0.86 : 1);
+    c.fillStyle = index % 3 ? '#ef9b9e' : '#f0beb8';
+    sakuraFlower(c, radius * length);
+    c.restore();
+  }
+  c.restore();
+}
+
+/** Static lacquer decoration: a few flowing ribbons leave the playing cells readable. */
+function sakuraWaves(c: Painter, w: number, h: number, scale: number, surface: SurfaceName) {
+  c.save();
+  const s = Math.min(w, h);
+  const opacity = c.globalAlpha;
+  const ink = c.strokeStyle;
+  const body = surface.endsWith('Body');
+  c.lineJoin = c.lineCap = 'round';
+  const bands = Math.min(8, Math.max(3, Math.round((body ? 2.5 : 4.5) * scale)));
+  for (let band = 0; band < bands; band++) {
+    for (const offset of [0, 0.01, 0.023]) {
+      const y = (-0.16 + (band * 1.32) / (bands - 1) + offset) * h;
+      const path = new Path2D();
+      path.moveTo(-w * 0.08, y + h * 0.13);
+      path.bezierCurveTo(w * 0.14, y + h * 0.12, w * 0.25, y - h * 0.12, w * 0.46, y - h * 0.025);
+      path.bezierCurveTo(w * 0.67, y + h * 0.15, w * 0.86, y + h * 0.06, w * 1.08, y - h * 0.11);
+      c.strokeStyle = '#78b8d0';
+      c.globalAlpha = opacity * (body ? 0.055 : 0.07);
+      c.lineWidth = s * 0.008;
+      c.stroke(path);
+      c.strokeStyle = ink;
+      c.globalAlpha = opacity * (body ? 0.24 : offset === 0 ? 0.46 : 0.25);
+      c.lineWidth = Math.max(0.65, s * (offset === 0 ? 0.00115 : 0.0008));
+      c.stroke(path);
+    }
+  }
+  if (surface === 'board') {
+    c.globalAlpha = opacity * 0.92;
+    for (const [x, y, angle] of [
+      [-0.02, 0.175, -0.2],
+      [1.02, 0.825, Math.PI - 0.2],
+    ]) {
+      c.save();
+      c.translate(x * w, y * h);
+      c.rotate(angle);
+      sakuraSprig(c, (s * 0.39) / Math.sqrt(scale));
+      c.restore();
+    }
+  } else if (!body) {
+    c.save();
+    c.translate(w * 0.19, h * 0.78);
+    c.rotate(-0.36);
+    c.globalAlpha = opacity * 0.65;
+    sakuraSprig(c, (s * 0.55) / Math.sqrt(scale));
+    c.restore();
+  }
+  const petals = body
+    ? [
+        [0.16, 0.32],
+        [0.51, 0.68],
+        [0.85, 0.29],
+      ]
+    : [
+        [0.17, 0.4],
+        [0.1, 0.69],
+        [0.42, 0.11],
+        [0.68, 0.075],
+        [0.9, 0.37],
+        [0.87, 0.59],
+        [0.56, 0.87],
+        [0.31, 0.94],
+      ];
+  for (const [index, [x, y]] of petals.entries()) {
+    c.save();
+    c.translate(x * w, y * h);
+    c.rotate(index * 1.31 + 0.4);
+    c.scale(0.7, 1);
+    c.fillStyle = index % 3 ? '#ed939f' : '#d8cbd7';
+    c.globalAlpha = opacity * (body ? 0.3 : 0.57);
+    sakuraPetal(c, (s * (index % 2 ? 0.012 : 0.016)) / Math.sqrt(scale));
+    c.fill();
+    c.restore();
+  }
+  if (!body) {
+    const rng = random(6837);
+    c.fillStyle = '#c5e2ec';
+    c.globalAlpha = opacity * 0.4;
+    for (let i = 0; i < 18; i++) {
+      const x = rng() * w;
+      const y = rng() * h;
+      star(c, x, y, s * (i % 6 ? 0.0009 : 0.0025));
+    }
+  }
+  c.restore();
+}
+
 export function layerPositions(layer: DesignLayer, width: number, height: number) {
   const size = Math.min(width, height) * layer.size;
   if (layer.placement === 'single')
@@ -480,6 +846,8 @@ export function makeSurfaceTexture(
   if (design.pattern === 'guilloche') guilloche(c, width, height, design.patternScale);
   if (design.pattern === 'marble') marble(c, width, height, design.patternScale);
   if (design.pattern === 'gingham') gingham(c, width, height, design.patternScale);
+  if (design.pattern === 'sakura-waves')
+    sakuraWaves(c, width, height, design.patternScale, surface);
   c.restore();
   if (design.border) {
     c.strokeStyle = c.fillStyle = design.ink;

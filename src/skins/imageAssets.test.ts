@@ -106,3 +106,18 @@ it('publishes newly decoded images after offline recovery without remounting and
   await loadSkinImage('b'.repeat(64));
   expect(ready).toHaveBeenCalledTimes(1);
 });
+
+it('loads stock anime artwork from its shipped immutable path and recovers it offline', async () => {
+  const { ANIME_HEROINE_IMAGE_ID } = await import('./builtinAssets');
+  const { skinImageUrl, loadSkinImage } = await import('./imageAssets');
+  const url = skinImageUrl(ANIME_HEROINE_IMAGE_ID);
+  expect(url).toMatch(/^\/skins\/moonlit-sakura-[a-f0-9]{12}\.webp$/);
+  await loadSkinImage(ANIME_HEROINE_IMAGE_ID);
+  expect(fetchMock.mock.calls[0][0]).toBe(url);
+  await vi.waitFor(() => expect(disk.has(url)).toBe(true));
+  vi.resetModules();
+  fetchMock.mockRejectedValue(new Error('offline'));
+  const restored = await import('./imageAssets');
+  await expect(restored.loadSkinImage(ANIME_HEROINE_IMAGE_ID)).resolves.toBeDefined();
+  expect(fetchMock).toHaveBeenCalledTimes(1);
+});

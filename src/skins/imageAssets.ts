@@ -1,3 +1,5 @@
+import { builtinSkinImageUrl } from './builtinAssets';
+
 const ASSET_CACHE = 'four-skin-assets-v1';
 const MAX_BYTES = 512 * 1024;
 const MAX_CACHED_IMAGES = 128;
@@ -16,7 +18,7 @@ export function subscribeSkinImages(listener: ImageListener) {
 
 export function skinImageUrl(id: string) {
   if (!/^[a-f0-9]{64}$/.test(id)) throw new Error('Некорректное изображение стиля');
-  return `/appearance/assets/${id}`;
+  return builtinSkinImageUrl(id) ?? `/appearance/assets/${id}`;
 }
 
 export function getLoadedSkinImage(id: string): HTMLImageElement | undefined {

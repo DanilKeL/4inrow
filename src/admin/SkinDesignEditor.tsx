@@ -1,3 +1,4 @@
+import { skinImageUrl } from '../skins/imageAssets';
 import { useId, useRef, useState } from 'react';
 import { ArrowDown, ArrowUp, Copy, ImagePlus, LoaderCircle, Plus, Trash2 } from 'lucide-react';
 import {
@@ -35,6 +36,7 @@ const patternNames: Record<Pattern, string> = {
   guilloche: 'Гильоше',
   marble: 'Мрамор',
   gingham: 'Клеточка',
+  'sakura-waves': 'Сакура и волны',
 };
 const motifNames: Record<Motif, string> = {
   moon: 'Луна',
@@ -47,6 +49,9 @@ const motifNames: Record<Motif, string> = {
   heart: 'Сердечко',
   bow: 'Бантик',
   blossom: 'Цветок',
+  sakura: 'Сакура',
+  kitsune: 'Маска кицунэ',
+  crest: 'Лунная печать',
 };
 const layerName = (layer: DesignLayer) =>
   layer.kind === 'motif' ? motifNames[layer.motif] : 'Изображение';
@@ -367,7 +372,7 @@ export default function SkinDesignEditor({
                   disabled={part.layers.length >= 12}
                   onClick={() => appendImage(id)}
                 >
-                  <img src={`/appearance/assets/${id}`} alt="" />
+                  <img src={skinImageUrl(id)} alt="" />
                 </button>
               ))}
             </div>
@@ -390,7 +395,7 @@ export default function SkinDesignEditor({
                   onClick={() => setSelectedId(layer.id)}
                 >
                   {layer.kind === 'image' ? (
-                    <img src={`/appearance/assets/${layer.imageId}`} alt="" />
+                    <img src={skinImageUrl(layer.imageId)} alt="" />
                   ) : (
                     <span className={styles.motifBadge} style={{ color: layer.color }}>
                       {layer.kind === 'motif' &&
@@ -405,6 +410,9 @@ export default function SkinDesignEditor({
                           heart: '♥',
                           bow: '⋈',
                           blossom: '✿',
+                          sakura: '✿',
+                          kitsune: '◇',
+                          crest: '☽',
                         }[layer.motif]}
                     </span>
                   )}
